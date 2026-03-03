@@ -9,35 +9,45 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-/* HEALTH CHECK */
+/*
+==============================
+  HEALTH CHECK
+==============================
+*/
 app.get("/", (req, res) => {
-  res.send("Kiddost AI is running 🚀");
+  res.send("Kiddost AI running 🚀");
 });
 
-/* WEBHOOK */
+/*
+==============================
+  BOTSPACE WEBHOOK
+==============================
+*/
 app.post("/webhook", async (req, res) => {
   try {
     console.log("==== NEW MESSAGE ====");
-    console.log("BotSpace Key Length:", process.env.BOTSPACE_API_KEY?.length);
-
-    console.log("Full incoming body:");
     console.log(JSON.stringify(req.body, null, 2));
 
+    // Extract message
     const message = req.body?.payload?.payload?.text;
     const countryCode = req.body?.phone?.countryCode;
     const phone = req.body?.phone?.phone;
 
-    const from = `${countryCode}${phone}`;
-
-    console.log("Extracted message:", message);
-    console.log("From:", from);
-
-    if (!message) {
-      return res.status(200).send("No text message");
+    if (!message || !countryCode || !phone) {
+      return res.status(200).send("No valid message");
     }
 
-    /* OPENAI */
-    const openaiResponse = await axios.post(
+    const from = `${countryCode}${phone}`;
+
+    console.log("User said:", message);
+    console.log("From:", from);
+
+    /*
+    ==============================
+      CALL OPENAI
+    ==============================
+    */
+    const openaiRes = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4o-mini",
@@ -45,9 +55,12 @@ app.post("/webhook", async (req, res) => {
           {
             role: "system",
             content:
-              "You are Kiddost AI assistant. Be friendly, clear and concise."
+              "You are Kiddost AI assistant. Be friendly, clear and helpful."
           },
-          { role: "user", content: message }
+          {
+            role: "user",
+            content: message
+          }
         ]
       },
       {
@@ -58,13 +71,17 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    const aiReply = openaiResponse.data.choices[0].message.content;
+    const aiReply = openaiRes.data.choices[0].message.content;
 
     console.log("AI Reply:", aiReply);
 
-    /* SEND BACK TO BOTSPACE */
-    const botspaceResponse = await axios.post(
-      "https://public-api.bot.space/v1/channel/69a01f1323c371226c2c3cea/message/send-session-message",
+    /*
+    ==============================
+      SEND BACK TO BOTSPACE
+    ==============================
+    */
+    const botspaceRes = await axios.post(
+      "https://public-api.bot.space/v1/channel/69a6fb50136d322a1f67dbd5/message/send-session-message",
       {
         phone: from,
         message: {
@@ -80,17 +97,21 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    console.log("BotSpace Response:", botspaceResponse.data);
+    console.log("BotSpace Response:", botspaceRes.data);
 
     res.status(200).send("OK");
   } catch (error) {
-    console.error("=== BOTSPACE ERROR ===");
+    console.error("=== ERROR ===");
     console.error(error.response?.data || error.message);
-    res.status(200).send("Error handled");
+    res.status(200).send("Handled");
   }
 });
 
-/* START SERVER */
+/*
+==============================
+  START SERVER
+==============================
+*/
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
