@@ -3,24 +3,24 @@ import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
-
 const app = express();
 app.use(express.json());
 
 app.post("/webhook", async (req, res) => {
   try {
-    const message = req.body.message?.text;
-    const from = req.body.message?.from;
+    const { message, from } = req.body;
 
     if (!message) return res.sendStatus(200);
 
-    // Send to OpenAI
+    console.log("Incoming message:", message);
+
+    // Call OpenAI
     const aiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are KidDost AI. Answer clearly and helpfully." },
+          { role: "system", content: "You are KidDost AI assistant. Be helpful, friendly and clear." },
           { role: "user", content: message }
         ]
       },
@@ -34,16 +34,9 @@ app.post("/webhook", async (req, res) => {
 
     const reply = aiResponse.data.choices[0].message.content;
 
-    // Send reply back via AiSensy API
-    await axios.post(
-      "https://backend.aisensy.com/campaign/t1/api/v2",
-      {
-        apiKey: process.env.AISENSY_API_KEY,
-        campaignName: "custom",
-        destination: from,
-        userName: "User",
-        templateParams: [reply]
-      }
+    // Send reply back using TextMeBot
+    await axios.get(
+      `http://api.textmebot.com/send.php?recipient=${from}&apikey=${process.env.TEXTMEBOT_KEY}&text=${encodeURIComponent(reply)}`
     );
 
     res.sendStatus(200);
@@ -53,6 +46,4 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
-});
+app.listen(3000, () => console.log("Server running on port 3000"));
