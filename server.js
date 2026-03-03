@@ -83,11 +83,9 @@ app.post("/webhook", async (req, res) => {
     const botspaceRes = await axios.post(
       "https://public-api.bot.space/v1/69a6fb50136d322a1f67dbd5/message/send-session-message",
       {
-        phone: from,
-        message: {
-          type: "text",
-          text: aiReply
-        }
+        to: from,
+        type: "text",
+        text: aiReply
       },
       {
         headers: {
