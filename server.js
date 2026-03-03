@@ -13,9 +13,9 @@ const BOTSPACE_API_KEY = process.env.BOTSPACE_API_KEY;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Health route
+// Health check
 app.get("/", (req, res) => {
-  res.send("Server running 🚀");
+  res.send("Kiddost AI running 🚀");
 });
 
 app.post("/webhook", async (req, res) => {
@@ -23,10 +23,10 @@ app.post("/webhook", async (req, res) => {
     console.log("Full incoming body:");
     console.log(JSON.stringify(req.body, null, 2));
 
-    // 🔥 Flattened extraction
-    const message = req.body?.message;
-    const countryCode = req.body?.countryCode;
-    const phone = req.body?.phone;
+    // ===== Extract from BotSpace ORIGINAL webhook format =====
+    const message = req.body?.payload?.payload?.text;
+    const countryCode = req.body?.phone?.countryCode;
+    const phone = req.body?.phone?.phone;
 
     if (!message || !countryCode || !phone) {
       console.log("Missing required fields");
@@ -38,13 +38,13 @@ app.post("/webhook", async (req, res) => {
     console.log("Extracted message:", message);
     console.log("From:", fullPhone);
 
-    // ===== CALL OPENAI =====
+    // ===== Call OpenAI =====
     const aiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "You are a helpful assistant." },
+          { role: "system", content: "You are a helpful assistant for Kiddost. Be friendly and concise." },
           { role: "user", content: message }
         ]
       },
@@ -60,7 +60,7 @@ app.post("/webhook", async (req, res) => {
 
     console.log("AI Reply:", aiReply);
 
-    // ===== SEND BACK TO BOTSPACE =====
+    // ===== Send reply via BotSpace =====
     await axios.post(
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
       {
