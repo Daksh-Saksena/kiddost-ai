@@ -13,20 +13,20 @@ const BOTSPACE_API_KEY = process.env.BOTSPACE_API_KEY;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// Health route
+app.get("/", (req, res) => {
+  res.send("Server running 🚀");
+});
+
 app.post("/webhook", async (req, res) => {
   try {
     console.log("Full incoming body:");
     console.log(JSON.stringify(req.body, null, 2));
 
-    // Extract message from BotSpace webhook structure
-    const message =
-      req.body?.payload?.payload?.text || null;
-
-    const countryCode =
-      req.body?.phone?.countryCode || null;
-
-    const phone =
-      req.body?.phone?.phone || null;
+    // 🔥 Flattened extraction
+    const message = req.body?.message;
+    const countryCode = req.body?.countryCode;
+    const phone = req.body?.phone;
 
     if (!message || !countryCode || !phone) {
       console.log("Missing required fields");
@@ -38,7 +38,7 @@ app.post("/webhook", async (req, res) => {
     console.log("Extracted message:", message);
     console.log("From:", fullPhone);
 
-    // ---- Call OpenAI ----
+    // ===== CALL OPENAI =====
     const aiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -56,12 +56,11 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    const aiReply =
-      aiResponse.data.choices[0].message.content;
+    const aiReply = aiResponse.data.choices[0].message.content;
 
     console.log("AI Reply:", aiReply);
 
-    // ---- Send reply to BotSpace ----
+    // ===== SEND BACK TO BOTSPACE =====
     await axios.post(
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
       {
@@ -85,15 +84,9 @@ app.post("/webhook", async (req, res) => {
 
   } catch (error) {
     console.log("=== BOTSPACE ERROR ===");
-    console.log(
-      error.response?.data || error.message
-    );
+    console.log(error.response?.data || error.message);
     res.status(200).json({ error: true });
   }
-});
-
-app.get("/", (req, res) => {
-  res.send("Server is running");
 });
 
 app.listen(PORT, () => {
