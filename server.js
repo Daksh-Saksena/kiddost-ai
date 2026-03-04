@@ -57,14 +57,14 @@ app.post("/webhook", async (req, res) => {
       .from("messages")
       .select("role, content")
       .eq("phone", fullPhone)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(10);
 
     if (error) {
       console.log("Supabase fetch error:", error);
     }
 
-    const history = Array.isArray(data) ? data : [];
+    const history = Array.isArray(data) ? data.reverse() : [];
     // OpenAI response
     const aiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
