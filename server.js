@@ -138,7 +138,53 @@ app.post("/webhook", async (req, res) => {
     res.status(200).json({ error: true });
   }
 });
+app.post("/agent-send", async (req, res) => {
+  try {
 
+    const { phone, message } = req.body;
+
+    console.log("Agent message:", phone, message);
+
+    // Save message to database
+    await supabase.from("messages").insert({
+      phone: phone,
+      role: "assistant",
+      content: message,
+      sender: "agent"
+    });
+
+    // Pause AI for this conversation
+    await supabase
+      .from("conversations")
+      .update({ ai_paused: true })
+      .eq("phone", phone);
+
+    // Send WhatsApp message through BotSpace
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+      {
+        phone: phone,
+        text: message
+      },
+      {
+        params: {
+          apiKey: BOTSPACE_API_KEY
+        }
+      }
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+
+    console.log("Agent send error:", err.response?.data || err.message);
+
+    res.status(500).json({
+      error: true
+    });
+
+  }
+});
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
