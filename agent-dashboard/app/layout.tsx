@@ -1,13 +1,12 @@
+import './globals.css';
+import './mobile-styles.css';
+
 export const metadata = {
   title: "Kiddost Support",
-  description: "Agent messaging dashboard"
+  description: "Agent messaging dashboard",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>

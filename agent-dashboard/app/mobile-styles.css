@@ -1,0 +1,11 @@
+/* Mobile website styles (trimmed) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #__next {
+  height: 100%;
+}
+
+/* Small tweaks to match Mobile website layout */
+.max-w-md { max-width: 420px; }
