@@ -4,36 +4,47 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function Home() {
-
-  const [conversations, setConversations] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [text, setText] = useState("");
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  async function loadConversations() {
-    const { data } = await supabase
-      .from("conversations")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    setConversations(data || []);
-  }
-
-  async function loadMessages(phone: string) {
-    setSelectedPhone(phone);
-
+  async function loadMessages() {
     const { data } = await supabase
       .from("messages")
       .select("*")
-      .eq("phone", phone)
       .order("created_at", { ascending: true });
 
     setMessages(data || []);
   }
+
+  useEffect(() => {
+    loadMessages();
+
+    const channel = supabase
+      .channel("messages-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const conversations = [
+    ...new Set(messages.map((m) => m.phone)),
+  ];
+
+  const filtered = messages.filter((m) => m.phone === selectedPhone);
 
   async function sendMessage() {
     if (!text || !selectedPhone) return;
@@ -41,158 +52,137 @@ export default function Home() {
     await fetch("https://kiddost-ai.onrender.com/agent-send", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         phone: selectedPhone,
-        message: text
-      })
+        text,
+      }),
     });
 
     setText("");
-
-    // reload messages after sending
-    loadMessages(selectedPhone);
   }
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "Arial" }}>
+      
+      {/* LEFT SIDEBAR */}
+      <div
+        style={{
+          width: "300px",
+          borderRight: "1px solid #ddd",
+          overflowY: "auto",
+        }}
+      >
+        <h3 style={{ padding: "15px" }}>Chats</h3>
 
-      {/* LEFT PANEL */}
-      <div style={{
-        width: "300px",
-        borderRight: "1px solid #ddd",
-        padding: "20px",
-        overflowY: "auto"
-      }}>
-
-        <h2>Chats</h2>
-
-        {conversations.map((c) => (
+        {conversations.map((phone) => (
           <div
-            key={c.phone}
-            onClick={() => loadMessages(c.phone)}
+            key={phone}
+            onClick={() => setSelectedPhone(phone)}
             style={{
               padding: "12px",
+              cursor: "pointer",
+              background:
+                selectedPhone === phone ? "#f0f0f0" : "white",
               borderBottom: "1px solid #eee",
-              cursor: "pointer"
             }}
           >
-            {c.phone}
+            {phone}
           </div>
         ))}
-
       </div>
 
+      {/* CHAT AREA */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        
+        {/* HEADER */}
+        <div
+          style={{
+            padding: "15px",
+            borderBottom: "1px solid #ddd",
+            fontWeight: "bold",
+          }}
+        >
+          {selectedPhone || "Select a chat"}
+        </div>
 
-      {/* RIGHT PANEL */}
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column"
-      }}>
-
-        {!selectedPhone && (
-          <div style={{ padding: "20px" }}>
-            Select a conversation
-          </div>
-        )}
-
-        {selectedPhone && (
-          <>
-            {/* HEADER */}
-            <div style={{
-              padding: "15px",
-              borderBottom: "1px solid #ddd",
-              fontWeight: "bold"
-            }}>
-              {selectedPhone}
-            </div>
-
-
-            {/* MESSAGE AREA */}
-            <div style={{
-              flex: 1,
-              padding: "20px",
-              overflowY: "auto",
-              background: "#f5f5f5"
-            }}>
-
-              {messages.map((m) => (
-
-                <div
-                  key={m.id}
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      m.sender === "agent" || m.sender === "ai"
-                        ? "flex-end"
-                        : "flex-start",
-                    marginBottom: "10px"
-                  }}
-                >
-
-                  <div style={{
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    background:
-                      m.sender === "agent" || m.sender === "ai"
-                        ? "#dcf8c6"
-                        : "#ffffff",
-                    maxWidth: "60%",
-                    color: "black"
-                  }}>
-                    {m.content}
-                  </div>
-
-                </div>
-
-              ))}
-
-            </div>
-
-
-            {/* INPUT AREA */}
-            <div style={{
-              padding: "15px",
-              borderTop: "1px solid #ddd",
-              display: "flex"
-            }}>
-
-              <input
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Type a message..."
+        {/* MESSAGES */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "20px",
+            background: "#f5f5f5",
+          }}
+        >
+          {filtered.map((msg) => (
+            <div
+              key={msg.id}
+              style={{
+                marginBottom: "10px",
+                display: "flex",
+                justifyContent:
+                  msg.sender === "agent"
+                    ? "flex-end"
+                    : "flex-start",
+              }}
+            >
+              <div
                 style={{
-                  flex: 1,
-                  padding: "10px",
-                  border: "1px solid #ccc",
-                  borderRadius: "6px"
-                }}
-              />
-
-              <button
-                onClick={sendMessage}
-                style={{
-                  marginLeft: "10px",
-                  padding: "10px 20px",
-                  background: "#25D366",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer"
+                  padding: "10px 15px",
+                  borderRadius: "12px",
+                  background:
+                    msg.sender === "agent"
+                      ? "#dcf8c6"
+                      : "white",
+                  maxWidth: "60%",
                 }}
               >
-                Send
-              </button>
-
+                {msg.text}
+              </div>
             </div>
+          ))}
+        </div>
 
-          </>
+        {/* INPUT */}
+        {selectedPhone && (
+          <div
+            style={{
+              display: "flex",
+              borderTop: "1px solid #ddd",
+              padding: "10px",
+            }}
+          >
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type message..."
+              style={{
+                flex: 1,
+                padding: "10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
+            />
+
+            <button
+              onClick={sendMessage}
+              style={{
+                marginLeft: "10px",
+                padding: "10px 15px",
+                background: "#25D366",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Send
+            </button>
+          </div>
         )}
-
       </div>
-
     </div>
   );
 }
