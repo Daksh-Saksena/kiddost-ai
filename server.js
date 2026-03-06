@@ -21,6 +21,105 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+// In-memory buffering to combine fragmented user messages per phone
+const messageBuffers = {};
+const messageTimers = {};
+
+// Helper: generate AI response for a combined user message
+async function handleAIResponse(fullPhone, combinedMessage) {
+  try {
+    // Fetch last 10 messages for conversation memory
+    const { data, error } = await supabase
+      .from("messages")
+      .select("role, content")
+      .eq("phone", fullPhone)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.log("Supabase fetch error:", error);
+    }
+
+    const history = Array.isArray(data) ? data.reverse() : [];
+
+    // Before generating AI response, check most recent message's ai_enabled flag
+    const { data: last, error: lastErr } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("phone", fullPhone)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastErr) console.log("Supabase fetch error:", lastErr);
+
+    if (last && last.ai_enabled === false) {
+      console.log("AI disabled for this conversation (buffered)");
+      return;
+    }
+
+    // Ensure the AI sees the combined version of the recent user input
+    const messagesForAI = [
+      {
+        role: "system",
+        content:
+          "You are a friendly WhatsApp assistant for Kiddost. Help parents understand programs, classes, and enrollment."
+      },
+      ...history,
+      { role: "user", content: combinedMessage }
+    ];
+
+    const aiResponse = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: messagesForAI
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const aiReply = aiResponse.data.choices[0].message.content;
+    console.log("AI Reply (buffered):", aiReply);
+
+    // Save AI reply (AI agent = null, ai_enabled = true)
+    await supabase.from("messages").insert({
+      phone: fullPhone,
+      role: "assistant",
+      content: aiReply,
+      sender: "ai",
+      agent: null,
+      ai_enabled: true
+    });
+
+    // Send message back via BotSpace
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+      {
+        name: "User",
+        phone: fullPhone,
+        text: aiReply
+      },
+      {
+        params: {
+          apiKey: BOTSPACE_API_KEY
+        },
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    console.log("Buffered message sent successfully");
+  } catch (err) {
+    console.error("handleAIResponse error", err.response?.data || err.message || err);
+  }
+}
+
 // Health check
 app.get("/", (req, res) => {
   res.send("Kiddost AI running 🚀");
@@ -114,62 +213,32 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ success: true, ai_skipped: true });
     }
 
-    const aiResponse = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a friendly WhatsApp assistant for Kiddost. Help parents understand programs, classes, and enrollment."
-          },
-          ...history
-        ]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json"
+    // Buffer this message for a short delay so fragmented messages are combined
+    // into a single prompt for the AI. This helps avoid message fragmentation.
+    if (!messageBuffers[fullPhone]) messageBuffers[fullPhone] = [];
+    messageBuffers[fullPhone].push(message);
+
+    // clear previous timer if any
+    if (messageTimers[fullPhone]) {
+      clearTimeout(messageTimers[fullPhone]);
+    }
+
+    // wait 10 seconds (user requested 10s buffer) before sending combined text to AI
+    messageTimers[fullPhone] = setTimeout(async () => {
+      const combined = (messageBuffers[fullPhone] || []).join(" ").trim();
+      // reset buffer
+      messageBuffers[fullPhone] = [];
+      try {
+        if (combined) {
+          await handleAIResponse(fullPhone, combined);
         }
+      } catch (e) {
+        console.error('buffered AI handler error', e?.message || e);
       }
-    );
+    }, 10000);
 
-    const aiReply = aiResponse.data.choices[0].message.content;
-
-    console.log("AI Reply:", aiReply);
-
-    // Save AI reply (AI agent = null, ai_enabled = true)
-    await supabase.from("messages").insert({
-      phone: fullPhone,
-      role: "assistant",
-      content: aiReply,
-      sender: "ai",
-      agent: null,
-      ai_enabled: true
-    });
-
-    // Send message back via BotSpace
-    await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-      {
-        name: "User",
-        phone: fullPhone,
-        text: aiReply
-      },
-      {
-        params: {
-          apiKey: BOTSPACE_API_KEY
-        },
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    console.log("Message sent successfully");
-
-    res.status(200).json({ success: true });
+    // respond quickly to webhook sender
+    return res.status(200).json({ success: true, buffered: true });
 
   } catch (error) {
     console.log("=== ERROR ===");

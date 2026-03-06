@@ -45,9 +45,23 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const name = chatName || "Unknown";
   const avatar = chatAvatar || avatarDataUrl(name);
 
-  const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
-  const aiEnabled = lastMessage && typeof lastMessage.ai_enabled !== 'undefined' ? !!lastMessage.ai_enabled : true;
-  const handler = lastMessage && lastMessage.agent ? lastMessage.agent : (aiEnabled ? 'AI 🤖' : 'Agent');
+  const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
+    const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+    return lm && typeof lm.ai_enabled !== 'undefined' ? !!lm.ai_enabled : true;
+  });
+  const [handlerLocal, setHandlerLocal] = useState<string>(() => {
+    const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+    return lm && lm.agent ? lm.agent : (lm && lm.ai_enabled === false ? 'Agent' : 'AI 🤖');
+  });
+
+  // sync local handler/ai state when messages prop updates
+  React.useEffect(() => {
+    const lastNonSystem = [...messages].reverse().find((m) => m.sender !== 'system') || null;
+    if (lastNonSystem) {
+      setAiEnabledLocal(typeof lastNonSystem.ai_enabled !== 'undefined' ? !!lastNonSystem.ai_enabled : true);
+      setHandlerLocal(lastNonSystem.agent ? lastNonSystem.agent : (lastNonSystem.ai_enabled === false ? 'Agent' : 'AI 🤖'));
+    }
+  }, [messages]);
 
   const toggleAi = async (enable: boolean) => {
     try {
@@ -57,16 +71,9 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
       });
       if (res.ok) {
-        // optimistic update: append a system message reflecting new state
-        const sysMsg: Message = {
-          id: `sys-${Date.now()}`,
-          text: enable ? 'Resume AI' : 'Stop AI',
-          sender: 'system',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          agent: null,
-          ai_enabled: enable,
-        };
-        setMessages((prev) => [...prev, sysMsg]);
+        // optimistic local update (do not insert visible system message)
+        setAiEnabledLocal(!!enable);
+        setHandlerLocal(enable ? 'AI 🤖' : 'Agent');
       }
     } catch (err) {
       console.error("toggleAi error", err);
@@ -96,8 +103,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
           <h2 className="font-medium">{name}</h2>
           <p className={`text-xs ${isDarkMode ? "text-white" : "text-gray-200"}`}>Online</p>
           <div className="text-xs mt-1 flex items-center gap-2">
-            <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>Handled by:</strong> {handler}</span>
-            {handler === 'AI 🤖' ? (
+            <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>Handled by:</strong> {handlerLocal}</span>
+            {handlerLocal === 'AI 🤖' ? (
               <button onClick={() => toggleAi(false)} className="ml-2 px-2 py-1 text-xs rounded bg-red-600 text-white">Stop AI</button>
             ) : (
               <button onClick={() => toggleAi(true)} className="ml-2 px-2 py-1 text-xs rounded bg-green-600 text-white">Resume AI</button>
@@ -110,17 +117,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
-        {messages.map((message) => {
-          if (message.sender === 'system') {
-            return (
-              <div key={message.id} className="flex justify-center">
-                <div className={`px-2 py-1 rounded-md text-xs ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-700'}`} style={{ maxWidth: 320 }}>
-                        {message.text}
-                      </div>
-              </div>
-            );
-          }
-
+        {messages.filter(m => m.sender !== 'system').map((message) => {
           const isMe = message.sender === 'me';
           return (
             <div key={message.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
