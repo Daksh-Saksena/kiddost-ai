@@ -62,7 +62,7 @@ export default function AppClient() {
     await fetch("https://kiddost-ai.onrender.com/agent-send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: selectedChat, text }),
+      body: JSON.stringify({ phone: selectedChat, message: text, agent: 'Daksh' }),
     });
   };
 
