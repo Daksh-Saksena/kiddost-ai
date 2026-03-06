@@ -356,9 +356,8 @@ app.post("/agent-send-media", async (req, res) => {
       name: "Agent",
       text: caption || ' ',
       type: 'image',
-      media: {
-        url: mediaUrl
-      }
+      mediaUrl: mediaUrl,
+      caption: caption || ''
     }
 
     console.log('BOTSPACE PAYLOAD', botPayload)
@@ -373,11 +372,14 @@ app.post("/agent-send-media", async (req, res) => {
       }
     )
 
+    console.log('BOTSPACE RESPONSE', response.data)
+
     await supabase.from("messages").insert({
       phone: phone,
       sender: "agent",
       text: caption || "",
-      media_url: mediaUrl
+      media_url: mediaUrl,
+      whatsapp_id: response?.data?.messageId || response?.data?.id || response?.data?.message_id || null
     })
 
     res.json({ success: true })
