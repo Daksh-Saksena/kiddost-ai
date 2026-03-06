@@ -7,7 +7,7 @@ import { ArrowLeft, Send, MoreVertical, Check, CheckCheck } from "lucide-react";
 interface Message {
   id: string;
   text: string;
-  sender: "me" | "other";
+  sender: "me" | "other" | "system";
   time: string;
   read?: boolean;
   agent?: string | null;
@@ -46,16 +46,28 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const avatar = chatAvatar || avatarDataUrl(name);
 
   const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
-  const handler = lastMessage && lastMessage.agent ? lastMessage.agent : "AI 🤖";
-  const aiEnabled = lastMessage && typeof (lastMessage as any).ai_enabled !== 'undefined' ? (lastMessage as any).ai_enabled : true;
+  const aiEnabled = lastMessage && typeof lastMessage.ai_enabled !== 'undefined' ? !!lastMessage.ai_enabled : true;
+  const handler = lastMessage && lastMessage.agent ? lastMessage.agent : (aiEnabled ? 'AI 🤖' : 'Agent');
 
   const toggleAi = async (enable: boolean) => {
     try {
-      await fetch("https://kiddost-ai.onrender.com/toggle-ai", {
+      const res = await fetch("https://kiddost-ai.onrender.com/toggle-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
       });
+      if (res.ok) {
+        // optimistic update: append a system message reflecting new state
+        const sysMsg: Message = {
+          id: `sys-${Date.now()}`,
+          text: enable ? 'Resume AI' : 'Stop AI',
+          sender: 'system',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          agent: null,
+          ai_enabled: enable,
+        };
+        setMessages((prev) => [...prev, sysMsg]);
+      }
     } catch (err) {
       console.error("toggleAi error", err);
     }
@@ -98,17 +110,30 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.sender === "me" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${isDarkMode ? (message.sender === "me" ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white backdrop-blur-sm" : "bg-gray-900/80 text-gray-100 border border-blue-500/20 backdrop-blur-sm") : (message.sender === "me" ? "bg-[#d9fdd3]" : "bg-white")}`} style={isDarkMode ? (message.sender === "me" ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.2)" } : { boxShadow: "0 0 15px rgba(59, 130, 246, 0.1)" }) : {}}>
-              <p className={`text-sm ${isDarkMode ? "" : "text-gray-900"}`}>{message.text}</p>
-              <div className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${isDarkMode ? (message.sender === "me" ? "text-blue-200" : "text-blue-400") : "text-gray-500"}`}>
-                <span>{message.time}</span>
-                {message.sender === "me" && (message.read ? <CheckCheck className="w-4 h-4 text-blue-400" /> : <Check className="w-4 h-4" />)}
+        {messages.map((message) => {
+          if (message.sender === 'system') {
+            return (
+              <div key={message.id} className="flex justify-center">
+                <div className={`px-3 py-1 rounded-full text-xs ${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-200 text-gray-700'}`}>
+                  {message.text}
+                </div>
+              </div>
+            );
+          }
+
+          const isMe = message.sender === 'me';
+          return (
+            <div key={message.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${isDarkMode ? (isMe ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white backdrop-blur-sm' : 'bg-gray-900/80 text-gray-100 border border-blue-500/20 backdrop-blur-sm') : (isMe ? 'bg-[#d9fdd3]' : 'bg-white')}`} style={isDarkMode ? (isMe ? { boxShadow: '0 0 15px rgba(37, 99, 235, 0.2)' } : { boxShadow: '0 0 15px rgba(59, 130, 246, 0.1)' }) : {}}>
+                <p className={`text-sm ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p>
+                <div className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
+                  <span>{message.time}</span>
+                  {isMe && (message.read ? <CheckCheck className="w-4 h-4 text-blue-400" /> : <Check className="w-4 h-4" />)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className={`px-4 py-3 flex items-center gap-3 relative z-10 ${isDarkMode ? "bg-gradient-to-t from-gray-900 to-black border-t border-blue-900/30" : "bg-[#f0f0f0]"}`}>
