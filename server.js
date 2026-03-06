@@ -346,6 +346,7 @@ app.post("/agent-send", async (req, res) => {
 // Endpoint to send media messages from agent and record them
 app.post("/agent-send-media", async (req, res) => {
   try {
+    console.log('/agent-send-media body:', JSON.stringify(req.body).slice(0,2000));
     const { phone, mediaUrl, caption } = req.body;
     if (!phone || !mediaUrl) return res.status(400).json({ error: "missing phone or mediaUrl" });
 
@@ -388,8 +389,13 @@ app.post("/agent-send-media", async (req, res) => {
 
     res.json({ success: true, whatsapp_id: whatsappId, status });
   } catch (err) {
-    console.error("/agent-send-media error", err.response?.data || err.message || err);
-    res.status(500).json({ error: true });
+    console.error("/agent-send-media error details:", {
+      message: err.message,
+      stack: err.stack,
+      responseData: err.response?.data || null
+    });
+    const detail = err.response?.data || err.message || 'unknown_error';
+    res.status(500).json({ error: true, detail });
   }
 });
 
