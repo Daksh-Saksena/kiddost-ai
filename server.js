@@ -345,18 +345,23 @@ app.post("/agent-send", async (req, res) => {
 
 // Endpoint to send media messages from agent and record them
 app.post("/agent-send-media", async (req, res) => {
-  const { phone, mediaUrl, caption } = req.body;
+  const { phone, mediaUrl, caption } = req.body
+
+  console.log("/agent-send-media body:", req.body)
 
   try {
+
     const response = await axios.post(
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message?apiKey=${BOTSPACE_API_KEY}`,
       {
-        name: "Agent",
         phone: phone,
-        text: caption || " ",
-        type: "image",
-        media: {
-          url: mediaUrl
+        name: "Agent",
+        payload: {
+          type: "image",
+          payload: {
+            url: mediaUrl,
+            caption: caption || ""
+          }
         }
       },
       {
@@ -364,23 +369,23 @@ app.post("/agent-send-media", async (req, res) => {
           "Content-Type": "application/json"
         }
       }
-    );
-
-    const whatsappId = response?.data?.messageId || response?.data?.id || response?.data?.message_id || null;
+    )
 
     await supabase.from("messages").insert({
-      phone,
-      content: caption || "",
+      phone: phone,
       sender: "agent",
-      media_url: mediaUrl,
-      whatsapp_id: whatsappId
-    });
+      text: caption || "",
+      media_url: mediaUrl
+    })
 
-    res.json({ success: true });
+    res.json({ success: true })
 
   } catch (err) {
-    console.error("BotSpace media error", err.response?.data || err);
-    res.status(500).json({ error: "Media send failed" });
+
+    console.error("BotSpace media error:", err.response?.data || err)
+
+    res.status(500).json({ error: "Media send failed" })
+
   }
 });
 
