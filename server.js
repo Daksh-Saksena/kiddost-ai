@@ -357,7 +357,7 @@ app.post("/agent-send-media", async (req, res) => {
         `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
         {
           phone,
-          text: caption || '',
+          text: caption || ' ',
           mediaUrl
         },
         {
