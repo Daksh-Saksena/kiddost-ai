@@ -55,12 +55,25 @@ app.post("/webhook", async (req, res) => {
     console.log("Extracted message:", message);
     console.log("From:", fullPhone);
 
-    // Save user message
+    // Determine previous AI state for this conversation
+    const { data: lastBefore } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("phone", fullPhone)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
+      .catch(() => ({ data: null }));
+
+    const aiEnabledForInsert = lastBefore && typeof lastBefore.ai_enabled !== 'undefined' ? lastBefore.ai_enabled : true;
+
+    // Save user message (preserve ai_enabled if conversation previously disabled)
     await supabase.from("messages").insert({
       phone: fullPhone,
       role: "user",
       content: message,
-      sender: "user"
+      sender: "user",
+      ai_enabled: aiEnabledForInsert
     });
 
     // Fetch last 10 messages for conversation memory
@@ -77,6 +90,20 @@ app.post("/webhook", async (req, res) => {
 
     const history = Array.isArray(data) ? data.reverse() : [];
     // OpenAI response
+    // Before generating AI response, check most recent message's ai_enabled flag
+    const { data: last } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("phone", fullPhone)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (last && last.ai_enabled === false) {
+      console.log("AI disabled for this conversation");
+      return res.status(200).json({ success: true, ai_skipped: true });
+    }
+
     const aiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -102,12 +129,14 @@ app.post("/webhook", async (req, res) => {
 
     console.log("AI Reply:", aiReply);
 
-    // Save AI reply
+    // Save AI reply (AI agent = null, ai_enabled = true)
     await supabase.from("messages").insert({
       phone: fullPhone,
       role: "assistant",
       content: aiReply,
-      sender: "ai"
+      sender: "ai",
+      agent: null,
+      ai_enabled: true
     });
 
     // Send message back via BotSpace
@@ -146,14 +175,19 @@ app.post("/agent-send", async (req, res) => {
     console.log("Agent message:", phone, message);
 
     // Save message to database
+    // record agent name if provided (default to Daksh)
+    const agentName = req.body.agent || "Daksh";
+
     await supabase.from("messages").insert({
       phone: phone,
       role: "assistant",
       content: message,
-      sender: "agent"
+      sender: "agent",
+      agent: agentName,
+      ai_enabled: false
     });
 
-    // Pause AI for this conversation
+    // Also update conversations table flag for compatibility
     await supabase
       .from("conversations")
       .update({ ai_paused: true })
@@ -183,6 +217,33 @@ app.post("/agent-send", async (req, res) => {
       error: true
     });
 
+  }
+});
+
+// Toggle AI on/off via system message
+app.post('/toggle-ai', async (req, res) => {
+  try {
+    const { phone, ai_enabled } = req.body;
+    if (typeof phone === 'undefined' || typeof ai_enabled === 'undefined') {
+      return res.status(400).json({ error: 'missing phone or ai_enabled' });
+    }
+
+    await supabase.from('messages').insert({
+      phone,
+      sender: 'system',
+      role: 'system',
+      content: ai_enabled ? 'Resume AI' : 'Stop AI',
+      ai_enabled: !!ai_enabled,
+      agent: null
+    });
+
+    // Also update conversations table flag for compatibility
+    await supabase.from('conversations').upsert({ phone, ai_paused: !ai_enabled });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('toggle-ai error', err.message || err);
+    res.status(500).json({ error: true });
   }
 });
 app.listen(PORT, () => {

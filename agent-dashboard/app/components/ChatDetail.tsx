@@ -9,6 +9,8 @@ interface Message {
   sender: "me" | "other";
   time: string;
   read?: boolean;
+  agent?: string | null;
+  ai_enabled?: boolean;
 }
 
 interface ChatDetailProps {
@@ -42,6 +44,22 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const name = chatName || "Unknown";
   const avatar = chatAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`;
 
+  const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+  const handler = lastMessage && lastMessage.agent ? lastMessage.agent : "AI 🤖";
+  const aiEnabled = lastMessage && typeof (lastMessage as any).ai_enabled !== 'undefined' ? (lastMessage as any).ai_enabled : true;
+
+  const toggleAi = async (enable: boolean) => {
+    try {
+      await fetch("/toggle-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
+      });
+    } catch (err) {
+      console.error("toggleAi error", err);
+    }
+  };
+
   return (
     <div className={`flex flex-col h-full relative overflow-hidden ${isDarkMode ? "bg-black" : "bg-[#efeae2]"}`}>
       {isDarkMode && (
@@ -64,6 +82,14 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         <div className="flex-1 ml-3 relative z-10">
           <h2 className="font-medium">{name}</h2>
           <p className={`text-xs ${isDarkMode ? "text-white" : "text-gray-200"}`}>Online</p>
+          <div className="text-xs mt-1 flex items-center gap-2">
+            <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>Handled by:</strong> {handler}</span>
+            {handler === 'AI 🤖' ? (
+              <button onClick={() => toggleAi(false)} className="ml-2 px-2 py-1 text-xs rounded bg-red-600 text-white">Stop AI</button>
+            ) : (
+              <button onClick={() => toggleAi(true)} className="ml-2 px-2 py-1 text-xs rounded bg-green-600 text-white">Resume AI</button>
+            )}
+          </div>
         </div>
         <button className={`relative z-10 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`}>
           <MoreVertical className="w-6 h-6" />

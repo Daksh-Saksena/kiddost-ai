@@ -7,7 +7,7 @@ import "./mobile-styles.css";
 import { supabase } from "../lib/supabase";
 
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
-type Message = { id: string; text: string; sender: "me" | "other"; time: string };
+type Message = { id: string; text: string; sender: "me" | "other"; time: string; agent?: string | null; ai_enabled?: boolean };
 
 export default function AppClient() {
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
@@ -49,6 +49,8 @@ export default function AppClient() {
       text: m.content || m.text || '',
       sender: ((m.role && m.role === 'user') ? 'other' : 'me') as 'me' | 'other',
       time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+      agent: m.agent ?? null,
+      ai_enabled: typeof m.ai_enabled !== 'undefined' ? !!m.ai_enabled : true,
     }));
     setMessages(msgs);
     setTimeout(scrollToBottom, 100);
@@ -86,6 +88,8 @@ export default function AppClient() {
               text: msg.content || msg.text || '',
               sender: ((msg.role && msg.role === 'user') ? 'other' : 'me') as 'me' | 'other',
               time: msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+              agent: msg.agent ?? null,
+              ai_enabled: typeof msg.ai_enabled !== 'undefined' ? !!msg.ai_enabled : true,
             };
             setMessages((prev) => [...prev, mapped]);
             setTimeout(scrollToBottom, 100);
