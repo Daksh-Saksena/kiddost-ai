@@ -97,13 +97,17 @@ app.post("/webhook", async (req, res) => {
     const history = Array.isArray(data) ? data.reverse() : [];
     // OpenAI response
     // Before generating AI response, check most recent message's ai_enabled flag
-    const { data: last } = await supabase
+    const { data: last, error: lastErr } = await supabase
       .from("messages")
       .select("*")
       .eq("phone", fullPhone)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
+
+    if (lastErr) {
+      console.log("Supabase fetch error:", lastErr);
+    }
 
     if (last && last.ai_enabled === false) {
       console.log("AI disabled for this conversation");
