@@ -352,19 +352,20 @@ app.post("/agent-send-media", async (req, res) => {
 
     let botResp;
     try {
+      // BotSpace does not have a /send-media route; use send-session-message and include mediaUrl
       botResp = await axios.post(
-        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-media`,
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
         {
           phone,
-          mediaUrl,
-          caption
+          text: caption || '',
+          mediaUrl
         },
         {
           params: { apiKey: BOTSPACE_API_KEY }
         }
       );
     } catch (err) {
-      console.error("BotSpace send-media error", err.response?.data || err.message || err);
+      console.error("BotSpace send-session-message (media) error", err.response?.data || err.message || err);
       return res.status(500).json({ error: true, detail: "botspace_send_failed" });
     }
 
