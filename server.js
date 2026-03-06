@@ -356,7 +356,7 @@ app.post("/agent-send-media", async (req, res) => {
       {
         phone: phone,
         name: "Agent",
-        text: caption || ' ',
+        text: caption || ' sds',
         payload: {
           type: "image",
           payload: {
