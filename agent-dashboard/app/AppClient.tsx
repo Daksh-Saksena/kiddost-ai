@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { ChatList } from "./components/ChatList";
 import { ChatDetail } from "./components/ChatDetail";
 import "./mobile-styles.css";
+import { avatarDataUrl } from './avatarDataUrl';
 import { supabase } from "../lib/supabase";
 
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
@@ -32,7 +33,7 @@ export default function AppClient() {
     const result: Chat[] = Array.from(map.values()).map((r: any) => ({
       id: r.phone,
       name: r.phone,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.phone)}&background=0D8ABC&color=fff`,
+      avatar: avatarDataUrl(r.phone),
       lastMessage: r.content || "",
       time: r.created_at ? new Date(r.created_at).toLocaleString() : "",
     }));

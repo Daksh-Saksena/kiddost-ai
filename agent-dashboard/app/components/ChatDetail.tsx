@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { avatarDataUrl } from '../avatarDataUrl';
 import { ArrowLeft, Send, MoreVertical, Check, CheckCheck } from "lucide-react";
 
 interface Message {
@@ -42,7 +43,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   };
 
   const name = chatName || "Unknown";
-  const avatar = chatAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`;
+  const avatar = chatAvatar || avatarDataUrl(name);
 
   const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
   const handler = lastMessage && lastMessage.agent ? lastMessage.agent : "AI 🤖";
@@ -50,7 +51,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   const toggleAi = async (enable: boolean) => {
     try {
-      await fetch("/toggle-ai", {
+      await fetch("https://kiddost-ai.onrender.com/toggle-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
