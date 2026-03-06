@@ -49,7 +49,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         return;
       }
       const publicRes = supabase.storage.from('media').getPublicUrl(path);
-      const publicURL = publicRes?.data?.publicUrl || publicRes?.publicUrl || publicRes?.publicURL || publicRes?.data?.publicURL || null;
+      const publicURL = publicRes?.data?.publicUrl || null;
       if (!publicURL) {
         console.error('failed to get public url for uploaded media');
         return;
