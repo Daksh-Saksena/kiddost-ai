@@ -44,7 +44,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     // Direct upload to Supabase Storage (public bucket) to avoid server proxy limits
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9.\-_\.]/g, "_");
-      const path = `${chatId}/${Date.now()}_${safeName}`;
+      const cleanPhone = String(chatId).replace(/^\+/, "");
+      const path = `${cleanPhone}/${Date.now()}_${safeName}`;
       const { data: uploadData, error: uploadErr } = await supabase.storage.from('media').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
       if (uploadErr) {
         console.error('direct upload error', uploadErr.message || uploadErr);
