@@ -7,7 +7,9 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+// Enable CORS for all origins (can be restricted via CORS_ORIGIN env)
+const CORS_ORIGIN = process.env.CORS_ORIGIN || true;
+app.use(cors({ origin: CORS_ORIGIN }));
 const PORT = process.env.PORT || 10000;
 
 // Keys
@@ -406,8 +408,16 @@ app.post('/ensure-media-bucket', async (req, res) => {
 });
 
 // Server-side upload endpoint: accepts base64 file, uploads to Supabase storage using service role, returns public URL
-app.post('/upload-media-server', express.json({ limit: '50mb' }), async (req, res) => {
+app.post('/upload-media-server', express.json({ limit: '100mb' }), async (req, res) => {
   try {
+    // Ensure CORS headers present for browsers (handle cases where middleware may not run)
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
     if (!supabaseService) return res.status(500).json({ error: 'missing_service_role_key' });
     const { fileBase64, fileName, phone } = req.body;
     if (!fileBase64 || !fileName || !phone) return res.status(400).json({ error: 'missing_params' });
