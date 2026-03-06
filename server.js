@@ -130,6 +130,24 @@ app.post("/webhook", async (req, res) => {
     console.log("Full incoming body:");
     console.log(JSON.stringify(req.body, null, 2));
 
+    // Handle delivery / status webhooks from BotSpace / WhatsApp
+    if (req.body?.event === "message-status" || req.body?.event === "message-delivered") {
+      const messageId = req.body?.messageId || req.body?.message_id || req.body?.payload?.messageId;
+      const status = req.body?.status || req.body?.payload?.status || req.body?.delivery_status;
+      if (messageId && status) {
+        try {
+          await supabase
+            .from("messages")
+            .update({ status })
+            .eq("whatsapp_id", messageId);
+          console.log(`Updated message status for ${messageId} -> ${status}`);
+        } catch (e) {
+          console.error("Failed to update message status", e?.message || e);
+        }
+      }
+      return res.status(200).json({ ok: true });
+    }
+
     const message = req.body?.payload?.payload?.text;
     const countryCode = req.body?.phone?.countryCode;
     const phone = req.body?.phone?.phone;
@@ -253,40 +271,54 @@ app.post("/agent-send", async (req, res) => {
 
     console.log("Agent message:", phone, message);
 
-    // Save message to database
-    // record agent name if provided (default to Daksh)
+    // Send WhatsApp message through BotSpace and capture returned message id/status
     const agentName = req.body.agent || "Daksh";
-
-    await supabase.from("messages").insert({
-      phone: phone,
-      role: "assistant",
-      content: message,
-      sender: "agent",
-      agent: agentName,
-      ai_enabled: false
-    });
-
-    // Also update conversations table flag for compatibility
-    await supabase
-      .from("conversations")
-      .update({ ai_paused: true })
-      .eq("phone", phone);
-
-    // Send WhatsApp message through BotSpace
-    await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-      {
-        phone: phone,
-        text: message
-      },
-      {
-        params: {
-          apiKey: BOTSPACE_API_KEY
+    let botResp;
+    try {
+      botResp = await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+        {
+          phone: phone,
+          text: message
+        },
+        {
+          params: {
+            apiKey: BOTSPACE_API_KEY
+          }
         }
-      }
-    );
+      );
+    } catch (err) {
+      console.log("BotSpace send error:", err.response?.data || err.message || err);
+      return res.status(500).json({ error: true, detail: "botspace_send_failed" });
+    }
 
-    res.json({ success: true });
+    // Attempt to extract a whatsapp message id and status from BotSpace response
+    const whatsappId = botResp?.data?.messageId || botResp?.data?.id || botResp?.data?.message_id || null;
+    const status = botResp?.data?.status || "sent";
+
+    // Save message to database with whatsapp id and status
+    try {
+      await supabase.from("messages").insert({
+        phone: phone,
+        role: "assistant",
+        content: message,
+        sender: "agent",
+        agent: agentName,
+        ai_enabled: false,
+        whatsapp_id: whatsappId,
+        status: status
+      });
+
+      // Also update conversations table flag for compatibility
+      await supabase
+        .from("conversations")
+        .update({ ai_paused: true })
+        .eq("phone", phone);
+    } catch (dbErr) {
+      console.error("Failed to insert agent message into supabase", dbErr?.message || dbErr);
+    }
+
+    res.json({ success: true, whatsapp_id: whatsappId, status });
 
   } catch (err) {
 
@@ -296,6 +328,56 @@ app.post("/agent-send", async (req, res) => {
       error: true
     });
 
+  }
+});
+
+// Endpoint to send media messages from agent and record them
+app.post("/agent-send-media", async (req, res) => {
+  try {
+    const { phone, mediaUrl, caption } = req.body;
+    if (!phone || !mediaUrl) return res.status(400).json({ error: "missing phone or mediaUrl" });
+
+    let botResp;
+    try {
+      botResp = await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-media`,
+        {
+          phone,
+          mediaUrl,
+          caption
+        },
+        {
+          params: { apiKey: BOTSPACE_API_KEY }
+        }
+      );
+    } catch (err) {
+      console.error("BotSpace send-media error", err.response?.data || err.message || err);
+      return res.status(500).json({ error: true, detail: "botspace_send_failed" });
+    }
+
+    const whatsappId = botResp?.data?.messageId || botResp?.data?.id || botResp?.data?.message_id || null;
+    const status = botResp?.data?.status || "sent";
+
+    try {
+      await supabase.from("messages").insert({
+        phone,
+        role: "assistant",
+        content: caption || null,
+        sender: "agent",
+        agent: req.body.agent || "Daksh",
+        ai_enabled: false,
+        media_url: mediaUrl,
+        whatsapp_id: whatsappId,
+        status
+      });
+    } catch (dbErr) {
+      console.error("Failed to insert media message into supabase", dbErr?.message || dbErr);
+    }
+
+    res.json({ success: true, whatsapp_id: whatsappId, status });
+  } catch (err) {
+    console.error("/agent-send-media error", err.response?.data || err.message || err);
+    res.status(500).json({ error: true });
   }
 });
 
