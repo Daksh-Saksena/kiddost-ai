@@ -160,11 +160,28 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
-    const message = req.body?.payload?.payload?.text;
+    // Extract text or media from the webhook payload
+    const payloadObj = req.body?.payload || {};
+    let message = null;
+    let mediaUrl = null;
+
+    if (payloadObj?.type === 'text') {
+      message = payloadObj.payload?.text || null;
+    } else if (payloadObj?.type === 'media' || payloadObj?.type === 'image') {
+      // BotSpace may label media as "media" with payload containing mediaType and url
+      mediaUrl = payloadObj.payload?.url || payloadObj.payload?.payload?.url || null;
+      // some webhooks include a caption field inside payload
+      message = payloadObj.payload?.caption || null;
+    } else {
+      // fallback: try to read text if present
+      message = payloadObj?.payload?.text || null;
+      mediaUrl = payloadObj?.payload?.url || null;
+    }
+
     const countryCode = req.body?.phone?.countryCode;
     const phone = req.body?.phone?.phone;
 
-    if (!message || !countryCode || !phone) {
+    if ((!message && !mediaUrl) || !countryCode || !phone) {
       console.log("Missing required fields");
       return res.status(200).json({ ok: true });
     }
@@ -206,8 +223,9 @@ app.post("/webhook", async (req, res) => {
     await supabase.from("messages").insert({
       phone: fullPhone,
       role: "user",
-      content: message,
+      content: message || null,
       sender: "user",
+      media_url: mediaUrl || null,
       ai_enabled: aiEnabledForInsert
     });
 
@@ -356,8 +374,9 @@ app.post("/agent-send-media", async (req, res) => {
       name: "Agent",
       text: caption || ' ',
       payload: {
-        type: "image",
+        type: "media",
         payload: {
+          mediaType: "image",
           url: mediaUrl,
           caption: caption || ""
         }
