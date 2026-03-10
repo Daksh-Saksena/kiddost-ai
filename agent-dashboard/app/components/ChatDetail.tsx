@@ -109,6 +109,34 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const name = chatName || "Unknown";
   const avatar = chatAvatar || avatarDataUrl(name);
 
+  function ProxyImage({ url, alt }: { url: string; alt?: string }) {
+    const [src, setSrc] = useState<string | null>(null);
+
+    useEffect(() => {
+      let mounted = true;
+      const fetchImage = async () => {
+        try {
+          const proxy = `/proxy-image?url=${encodeURIComponent(url)}`;
+          const resp = await fetch(proxy);
+          if (!resp.ok) throw new Error('proxy fetch failed');
+          const blob = await resp.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          if (mounted) setSrc(objectUrl);
+        } catch (e) {
+          // fallback to original URL
+          if (mounted) setSrc(url);
+        }
+      };
+      fetchImage();
+      return () => {
+        mounted = false;
+        if (src) URL.revokeObjectURL(src);
+      };
+    }, [url]);
+
+    return <img src={src || ''} alt={alt || 'media'} className="w-48 rounded-md object-cover" />;
+  }
+
   const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
     const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
     return lm && typeof lm.ai_enabled !== 'undefined' ? !!lm.ai_enabled : true;

@@ -541,12 +541,27 @@ app.get('/proxy-image', async (req, res) => {
     if (!allowedHosts.includes(parsed.hostname)) return res.status(403).send('forbidden host');
 
     const resp = await axios.get(url, { responseType: 'arraybuffer' });
-    const contentType = resp.headers['content-type'] || 'application/octet-stream';
+    const buf = Buffer.from(resp.data);
+    let contentType = resp.headers['content-type'] || 'application/octet-stream';
+
+    // If upstream didn't provide a useful content-type, sniff common types from magic bytes
+    if (!contentType || contentType === 'application/octet-stream') {
+      if (buf.length >= 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+        contentType = 'image/jpeg';
+      } else if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+        contentType = 'image/png';
+      } else if (buf.length >= 4 && buf.slice(0, 4).toString() === '%PDF') {
+        contentType = 'application/pdf';
+      } else if (buf.length >= 3 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) {
+        contentType = 'image/gif';
+      }
+    }
+
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=31536000');
     // Force inline disposition so browser attempts to render instead of download
     res.setHeader('Content-Disposition', 'inline');
-    return res.end(Buffer.from(resp.data));
+    return res.end(buf);
   } catch (e) {
     console.error('/proxy-image error', e?.response?.status, e?.message || e);
     return res.status(500).send('proxy error');
