@@ -244,8 +244,8 @@ app.post("/webhook", async (req, res) => {
       media_url: mediaUrl || null,
       ai_enabled: aiEnabledForInsert
     });
-
-    // If AI is disabled for this conversation, skip buffering/responding
+ 
+    // If AI is disabled for this conversation, skip buffering/respon
     const { data: last, error: lastErr } = await supabase
       .from("messages")
       .select("*")
