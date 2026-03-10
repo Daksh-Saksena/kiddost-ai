@@ -116,13 +116,17 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       let mounted = true;
       const fetchImage = async () => {
         try {
-          const proxy = `/proxy-image?url=${encodeURIComponent(url)}`;
+          const proxyBase = 'https://kiddost-ai.onrender.com';
+          const proxy = `${proxyBase}/proxy-image?url=${encodeURIComponent(url)}`;
+          console.log('ProxyImage fetching', proxy);
           const resp = await fetch(proxy);
+          console.log('ProxyImage response', resp.status, resp.headers.get('content-type'));
           if (!resp.ok) throw new Error('proxy fetch failed');
           const blob = await resp.blob();
           const objectUrl = URL.createObjectURL(blob);
           if (mounted) setSrc(objectUrl);
         } catch (e) {
+          console.error('ProxyImage error', e);
           // fallback to original URL
           if (mounted) setSrc(url);
         }
@@ -221,8 +225,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                     ) : (
                       (() => {
                         const isBotspace = message.media_url.includes('public-api.bot.space') || message.media_url.includes('bot.space');
-                        const displayUrl = isBotspace ? `https://kiddost-ai.onrender.com/proxy-image?url=${encodeURIComponent(message.media_url)}` : message.media_url;
-                        return <img src={displayUrl} alt="media" className="w-48 rounded-md object-cover" />;
+                        if (isBotspace) return <ProxyImage url={message.media_url} alt="media" />;
+                        return <img src={message.media_url} alt="media" className="w-48 rounded-md object-cover" />;
                       })()
                     )}
                   </div>
