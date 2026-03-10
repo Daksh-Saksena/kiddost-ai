@@ -414,13 +414,14 @@ app.post("/agent-send-media", async (req, res) => {
 
     console.log('BOTSPACE RESPONSE', response.data);
 
-    await supabase.from("messages").insert({
+    const { data: insertData, error: insertError } = await supabase.from("messages").insert({
       phone: phone,
       sender: "agent",
       content: caption || "",
       media_url: mediaUrl,
       whatsapp_id: response?.data?.messageId || response?.data?.id || response?.data?.message_id || null
     });
+    console.log('/agent-send-media insert result', { insertError, insertData });
 
     res.json({ success: true });
   } catch (err) {
@@ -493,14 +494,15 @@ app.post('/toggle-ai', async (req, res) => {
       return res.status(400).json({ error: 'missing phone or ai_enabled' });
     }
 
-    await supabase.from('messages').insert({
-      phone,
-      sender: 'system',
-      role: 'system',
-      content: ai_enabled ? 'Resume AI' : 'Stop AI',
-      ai_enabled: !!ai_enabled,
-      agent: null
+    const { data: userInsertData, error: userInsertError } = await supabase.from("messages").insert({
+      phone: fullPhone,
+      role: "user",
+      content: message || null,
+      sender: "user",
+      media_url: storedMediaUrl || null,
+      ai_enabled: aiEnabledForInsert
     });
+    console.log('/webhook insert result', { userInsertError, userInsertData });
 
     // Also update conversations table flag for compatibility
     await supabase.from('conversations').upsert({ phone, ai_paused: !ai_enabled });
