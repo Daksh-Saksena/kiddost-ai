@@ -416,6 +416,7 @@ app.post("/agent-send-media", async (req, res) => {
 
     const { data: insertData, error: insertError } = await supabase.from("messages").insert({
       phone: phone,
+      role: "assistant",
       sender: "agent",
       content: caption || "",
       media_url: mediaUrl,
