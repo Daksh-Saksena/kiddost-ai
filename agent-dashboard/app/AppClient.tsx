@@ -8,7 +8,7 @@ import { avatarDataUrl } from './avatarDataUrl';
 import { supabase } from "../lib/supabase";
 
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
-type Message = { id: string; text: string; sender: "me" | "other"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
+type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 
 export default function AppClient() {
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
