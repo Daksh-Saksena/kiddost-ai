@@ -22,7 +22,7 @@ export default function AppClient() {
   };
 
   const loadChats = async () => {
-    const { data, error } = await supabase.from("messages").select("phone, content, created_at").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("messages").select("phone, content, role, sender, created_at").order("created_at", { ascending: false });
     console.log('loadChats result', { data, error });
     if (error) return;
     if (!data || data.length === 0) return setChats([]);
@@ -36,7 +36,7 @@ export default function AppClient() {
       id: r.phone,
       name: r.phone,
       avatar: avatarDataUrl(r.phone),
-      lastMessage: r.content || "",
+      lastMessage: r.content || '',
       time: r.created_at ? new Date(r.created_at).toLocaleString() : "",
     }));
 
@@ -49,17 +49,22 @@ export default function AppClient() {
     console.log('loadMessages result', { phone, data, error });
     if (error) return;
     if (!data) return setMessages([]);
-    const msgs: Message[] = data.map((m: any) => ({
-      id: String(m.id || m.created_at),
-      text: m.content || m.text || '',
-      sender: ((m.role && m.role === 'user') ? 'other' : 'me') as 'me' | 'other',
-      time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-      agent: m.agent ?? null,
-      ai_enabled: typeof m.ai_enabled !== 'undefined' ? !!m.ai_enabled : true,
-      status: m.status ?? null,
-      media_url: m.media_url ?? null,
-      whatsapp_id: m.whatsapp_id ?? null,
-    }));
+    const msgs: Message[] = data.map((m: any) => {
+      // prefer explicit sender column when present
+      const isOther = m.sender === 'user' || m.role === 'user';
+      const isSystem = m.sender === 'system' || m.role === 'system';
+      return ({
+        id: String(m.id || m.created_at),
+        text: m.content || m.text || '',
+        sender: isSystem ? 'system' : (isOther ? 'other' : 'me'),
+        time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        agent: m.agent ?? null,
+        ai_enabled: typeof m.ai_enabled !== 'undefined' ? !!m.ai_enabled : true,
+        status: m.status ?? null,
+        media_url: m.media_url ?? null,
+        whatsapp_id: m.whatsapp_id ?? null,
+      });
+    });
     setMessages(msgs);
     setTimeout(scrollToBottom, 100);
   };

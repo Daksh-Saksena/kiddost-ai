@@ -235,13 +235,38 @@ app.post("/webhook", async (req, res) => {
 
     const aiEnabledForInsert = lastBefore && typeof lastBefore.ai_enabled !== 'undefined' ? lastBefore.ai_enabled : true;
 
+    // If incoming media URL is provided, try to fetch it and store in Supabase storage
+    let storedMediaUrl = mediaUrl || null;
+    if (mediaUrl && supabaseService) {
+      try {
+        const fetchResp = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(fetchResp.data);
+        const contentType = fetchResp.headers['content-type'] || 'application/octet-stream';
+        const safePhone = String(fullPhone).replace(/^\+/, '');
+        const ext = (contentType.split('/')[1] || '').split(';')[0].split('+')[0];
+        const safeExt = ext ? `.${ext}` : '';
+        const safeName = `incoming_${Date.now()}${safeExt}`;
+        const path = `${safePhone}/${safeName}`;
+
+        const { error: uploadErr } = await supabaseService.storage.from('media').upload(path, buffer, { cacheControl: '3600', upsert: false, contentType });
+        if (uploadErr) {
+          console.error('service upload error (incoming media)', uploadErr);
+        } else {
+          const publicRes = supabaseService.storage.from('media').getPublicUrl(path);
+          storedMediaUrl = publicRes?.data?.publicUrl || storedMediaUrl;
+        }
+      } catch (e) {
+        console.error('failed to fetch/upload incoming media', e.response?.data || e.message || e);
+      }
+    }
+
     // Save user message (preserve ai_enabled if conversation previously disabled)
     await supabase.from("messages").insert({
       phone: fullPhone,
       role: "user",
       content: message || null,
       sender: "user",
-      media_url: mediaUrl || null,
+      media_url: storedMediaUrl || null,
       ai_enabled: aiEnabledForInsert
     });
  
