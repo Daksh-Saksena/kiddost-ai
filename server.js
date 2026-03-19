@@ -6,7 +6,7 @@ import cors from "cors";
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 // Restrict CORS to the Vercel frontend origin
 app.use(cors({
   origin: "https://kiddost-ai.vercel.app",
