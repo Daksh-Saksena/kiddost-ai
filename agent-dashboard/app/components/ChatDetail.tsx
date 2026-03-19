@@ -343,7 +343,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                   <span>{message.time}</span>
                   {isMe && (() => {
                     const s = message.status?.toLowerCase() || '';
-                    if (s === 'read' || s === 'seen') return <CheckCheck className="w-4 h-4" style={{ color: '#60a5fa' }} />;
+                    if (s === 'read' || s === 'seen') return <CheckCheck className="w-4 h-4" style={{ color: '#22aaff' }} />;
                     if (s === 'delivered' || s === 'delivery') return <CheckCheck className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
                     if (s === 'sent' || s === 'accepted' || s === 'enqueued') return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
                     return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#4b5563' : '#d1d5db' }} />;
