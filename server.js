@@ -279,7 +279,7 @@ app.post("/webhook", async (req, res) => {
     if (body?.event === "message-status" || body?.event === "message-delivered" ||
         body?.event === "message-read" || body?.event === "message-seen" ||
         body?.event === "status" || body?.type === "status") {
-      const messageId = body?.messageId || body?.message_id || body?.payload?.messageId || body?.payload?.message_id;
+      const messageId = body?.id || body?.messageId || body?.message_id || body?.payload?.messageId || body?.payload?.message_id || body?.payload?.id;
       const rawStatus = body?.status || body?.payload?.status || body?.delivery_status || body?.payload?.delivery_status;
       // Normalise to consistent lowercase values
       const statusMap = { delivered: 'delivered', delivery: 'delivered', read: 'read', seen: 'read', sent: 'sent', accepted: 'sent', enqueued: 'sent' };
@@ -560,7 +560,7 @@ app.post("/agent-send-media", async (req, res) => {
       sender: "agent",
       content: caption || "",
       media_url: mediaUrl,
-      whatsapp_id: response?.data?.messageId || response?.data?.id || response?.data?.message_id || null
+      whatsapp_id: response?.data?.data?.id || response?.data?.data?.messageId || response?.data?.messageId || response?.data?.id || response?.data?.message_id || null
     });
     console.log('/agent-send-media insert result', { insertError, insertData });
 
