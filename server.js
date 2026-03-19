@@ -507,15 +507,14 @@ app.post('/toggle-ai', async (req, res) => {
       return res.status(400).json({ error: 'missing phone or ai_enabled' });
     }
 
-    const { data: userInsertData, error: userInsertError } = await supabase.from("messages").insert({
-      phone: fullPhone,
-      role: "user",
-      content: message || null,
-      sender: "user",
-      media_url: storedMediaUrl || null,
-      ai_enabled: aiEnabledForInsert
+    // Insert a system message so the next webhook message inherits the correct ai_enabled state
+    await supabase.from("messages").insert({
+      phone: phone,
+      role: "system",
+      content: ai_enabled ? "AI resumed" : "AI paused by agent",
+      sender: "system",
+      ai_enabled: !!ai_enabled
     });
-    console.log('/webhook insert result', { userInsertError, userInsertData });
 
     // Also update conversations table flag for compatibility
     await supabase.from('conversations').upsert({ phone, ai_paused: !ai_enabled });
