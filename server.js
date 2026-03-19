@@ -45,6 +45,36 @@ function hashPin(pin) {
   return crypto.createHash('sha256').update(String(pin)).digest('hex');
 }
 
+// Poll BotSpace for message delivery status and update Supabase
+async function pollMessageStatus(whatsappId, phone) {
+  const statusMap = { sent: 'sent', accepted: 'sent', enqueued: 'sent', delivered: 'delivered', read: 'read', seen: 'read', failed: 'failed' };
+  let lastStatus = null;
+  let attempts = 0;
+  const maxAttempts = 60; // 60 × 10s = 10 minutes
+  const interval = setInterval(async () => {
+    attempts++;
+    try {
+      const resp = await axios.get(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/${whatsappId}/status`,
+        { params: { apiKey: BOTSPACE_API_KEY } }
+      );
+      const raw = resp?.data?.data?.status || '';
+      const normalized = statusMap[raw.toLowerCase()] || raw.toLowerCase();
+      if (normalized && normalized !== lastStatus) {
+        lastStatus = normalized;
+        await supabase.from('messages').update({ status: normalized }).eq('whatsapp_id', whatsappId);
+        console.log(`[poll] ${whatsappId} status -> ${normalized}`);
+      }
+      if (normalized === 'read' || normalized === 'failed' || attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    } catch (e) {
+      console.error(`[poll] failed for ${whatsappId}:`, e?.response?.data || e?.message);
+      if (attempts >= maxAttempts) clearInterval(interval);
+    }
+  }, 10000);
+}
+
 // Helper: generate AI response for a combined user message
 async function handleAIResponse(fullPhone, combinedMessage) {
   try {
@@ -508,6 +538,8 @@ app.post("/agent-send", async (req, res) => {
       console.error("Failed to insert agent message into supabase", dbErr?.message || dbErr);
     }
 
+    if (whatsappId) pollMessageStatus(whatsappId, phone);
+
     res.json({ success: true, whatsapp_id: whatsappId, status });
 
   } catch (err) {
@@ -563,6 +595,9 @@ app.post("/agent-send-media", async (req, res) => {
       whatsapp_id: response?.data?.data?.id || response?.data?.data?.messageId || response?.data?.messageId || response?.data?.id || response?.data?.message_id || null
     });
     console.log('/agent-send-media insert result', { insertError, insertData });
+
+    const mediaMsgId = response?.data?.data?.id || response?.data?.data?.messageId || response?.data?.messageId || response?.data?.id || null;
+    if (mediaMsgId) pollMessageStatus(mediaMsgId, phone);
 
     res.json({ success: true });
   } catch (err) {
