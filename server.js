@@ -190,10 +190,12 @@ app.post("/webhook", async (req, res) => {
     // Safely extract message or media
     let message = null;
     let mediaUrl = null;
+    let incomingContentType = null;
     if (body.payload?.type === 'text') {
       message = body.payload?.payload?.text || null;
     } else if (body.payload?.type === 'media') {
       mediaUrl = body.payload?.payload?.url || null;
+      incomingContentType = body.payload?.payload?.contentType || null;
     }
 
     console.log("Extracted message:", message);
@@ -241,7 +243,8 @@ app.post("/webhook", async (req, res) => {
       try {
         const fetchResp = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(fetchResp.data);
-        const contentType = fetchResp.headers['content-type'] || 'application/octet-stream';
+        // Prefer the contentType from the BotSpace webhook payload (accurate) over the HTTP header (often octet-stream)
+        const contentType = incomingContentType || (fetchResp.headers['content-type'] !== 'application/octet-stream' ? fetchResp.headers['content-type'] : null) || 'application/octet-stream';
         const safePhone = String(fullPhone).replace(/^\+/, '');
         const ext = (contentType.split('/')[1] || '').split(';')[0].split('+')[0];
         const safeExt = ext ? `.${ext}` : '';
@@ -551,10 +554,12 @@ app.get('/proxy-image', async (req, res) => {
 
     const resp = await axios.get(url, { responseType: 'arraybuffer' });
     const buf = Buffer.from(resp.data);
-    let contentType = resp.headers['content-type'] || 'application/octet-stream';
+    // Honor an explicit type hint (passed when storing proxy URL from webhook)
+    const typeHint = req.query.type;
+    let contentType = typeHint || resp.headers['content-type'] || 'application/octet-stream';
 
     // If upstream didn't provide a useful content-type, sniff common types from magic bytes
-    if (!contentType || contentType === 'application/octet-stream') {
+    if (!typeHint && (!contentType || contentType === 'application/octet-stream')) {
       if (buf.length >= 4 && buf[0] === 0xff && buf[1] === 0xd8) {
         contentType = 'image/jpeg';
       } else if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {

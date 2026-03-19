@@ -119,11 +119,24 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   }
 
   function getMediaType(url: string): 'image' | 'video' | 'audio' | 'pdf' | 'file' {
+    // Check for an explicit 'type' MIME hint in the query string (set by proxy URLs or server)
+    try {
+      const parsed = new URL(url);
+      const typeParam = parsed.searchParams.get('type');
+      if (typeParam) {
+        if (typeParam.startsWith('image/')) return 'image';
+        if (typeParam.startsWith('video/')) return 'video';
+        if (typeParam.startsWith('audio/')) return 'audio';
+        if (typeParam === 'application/pdf') return 'pdf';
+      }
+    } catch { /* ignore — not a valid absolute URL */ }
     const clean = url.split('?')[0].toLowerCase();
     if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)$/.test(clean)) return 'image';
     if (/\.(mp4|mov|avi|mkv|webm|3gp)$/.test(clean)) return 'video';
     if (/\.(mp3|ogg|wav|m4a|aac)$/.test(clean)) return 'audio';
     if (/\.pdf$/.test(clean)) return 'pdf';
+    // Proxy URLs lack an extension — BotSpace primarily sends images, so default to image
+    if (url.includes('/proxy-image')) return 'image';
     return 'file';
   }
 
