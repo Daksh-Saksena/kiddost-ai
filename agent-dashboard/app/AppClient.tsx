@@ -234,10 +234,10 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
 }
 
 const CONTACTS_KEY = 'kiddost_contacts';
-function getContacts(): Record<string, { name: string; notes: string }> {
+function getContacts(): Record<string, { name: string; notes: string; labels?: string[] }> {
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) || '{}'); } catch { return {}; }
 }
-function saveContact(phone: string, data: { name: string; notes: string }) {
+function saveContact(phone: string, data: { name: string; notes: string; labels?: string[] }) {
   const all = getContacts();
   all[phone] = data;
   try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(all)); } catch {}
@@ -256,7 +256,7 @@ export default function AppClient() {
     }
     return 'Agent';
   });
-  const [contacts, setContacts] = useState<Record<string, { name: string; notes: string }>>(() => getContacts());
+  const [contacts, setContacts] = useState<Record<string, { name: string; notes: string; labels?: string[] }>>(() => getContacts());
 
   // Load shared contacts from server on mount
   useEffect(() => {
@@ -515,16 +515,35 @@ export default function AppClient() {
             setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: name || c.id } : c));
           }}
           initialContact={contacts[selectedChat] || { name: '', notes: '' }}
-          onAddLabel={(label) => fetch(`${SERVER}/label`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: selectedChat, label })
-          }).catch(() => {})}
-          onRemoveLabel={(label) => fetch(`${SERVER}/label`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: selectedChat, label })
-          }).catch(() => {})}
+          initialLabels={contacts[selectedChat]?.labels || []}
+          onAddLabel={(label) => {
+            fetch(`${SERVER}/label`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: selectedChat, label })
+            }).catch(() => {});
+            setContacts(prev => {
+              const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
+              const newLabels = cur.labels?.includes(label) ? cur.labels : [...(cur.labels || []), label];
+              const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
+              try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+              return updated;
+            });
+          }}
+          onRemoveLabel={(label) => {
+            fetch(`${SERVER}/label`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: selectedChat, label })
+            }).catch(() => {});
+            setContacts(prev => {
+              const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
+              const newLabels = (cur.labels || []).filter(l => l !== label);
+              const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
+              try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+              return updated;
+            });
+          }}
         />
       ) : (
         chats.length === 0 ? (

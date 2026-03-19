@@ -23,13 +23,13 @@ interface ChatDetailProps {
   isDarkMode: boolean;
 }
 
-export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact, onAddLabel, onRemoveLabel }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string }; onAddLabel?: (label: string) => void; onRemoveLabel?: (label: string) => void }) {
+export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact, initialLabels = [], onAddLabel, onRemoveLabel }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string }; initialLabels?: string[]; onAddLabel?: (label: string) => void; onRemoveLabel?: (label: string) => void }) {
   const [messages, setMessages] = useState<Message[]>(propMessages || []);
   const [inputValue, setInputValue] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [contactName, setContactName] = useState(initialContact?.name || '');
   const [contactNotes, setContactNotes] = useState(initialContact?.notes || '');
-  const [labels, setLabels] = useState<string[]>([]);
+  const [labels, setLabels] = useState<string[]>(initialLabels);
   const [labelInput, setLabelInput] = useState('');
 
   // Reset info panel when switching chats
@@ -37,7 +37,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     setContactName(initialContact?.name || '');
     setContactNotes(initialContact?.notes || '');
     setShowInfo(false);
-    setLabels([]);
+    setLabels(initialLabels || []);
     setLabelInput('');
   }, [chatId]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -334,7 +334,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                 {labels.map(l => (
                   <span key={l} className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ isDarkMode ? 'bg-blue-900/60 text-blue-200' : 'bg-green-100 text-green-800'}`}>
                     {l}
-                    <button onClick={() => { onRemoveLabel?.(l); setLabels(prev => prev.filter(x => x !== l)); }} className="ml-1 hover:opacity-70">
+                  <button onClick={() => { onRemoveLabel?.(l); setLabels(prev => prev.filter(x => x !== l)); }} className="ml-1 hover:opacity-70">
                       <X className="w-3 h-3" />
                     </button>
                   </span>

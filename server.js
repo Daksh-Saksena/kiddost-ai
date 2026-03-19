@@ -322,10 +322,10 @@ async function sendPushToAll(payload) {
 
 // Shared contacts (stored in Supabase so all agents see the same names)
 app.get('/contacts', async (req, res) => {
-  const { data, error } = await supabase.from('contacts').select('phone, name, notes');
+  const { data, error } = await supabase.from('contacts').select('phone, name, notes, labels');
   if (error) return res.status(500).json({ error: error.message });
   const map = {};
-  for (const row of (data || [])) map[row.phone] = { name: row.name || '', notes: row.notes || '' };
+  for (const row of (data || [])) map[row.phone] = { name: row.name || '', notes: row.notes || '', labels: row.labels || [] };
   res.json({ contacts: map });
 });
 
@@ -337,41 +337,57 @@ app.post('/contacts', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Label endpoints — proxy to BotSpace using stored conversationId
+// Label endpoints — persist to Supabase and proxy add/remove to BotSpace
 app.post('/label', async (req, res) => {
   const { phone, label } = req.body;
   if (!phone || !label) return res.status(400).json({ error: 'missing phone or label' });
+
+  // Persist label to Supabase contacts table
+  const { data: existing } = await supabase.from('contacts').select('labels').eq('phone', phone).maybeSingle();
+  const currentLabels = existing?.labels || [];
+  if (!currentLabels.includes(label)) {
+    await supabase.from('contacts').upsert({ phone, labels: [...currentLabels, label] }, { onConflict: 'phone' });
+  }
+
+  // Also send to BotSpace if we have the conversationId
   const { data: conv } = await supabase.from('conversations').select('conversation_id').eq('phone', phone).maybeSingle();
   const conversationId = conv?.conversation_id;
-  if (!conversationId) return res.status(404).json({ error: 'conversation_id not found for this phone' });
-  try {
-    await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/conversation/${conversationId}/labels?apiKey=${BOTSPACE_API_KEY}`,
-      { labels: [label] },
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('[label] add error', e?.response?.data || e.message);
-    res.status(500).json({ error: 'BotSpace label add failed' });
+  if (conversationId) {
+    try {
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/conversation/${conversationId}/labels?apiKey=${BOTSPACE_API_KEY}`,
+        { labels: [label] },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    } catch (e) {
+      console.error('[label] BotSpace add error', e?.response?.data || e.message);
+    }
   }
+  res.json({ ok: true });
 });
 
 app.delete('/label', async (req, res) => {
   const { phone, label } = req.body;
   if (!phone || !label) return res.status(400).json({ error: 'missing phone or label' });
+
+  // Remove from Supabase
+  const { data: existing } = await supabase.from('contacts').select('labels').eq('phone', phone).maybeSingle();
+  const updatedLabels = (existing?.labels || []).filter(l => l !== label);
+  await supabase.from('contacts').upsert({ phone, labels: updatedLabels }, { onConflict: 'phone' });
+
+  // Also remove from BotSpace
   const { data: conv } = await supabase.from('conversations').select('conversation_id').eq('phone', phone).maybeSingle();
   const conversationId = conv?.conversation_id;
-  if (!conversationId) return res.status(404).json({ error: 'conversation_id not found for this phone' });
-  try {
-    await axios.delete(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/conversation/${conversationId}/labels/${encodeURIComponent(label)}?apiKey=${BOTSPACE_API_KEY}`
-    );
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('[label] remove error', e?.response?.data || e.message);
-    res.status(500).json({ error: 'BotSpace label remove failed' });
+  if (conversationId) {
+    try {
+      await axios.delete(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/conversation/${conversationId}/labels/${encodeURIComponent(label)}?apiKey=${BOTSPACE_API_KEY}`
+      );
+    } catch (e) {
+      console.error('[label] BotSpace remove error', e?.response?.data || e.message);
+    }
   }
+  res.json({ ok: true });
 });
 
 app.post("/webhook", async (req, res) => {
