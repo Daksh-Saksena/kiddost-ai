@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Moon, Sun, LogOut } from "lucide-react";
+import { Search, Moon, Sun, LogOut, Trash2 } from "lucide-react";
 
 interface Chat {
   id: string;
@@ -19,10 +19,11 @@ interface ChatListProps {
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onLogout: () => void;
+  onDeleteAccount?: () => void;
   chats: Chat[];
 }
 
-export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, chats }: ChatListProps) {
+export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats }: ChatListProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
 
@@ -58,6 +59,17 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
           >
             <LogOut className="w-5 h-5" />
           </button>
+          {onDeleteAccount && (
+            <button
+              onClick={onDeleteAccount}
+              title="Delete Account"
+              className={`p-2 rounded-full transition-all ${
+                isDarkMode ? "hover:bg-red-900/30 text-red-500/70 hover:text-red-400" : "hover:bg-red-500/10 text-red-300 hover:text-red-200"
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           <h1 className="text-xl flex-1 text-center">Chats</h1>
           <button
             onClick={onToggleTheme}

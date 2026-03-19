@@ -62,10 +62,7 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
       });
       const json = await res.json();
       if (res.ok && json.name) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name }));
-        onLogin(json.name);
-      } else {
-        setError("Incorrect PIN. Try again.");
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name, id: selectedAgent.id }));
         setPin("");
       }
     } catch { setError("Connection error. Try again."); }
@@ -109,7 +106,7 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
       });
       const json = await res.json();
       if (res.ok) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name }));
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name, id: json.id ?? null }));
         onLogin(json.name);
       } else {
         const msg = json.error === 'invalid_otp' ? "Incorrect OTP."
@@ -256,6 +253,16 @@ export default function AppClient() {
     }
     return 'Agent';
   });
+  const [agentId, setAgentId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      try { return JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null; } catch { return null; }
+    }
+    return null;
+  });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePin, setDeletePin] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [contacts, setContacts] = useState<Record<string, { name: string; notes: string; labels?: string[] }>>(() => getContacts());
 
   // Load shared contacts from server on mount
@@ -486,8 +493,32 @@ export default function AppClient() {
 
   const currentChat = chats.find((c) => c.id === selectedChat);
 
+  const handleDeleteAccount = async () => {
+    if (!agentId || !deletePin.trim()) return;
+    setDeleteLoading(true); setDeleteError('');
+    try {
+      const res = await fetch(`${SERVER}/delete-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, pin: deletePin.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setShowDeleteModal(false);
+        localStorage.removeItem(SESSION_KEY);
+        setAuthed(false); setAgentName('Agent'); setAgentId(null);
+      } else {
+        setDeleteError(json.error === 'invalid_pin' ? 'Incorrect PIN. Try again.' : 'Failed to delete account.');
+      }
+    } catch { setDeleteError('Connection error. Try again.'); }
+    finally { setDeleteLoading(false); }
+  };
+
   if (!authed) {
-    return <LoginScreen onLogin={(name) => { setAuthed(true); setAgentName(name); }} />;
+    return <LoginScreen onLogin={(name) => {
+      setAuthed(true); setAgentName(name);
+      try { setAgentId(JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null); } catch {}
+    }} />;
   }
 
   return (
@@ -558,12 +589,54 @@ export default function AppClient() {
             onSelectChat={(chatId) => setSelectedChat(chatId)}
             isDarkMode={isDarkMode}
             onToggleTheme={() => setIsDarkMode(!isDarkMode)}
-            onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); }}
+            onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}
+            onDeleteAccount={agentId && agentId !== 'admin' ? () => { setDeletePin(''); setDeleteError(''); setShowDeleteModal(true); } : undefined}
             chats={chats}
           />
         )
       )}
       <div ref={bottomRef} />
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowDeleteModal(false)}>
+          <div
+            className={`w-80 rounded-2xl p-6 shadow-2xl ${isDarkMode ? 'bg-gray-900 border border-red-900/40' : 'bg-white border border-red-200'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className={`text-lg font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Delete Account</h2>
+            <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              This will permanently remove your agent account. Enter your PIN to confirm.
+            </p>
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="Enter your PIN"
+              value={deletePin}
+              onChange={(e) => setDeletePin(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDeleteAccount()}
+              maxLength={8}
+              className={`w-full rounded-xl px-4 py-3 text-sm outline-none mb-3 ${isDarkMode ? 'bg-gray-800 text-white border border-gray-700 focus:border-red-500' : 'bg-gray-100 text-gray-900 border border-gray-200 focus:border-red-400'}`}
+            />
+            {deleteError && <p className="text-red-500 text-xs mb-3">{deleteError}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading || !deletePin.trim()}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 active:scale-95 transition-all"
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -213,7 +213,7 @@ app.post("/agent-login", async (req, res) => {
       .eq('pin_hash', hashed);
     if (agentId && agentId !== 'admin') query = query.eq('id', agentId);
     const { data: agent } = await query.maybeSingle();
-    if (agent) return res.json({ success: true, name: agent.name });
+    if (agent) return res.json({ success: true, name: agent.name, id: agent.id });
   }
 
   return res.status(401).json({ error: 'invalid_pin' });
@@ -269,16 +269,39 @@ app.post("/create-agent", async (req, res) => {
   const pinHash = hashPin(String(pin).trim());
   const safeName = String(name).trim().slice(0, 50);
 
-  const { error: insertError } = await supabaseService
+  const { data: created, error: insertError } = await supabaseService
     .from('agents')
-    .insert({ name: safeName, pin_hash: pinHash, active: true });
+    .insert({ name: safeName, pin_hash: pinHash, active: true })
+    .select('id')
+    .single();
 
   if (insertError) {
     console.error('create-agent insert error', insertError);
     return res.status(500).json({ error: 'db_error', detail: insertError.message });
   }
 
-  return res.json({ success: true, name: safeName });
+  return res.json({ success: true, name: safeName, id: created?.id ?? null });
+});
+
+// Delete an agent account — requires matching agentId + PIN
+app.post('/delete-agent', async (req, res) => {
+  const { agentId, pin } = req.body;
+  if (!agentId || !pin || typeof pin !== 'string') return res.status(400).json({ error: 'missing_fields' });
+  if (agentId === 'admin') return res.status(403).json({ error: 'cannot_delete_admin' });
+  if (!supabaseService) return res.status(500).json({ error: 'missing_service_role_key' });
+
+  const hashed = hashPin(pin.trim());
+  const { data: agent } = await supabaseService
+    .from('agents')
+    .select('id')
+    .eq('id', agentId)
+    .eq('pin_hash', hashed)
+    .maybeSingle();
+
+  if (!agent) return res.status(401).json({ error: 'invalid_pin' });
+
+  await supabaseService.from('agents').delete().eq('id', agentId);
+  return res.json({ ok: true });
 });
 
 // In-memory store for last 20 webhook bodies (for debugging)
