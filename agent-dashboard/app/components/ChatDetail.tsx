@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { avatarDataUrl } from '../avatarDataUrl';
-import { ArrowLeft, Send, MoreVertical, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X } from "lucide-react";
 import { supabase } from '../../lib/supabase';
 
 interface Message {
@@ -23,9 +23,19 @@ interface ChatDetailProps {
   isDarkMode: boolean;
 }
 
-export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void> }) {
+export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string } }) {
   const [messages, setMessages] = useState<Message[]>(propMessages || []);
   const [inputValue, setInputValue] = useState("");
+  const [showInfo, setShowInfo] = useState(false);
+  const [contactName, setContactName] = useState(initialContact?.name || '');
+  const [contactNotes, setContactNotes] = useState(initialContact?.notes || '');
+
+  // Reset info panel when switching chats
+  useEffect(() => {
+    setContactName(initialContact?.name || '');
+    setContactNotes(initialContact?.notes || '');
+    setShowInfo(false);
+  }, [chatId]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const prevLengthRef = useRef(0);
@@ -133,6 +143,11 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   const name = chatName || "Unknown";
   const avatar = chatAvatar || avatarDataUrl(name);
+
+  const handleSaveContact = () => {
+    onSaveContact?.(contactName.trim(), contactNotes.trim());
+    setShowInfo(false);
+  };
 
   function resolveMediaUrl(url: string): string {
     if (!url) return url;
@@ -260,10 +275,52 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
             )}
           </div>
         </div>
-        <button className={`relative z-10 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`}>
-          <MoreVertical className="w-6 h-6" />
+        <button className={`relative z-10 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`} onClick={() => setShowInfo(true)}>
+          <Info className="w-6 h-6" />
         </button>
       </div>
+
+      {/* Info / Notes drawer */}
+      {showInfo && (
+        <div className={`absolute inset-0 z-50 flex flex-col ${ isDarkMode ? 'bg-gray-950' : 'bg-white'}`}>
+          <div className={`flex items-center gap-3 px-4 py-4 border-b ${ isDarkMode ? 'border-blue-900/30 text-white' : 'border-gray-200 text-gray-900'}`}>
+            <button onClick={() => setShowInfo(false)} className="hover:opacity-70 transition-opacity">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="font-semibold text-base flex-1">Contact Info</h2>
+            <button onClick={handleSaveContact} className={`text-sm font-semibold px-3 py-1 rounded-lg ${ isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white'} transition-colors`}>Save</button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-6">
+            {/* Phone */}
+            <div>
+              <label className={`text-xs font-medium mb-1 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>PHONE</label>
+              <p className={`text-sm ${ isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{chatId}</p>
+            </div>
+            {/* Display name */}
+            <div>
+              <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>DISPLAY NAME</label>
+              <input
+                type="text"
+                value={contactName}
+                onChange={e => setContactName(e.target.value)}
+                placeholder="e.g. Rahul Sharma"
+                className={`w-full rounded-xl px-4 py-3 text-sm outline-none transition-all ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`}
+              />
+            </div>
+            {/* Notes */}
+            <div>
+              <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>
+              <textarea
+                value={contactNotes}
+                onChange={e => setContactNotes(e.target.value)}
+                placeholder="Add any notes about this customer..."
+                rows={6}
+                className={`w-full rounded-xl px-4 py-3 text-sm outline-none resize-none transition-all ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
         {messages.filter(m => m.sender !== 'system').map((message) => {

@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase";
 const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 
-type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null };
+type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
@@ -233,6 +233,16 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
   );
 }
 
+const CONTACTS_KEY = 'kiddost_contacts';
+function getContacts(): Record<string, { name: string; notes: string }> {
+  try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) || '{}'); } catch { return {}; }
+}
+function saveContact(phone: string, data: { name: string; notes: string }) {
+  const all = getContacts();
+  all[phone] = data;
+  try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(all)); } catch {}
+}
+
 export default function AppClient() {
   const [authed, setAuthed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -251,6 +261,15 @@ export default function AppClient() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // Track last-seen message timestamp per phone to calculate unread counts
+  const lastSeenRef = useRef<Record<string, string>>(
+    (() => { try { return JSON.parse(localStorage.getItem('kiddost_lastSeen') || '{}'); } catch { return {}; } })()
+  );
+
+  const markRead = (phone: string) => {
+    lastSeenRef.current[phone] = new Date().toISOString();
+    try { localStorage.setItem('kiddost_lastSeen', JSON.stringify(lastSeenRef.current)); } catch {}
+  };
 
   const scrollToBottom = () => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -262,18 +281,31 @@ export default function AppClient() {
     if (error) return;
     if (!data || data.length === 0) return setChats([]);
 
+    // Count unread (user messages newer than last-seen) per phone
+    const unreadCount: Record<string, number> = {};
+    for (const row of data) {
+      if (row.role !== 'user' && row.sender !== 'user') continue;
+      const lastSeen = lastSeenRef.current[row.phone];
+      if (!lastSeen || row.created_at > lastSeen) {
+        unreadCount[row.phone] = (unreadCount[row.phone] || 0) + 1;
+      }
+    }
+
     const map = new Map();
     for (const row of data) {
       if (!map.has(row.phone)) map.set(row.phone, row);
     }
 
+    const contacts = getContacts();
     const result: Chat[] = Array.from(map.values()).map((r: any) => ({
       id: r.phone,
-      name: r.phone,
+      name: contacts[r.phone]?.name || r.phone,
       avatar: avatarDataUrl(r.phone),
       lastMessage: r.content || '',
       time: r.created_at ? new Date(r.created_at).toLocaleString() : "",
       agent: r.agent ?? null,
+      unread: unreadCount[r.phone] || 0,
+      lastMsgAt: r.created_at,
     }));
 
     setChats(result);
@@ -319,7 +351,12 @@ export default function AppClient() {
   }, []);
 
   useEffect(() => {
-    if (selectedChat) loadMessages(selectedChat);
+    if (selectedChat) {
+      loadMessages(selectedChat);
+      markRead(selectedChat);
+      // Refresh chats so unread badge clears immediately
+      setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, unread: 0 } : c));
+    }
   }, [selectedChat]);
 
   useEffect(() => {
@@ -345,6 +382,13 @@ export default function AppClient() {
             };
             setMessages((prev) => [...prev, mapped]);
             setTimeout(scrollToBottom, 100);
+            // Mark as read since we're looking at it
+            markRead(msg.phone);
+          } else if (msg.role === 'user' || msg.sender === 'user') {
+            // Message for a background chat — bump its unread count
+            setChats(prev => prev.map(c =>
+              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1 } : c
+            ));
           }
           loadChats();
         }
@@ -386,6 +430,11 @@ export default function AppClient() {
           chatName={currentChat?.name}
           chatAvatar={currentChat?.avatar}
           onSend={sendMessage}
+          onSaveContact={(name, notes) => {
+            saveContact(selectedChat, { name, notes });
+            setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: name || c.id } : c));
+          }}
+          initialContact={(() => { const c = getContacts(); return c[selectedChat] || { name: '', notes: '' }; })()}
         />
       ) : (
         chats.length === 0 ? (
