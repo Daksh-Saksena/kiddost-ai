@@ -324,7 +324,7 @@ async function sendPushToAll(payload) {
 app.get('/contacts', async (req, res) => {
   const { data, error } = await supabase.from('contacts').select('phone, name, notes');
   if (error) return res.status(500).json({ error: error.message });
-  const map: Record<string, { name: string; notes: string }> = {};
+  const map = {};
   for (const row of (data || [])) map[row.phone] = { name: row.name || '', notes: row.notes || '' };
   res.json({ contacts: map });
 });
