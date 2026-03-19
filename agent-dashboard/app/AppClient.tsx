@@ -395,6 +395,22 @@ export default function AppClient() {
           loadChats();
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages" },
+        (payload) => {
+          const msg = payload.new;
+          // Patch status on matching message in state (status tick update)
+          if (msg.phone === selectedChat && msg.status) {
+            setMessages(prev => prev.map(m =>
+              (m.whatsapp_id && m.whatsapp_id === msg.whatsapp_id) ||
+              (m.id === String(msg.id))
+                ? { ...m, status: msg.status }
+                : m
+            ));
+          }
+        }
+      )
       .subscribe();
 
     return () => {

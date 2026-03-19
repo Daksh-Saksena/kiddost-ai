@@ -276,9 +276,14 @@ app.post("/webhook", async (req, res) => {
     console.log(JSON.stringify(body, null, 2));
 
     // Handle delivery / status webhooks from BotSpace / WhatsApp
-    if (body?.event === "message-status" || body?.event === "message-delivered") {
-      const messageId = body?.messageId || body?.message_id || body?.payload?.messageId;
-      const status = body?.status || body?.payload?.status || body?.delivery_status;
+    if (body?.event === "message-status" || body?.event === "message-delivered" ||
+        body?.event === "message-read" || body?.event === "message-seen" ||
+        body?.event === "status" || body?.type === "status") {
+      const messageId = body?.messageId || body?.message_id || body?.payload?.messageId || body?.payload?.message_id;
+      const rawStatus = body?.status || body?.payload?.status || body?.delivery_status || body?.payload?.delivery_status;
+      // Normalise to consistent lowercase values
+      const statusMap = { delivered: 'delivered', delivery: 'delivered', read: 'read', seen: 'read', sent: 'sent', accepted: 'sent', enqueued: 'sent' };
+      const status = rawStatus ? (statusMap[String(rawStatus).toLowerCase()] || String(rawStatus).toLowerCase()) : null;
       if (messageId && status) {
         try {
           await supabase

@@ -341,13 +341,14 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                 {message.text ? <p className={`text-sm ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
                 <div className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
                   <span>{message.time}</span>
-                  {isMe && (
-                    message.status === 'delivered' || message.status === 'read' ? (
-                      <CheckCheck className={`w-4 h-4 ${message.status === 'read' ? 'text-blue-400' : ''}`} />
-                    ) : (
-                      <Check className="w-4 h-4" />
-                    )
-                  )}
+                  {isMe && (() => {
+                    const s = message.status?.toLowerCase() || '';
+                    if (s === 'read' || s === 'seen') return <CheckCheck className="w-4 h-4 text-blue-400" />;
+                    if (s === 'delivered' || s === 'delivery') return <CheckCheck className="w-4 h-4" />;
+                    if (s === 'sent' || s === 'accepted' || s === 'enqueued') return <Check className="w-4 h-4" />;
+                    // No status yet — show single grey tick (sending)
+                    return <Check className="w-4 h-4 opacity-50" />;
+                  })()}
                 </div>
               </div>
             </div>
