@@ -397,11 +397,19 @@ app.post("/agent-send-media", async (req, res) => {
   console.log("/agent-send-media body:", req.body);
 
   try {
+    // Auto-detect mediaType from URL extension
+    function detectMediaType(url) {
+      const clean = (url || '').split('?')[0].toLowerCase();
+      if (/\.(mp4|mov|avi|mkv|webm|3gp)$/.test(clean)) return 'video';
+      if (/\.(mp3|ogg|wav|m4a|aac)$/.test(clean)) return 'audio';
+      if (/\.pdf$/.test(clean)) return 'document';
+      return 'image'; // default
+    }
     const payload = {
       name: "Agent",
       phone: phone,
       mediaUrl: mediaUrl,
-      mediaType: "image",
+      mediaType: detectMediaType(mediaUrl),
       label: caption || ""
     };
 

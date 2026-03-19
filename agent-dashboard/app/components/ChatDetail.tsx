@@ -118,6 +118,44 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     return url;
   }
 
+  function getMediaType(url: string): 'image' | 'video' | 'audio' | 'pdf' | 'file' {
+    const clean = url.split('?')[0].toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)$/.test(clean)) return 'image';
+    if (/\.(mp4|mov|avi|mkv|webm|3gp)$/.test(clean)) return 'video';
+    if (/\.(mp3|ogg|wav|m4a|aac)$/.test(clean)) return 'audio';
+    if (/\.pdf$/.test(clean)) return 'pdf';
+    return 'file';
+  }
+
+  function MediaRenderer({ url, isDark }: { url: string; isDark: boolean }) {
+    const resolved = resolveMediaUrl(url);
+    const type = getMediaType(url);
+    const linkClass = `text-sm underline ${isDark ? 'text-blue-300' : 'text-blue-600'}`;
+    if (type === 'image') {
+      return <img src={resolved} alt="media" className="w-48 rounded-md object-cover" />;
+    }
+    if (type === 'video') {
+      return (
+        <video controls className="w-48 rounded-md" preload="metadata">
+          <source src={resolved} />
+          <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>View video</a>
+        </video>
+      );
+    }
+    if (type === 'audio') {
+      return (
+        <audio controls className="w-48">
+          <source src={resolved} />
+          <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>Play audio</a>
+        </audio>
+      );
+    }
+    if (type === 'pdf') {
+      return <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>📄 View PDF</a>;
+    }
+    return <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>📎 Download file</a>;
+  }
+
   const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
     const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
     return lm && typeof lm.ai_enabled !== 'undefined' ? !!lm.ai_enabled : true;
@@ -197,11 +235,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
               <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${isDarkMode ? (isMe ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white backdrop-blur-sm' : 'bg-gray-900/80 text-gray-100 border border-blue-500/20 backdrop-blur-sm') : (isMe ? 'bg-[#d9fdd3]' : 'bg-white')}`} style={isDarkMode ? (isMe ? { boxShadow: '0 0 15px rgba(37, 99, 235, 0.2)' } : { boxShadow: '0 0 15px rgba(59, 130, 246, 0.1)' }) : {}}>
                 {message.media_url && (
                   <div className="mb-2">
-                    {message.media_url.endsWith('.pdf') ? (
-                      <a href={message.media_url} target="_blank" rel="noreferrer" className="text-sm underline">View document</a>
-                    ) : (
-                      <img src={resolveMediaUrl(message.media_url)} alt="media" className="w-48 rounded-md object-cover" />
-                    )}
+                    <MediaRenderer url={message.media_url} isDark={isDarkMode} />
                   </div>
                 )}
                 {message.text ? <p className={`text-sm ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
