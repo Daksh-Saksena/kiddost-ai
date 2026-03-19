@@ -268,9 +268,19 @@ app.post("/create-agent", async (req, res) => {
   return res.json({ success: true, name: safeName });
 });
 
+// In-memory store for last 20 webhook bodies (for debugging)
+const recentWebhooks = [];
+app.get("/debug-webhooks", (req, res) => {
+  res.json({ count: recentWebhooks.length, webhooks: recentWebhooks });
+});
+
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
+
+    // Store for debug inspection
+    recentWebhooks.unshift({ ts: new Date().toISOString(), body });
+    if (recentWebhooks.length > 20) recentWebhooks.pop();
 
     console.log("Full incoming body:");
     console.log(JSON.stringify(body, null, 2));
