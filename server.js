@@ -45,36 +45,6 @@ function hashPin(pin) {
   return crypto.createHash('sha256').update(String(pin)).digest('hex');
 }
 
-// Poll BotSpace for message delivery status and update Supabase
-async function pollMessageStatus(whatsappId, phone) {
-  const statusMap = { sent: 'sent', accepted: 'sent', enqueued: 'sent', delivered: 'delivered', read: 'read', seen: 'read', failed: 'failed' };
-  let lastStatus = null;
-  let attempts = 0;
-  const maxAttempts = 60; // 60 × 10s = 10 minutes
-  const interval = setInterval(async () => {
-    attempts++;
-    try {
-      const resp = await axios.get(
-        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/${whatsappId}/status`,
-        { params: { apiKey: BOTSPACE_API_KEY } }
-      );
-      const raw = resp?.data?.data?.status || '';
-      const normalized = statusMap[raw.toLowerCase()] || raw.toLowerCase();
-      if (normalized && normalized !== lastStatus) {
-        lastStatus = normalized;
-        await supabase.from('messages').update({ status: normalized }).eq('whatsapp_id', whatsappId);
-        console.log(`[poll] ${whatsappId} status -> ${normalized}`);
-      }
-      if (normalized === 'read' || normalized === 'failed' || attempts >= maxAttempts) {
-        clearInterval(interval);
-      }
-    } catch (e) {
-      console.error(`[poll] failed for ${whatsappId}:`, e?.response?.data || e?.message);
-      if (attempts >= maxAttempts) clearInterval(interval);
-    }
-  }, 10000);
-}
-
 // Helper: generate AI response for a combined user message
 async function handleAIResponse(fullPhone, combinedMessage) {
   try {
@@ -304,11 +274,17 @@ app.post("/webhook", async (req, res) => {
 
     console.log("Full incoming body:");
     console.log(JSON.stringify(body, null, 2));
+    console.log('[webhook] event:', body?.event, '| type:', body?.type, '| status:', body?.status || body?.payload?.status);
 
     // Handle delivery / status webhooks from BotSpace / WhatsApp
-    if (body?.event === "message-status" || body?.event === "message-delivered" ||
-        body?.event === "message-read" || body?.event === "message-seen" ||
-        body?.event === "status" || body?.type === "status") {
+    // Catch any event that carries a status field or has status-related event name
+    const isStatusEvent = body?.event === 'message-status' || body?.event === 'message-delivered' ||
+      body?.event === 'message-read' || body?.event === 'message-seen' ||
+      body?.event === 'status' || body?.type === 'status' ||
+      (body?.payload?.status && body?.direction === 'outgoing') ||
+      (body?.status && body?.direction === 'outgoing');
+
+    if (isStatusEvent) {
       const messageId = body?.id || body?.messageId || body?.message_id || body?.payload?.messageId || body?.payload?.message_id || body?.payload?.id;
       const rawStatus = body?.status || body?.payload?.status || body?.delivery_status || body?.payload?.delivery_status;
       // Normalise to consistent lowercase values
@@ -538,7 +514,7 @@ app.post("/agent-send", async (req, res) => {
       console.error("Failed to insert agent message into supabase", dbErr?.message || dbErr);
     }
 
-    if (whatsappId) pollMessageStatus(whatsappId, phone);
+    if (whatsappId) console.log('[agent-send] whatsapp_id captured:', whatsappId, 'status:', status);
 
     res.json({ success: true, whatsapp_id: whatsappId, status });
 
@@ -597,7 +573,7 @@ app.post("/agent-send-media", async (req, res) => {
     console.log('/agent-send-media insert result', { insertError, insertData });
 
     const mediaMsgId = response?.data?.data?.id || response?.data?.data?.messageId || response?.data?.messageId || response?.data?.id || null;
-    if (mediaMsgId) pollMessageStatus(mediaMsgId, phone);
+    if (mediaMsgId) console.log('[agent-send-media] whatsapp_id captured:', mediaMsgId);
 
     res.json({ success: true });
   } catch (err) {
