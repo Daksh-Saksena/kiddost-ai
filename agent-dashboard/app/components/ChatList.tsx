@@ -10,6 +10,7 @@ interface Chat {
   lastMessage: string;
   time: string;
   unread?: number;
+  agent?: string | null;
 }
 
 interface ChatListProps {
@@ -22,7 +23,7 @@ interface ChatListProps {
 
 export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, chats }: ChatListProps) {
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<'latest' | 'az'>('latest');
+  const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
 
   const filtered = query.trim()
     ? chats.filter(
@@ -34,7 +35,9 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
 
   const sorted = sort === 'az'
     ? [...filtered].sort((a, b) => a.name.localeCompare(b.name))
-    : filtered; // already latest-first from AppClient
+    : sort === 'agent'
+    ? [...filtered].sort((a, b) => (a.agent || 'AI').localeCompare(b.agent || 'AI'))
+    : filtered;
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
@@ -93,7 +96,7 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
         </div>
         {/* Sort pills */}
         <div className="flex gap-2 mt-2">
-          {(['latest', 'az'] as const).map((s) => (
+          {(['latest', 'az', 'agent'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSort(s)}
@@ -103,7 +106,7 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
                   : isDarkMode ? 'bg-gray-800 text-gray-400 hover:text-white' : 'bg-gray-200 text-gray-600'
               }`}
             >
-              {s === 'latest' ? 'Latest' : 'A – Z'}
+              {s === 'latest' ? 'Latest' : s === 'az' ? 'A – Z' : 'Agent'}
             </button>
           ))}
         </div>
@@ -136,13 +139,20 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
               </div>
               <div className="flex justify-between items-center mt-1.5">
                 <p className={`text-sm truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
-                {chat.unread ? (
-                  <span className={`ml-2 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 ${
-                    isDarkMode ? "bg-gradient-to-r from-blue-500 to-cyan-500" : "bg-[#25d366]"
-                  }`} style={isDarkMode ? { boxShadow: '0 0 15px rgba(59, 130, 246, 0.7)' } : {}}>
-                    {chat.unread}
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  {chat.agent && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      isDarkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700/40' : 'bg-gray-100 text-gray-600'
+                    }`}>{chat.agent}</span>
+                  )}
+                  {chat.unread ? (
+                    <span className={`text-white text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 ${
+                      isDarkMode ? "bg-gradient-to-r from-blue-500 to-cyan-500" : "bg-[#25d366]"
+                    }`} style={isDarkMode ? { boxShadow: '0 0 15px rgba(59, 130, 246, 0.7)' } : {}}>
+                      {chat.unread}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase";
 const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 
-type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
+type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
@@ -257,7 +257,7 @@ export default function AppClient() {
   };
 
   const loadChats = async () => {
-    const { data, error } = await supabase.from("messages").select("phone, content, role, sender, created_at").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("messages").select("phone, content, role, sender, agent, created_at").order("created_at", { ascending: false });
     console.log('loadChats result', { data, error });
     if (error) return;
     if (!data || data.length === 0) return setChats([]);
@@ -273,6 +273,7 @@ export default function AppClient() {
       avatar: avatarDataUrl(r.phone),
       lastMessage: r.content || '',
       time: r.created_at ? new Date(r.created_at).toLocaleString() : "",
+      agent: r.agent ?? null,
     }));
 
     setChats(result);
