@@ -109,36 +109,13 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const name = chatName || "Unknown";
   const avatar = chatAvatar || avatarDataUrl(name);
 
-  function ProxyImage({ url, alt }: { url: string; alt?: string }) {
-    const [src, setSrc] = useState<string | null>(null);
-
-    useEffect(() => {
-      let mounted = true;
-      const fetchImage = async () => {
-        try {
-          const proxyBase = 'https://kiddost-ai.onrender.com';
-          const proxy = `${proxyBase}/proxy-image?url=${encodeURIComponent(url)}`;
-          console.log('ProxyImage fetching', proxy);
-          const resp = await fetch(proxy);
-          console.log('ProxyImage response', resp.status, resp.headers.get('content-type'));
-          if (!resp.ok) throw new Error('proxy fetch failed');
-          const blob = await resp.blob();
-          const objectUrl = URL.createObjectURL(blob);
-          if (mounted) setSrc(objectUrl);
-        } catch (e) {
-          console.error('ProxyImage error', e);
-          // fallback to original URL
-          if (mounted) setSrc(url);
-        }
-      };
-      fetchImage();
-      return () => {
-        mounted = false;
-        if (src) URL.revokeObjectURL(src);
-      };
-    }, [url]);
-
-    return <img src={src || ''} alt={alt || 'media'} className="w-48 rounded-md object-cover" />;
+  function resolveMediaUrl(url: string): string {
+    if (!url) return url;
+    // Route BotSpace-hosted media through the server proxy so browsers render inline
+    if (url.includes('bot.space') || url.includes('botspace')) {
+      return `https://kiddost-ai.onrender.com/proxy-image?url=${encodeURIComponent(url)}`;
+    }
+    return url;
   }
 
   const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
@@ -223,11 +200,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                     {message.media_url.endsWith('.pdf') ? (
                       <a href={message.media_url} target="_blank" rel="noreferrer" className="text-sm underline">View document</a>
                     ) : (
-                      (() => {
-                        const isBotspace = message.media_url.includes('public-api.bot.space') || message.media_url.includes('bot.space');
-                        if (isBotspace) return <ProxyImage url={message.media_url} alt="media" />;
-                        return <img src={message.media_url} alt="media" className="w-48 rounded-md object-cover" />;
-                      })()
+                      <img src={resolveMediaUrl(message.media_url)} alt="media" className="w-48 rounded-md object-cover" />
                     )}
                   </div>
                 )}
