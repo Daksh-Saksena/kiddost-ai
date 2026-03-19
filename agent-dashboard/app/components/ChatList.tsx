@@ -11,6 +11,7 @@ interface Chat {
   time: string;
   unread?: number;
   agent?: string | null;
+  labels?: string[];
 }
 
 interface ChatListProps {
@@ -154,6 +155,15 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
                   ) : null}
                 </div>
               </div>
+              {chat.labels && chat.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {chat.labels.map(l => (
+                    <span key={l} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                      isDarkMode ? 'bg-blue-900/40 text-blue-300' : 'bg-green-100 text-green-700'
+                    }`}>{l}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}

@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase";
 const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 
-type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string };
+type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[] };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
@@ -320,6 +320,7 @@ export default function AppClient() {
       agent: r.agent ?? null,
       unread: unreadCount[r.phone] || 0,
       lastMsgAt: r.created_at,
+      labels: contacts[r.phone]?.labels || [],
     }));
 
     setChats(result);
@@ -527,6 +528,7 @@ export default function AppClient() {
               const newLabels = cur.labels?.includes(label) ? cur.labels : [...(cur.labels || []), label];
               const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
               try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+              setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
               return updated;
             });
           }}
@@ -541,6 +543,7 @@ export default function AppClient() {
               const newLabels = (cur.labels || []).filter(l => l !== label);
               const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
               try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+              setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
               return updated;
             });
           }}
