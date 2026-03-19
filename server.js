@@ -160,27 +160,47 @@ app.get("/", (req, res) => {
   res.send("Kiddost AI running 🚀");
 });
 
-// Agent login — checks agents table (hashed PIN), falls back to DASHBOARD_PIN env var
+// List all active agents (names + ids only, no PINs) — used by login profile picker
+app.get("/agents", async (req, res) => {
+  const profiles = [];
+  if (supabaseService) {
+    const { data } = await supabaseService
+      .from('agents')
+      .select('id, name')
+      .order('created_at', { ascending: true });
+    if (data) profiles.push(...data);
+  }
+  // Always include Admin card if DASHBOARD_PIN is configured
+  if (process.env.DASHBOARD_PIN) {
+    profiles.push({ id: 'admin', name: 'Admin' });
+  }
+  return res.json({ agents: profiles });
+});
+
+// Agent login — accepts agentId to restrict hash lookup to that specific account
 app.post("/agent-login", async (req, res) => {
-  const { pin } = req.body;
+  const { pin, agentId } = req.body;
   if (!pin || typeof pin !== "string") return res.status(400).json({ error: "missing_pin" });
   const hashed = hashPin(pin.trim());
 
-  // Check agents table (requires supabaseService to bypass RLS)
-  if (supabaseService) {
-    const { data: agent } = await supabaseService
-      .from('agents')
-      .select('id, name')
-      .eq('pin_hash', hashed)
-      .eq('active', true)
-      .maybeSingle();
-    if (agent) return res.json({ success: true, name: agent.name });
+  // Admin shortcut (DASHBOARD_PIN)
+  if (agentId === 'admin' || !agentId) {
+    const DASHBOARD_PIN = process.env.DASHBOARD_PIN;
+    if (DASHBOARD_PIN && pin.trim() === DASHBOARD_PIN) {
+      return res.json({ success: true, name: 'Admin' });
+    }
+    if (agentId === 'admin') return res.status(401).json({ error: 'invalid_pin' });
   }
 
-  // Fallback: DASHBOARD_PIN env var → logs in as "Admin"
-  const DASHBOARD_PIN = process.env.DASHBOARD_PIN;
-  if (DASHBOARD_PIN && pin.trim() === DASHBOARD_PIN) {
-    return res.json({ success: true, name: 'Admin' });
+  // Check agents table — if agentId given, restrict to that row only
+  if (supabaseService) {
+    let query = supabaseService
+      .from('agents')
+      .select('id, name')
+      .eq('pin_hash', hashed);
+    if (agentId && agentId !== 'admin') query = query.eq('id', agentId);
+    const { data: agent } = await query.maybeSingle();
+    if (agent) return res.json({ success: true, name: agent.name });
   }
 
   return res.status(401).json({ error: 'invalid_pin' });
