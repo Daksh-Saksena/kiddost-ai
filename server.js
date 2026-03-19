@@ -261,14 +261,15 @@ app.post("/webhook", async (req, res) => {
     }
 
     // Save user message (preserve ai_enabled if conversation previously disabled)
-    await supabase.from("messages").insert({
+    const { error: userInsertError } = await supabase.from("messages").insert({
       phone: fullPhone,
       role: "user",
-      content: message || null,
+      content: message || "",
       sender: "user",
       media_url: storedMediaUrl || null,
       ai_enabled: aiEnabledForInsert
     });
+    if (userInsertError) console.error('/webhook user insert error', userInsertError.message, { storedMediaUrl });
  
     // If AI is disabled for this conversation, skip buffering/respon
     const { data: last, error: lastErr } = await supabase
