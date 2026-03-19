@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import cors from "cors";
 import crypto from "crypto";
+import webpush from "web-push";
 dotenv.config();
 
 const app = express();
@@ -20,6 +21,18 @@ const PORT = process.env.PORT || 10000;
 const BOTSPACE_API_KEY = process.env.BOTSPACE_API_KEY;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// VAPID setup for Web Push
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:support@kiddost.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
+// In-memory push subscription store { endpoint -> subscriptionObject }
+const pushSubscriptions = new Map();
 
 // Supabase
 const supabase = createClient(
@@ -274,6 +287,39 @@ app.get("/debug-webhooks", (req, res) => {
   res.json({ count: recentWebhooks.length, webhooks: recentWebhooks });
 });
 
+// Push notification endpoints
+app.get('/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
+});
+
+app.post('/push-subscribe', (req, res) => {
+  const { subscription, agent } = req.body;
+  if (!subscription?.endpoint) return res.status(400).json({ error: 'invalid_subscription' });
+  pushSubscriptions.set(subscription.endpoint, { subscription, agent });
+  console.log(`[push] subscribed: ${agent} (${pushSubscriptions.size} total)`);
+  res.json({ ok: true });
+});
+
+app.post('/push-unsubscribe', (req, res) => {
+  const { endpoint } = req.body;
+  if (endpoint) pushSubscriptions.delete(endpoint);
+  res.json({ ok: true });
+});
+
+async function sendPushToAll(payload) {
+  if (!process.env.VAPID_PUBLIC_KEY) return;
+  const dead = [];
+  for (const [endpoint, { subscription }] of pushSubscriptions) {
+    try {
+      await webpush.sendNotification(subscription, JSON.stringify(payload));
+    } catch (e) {
+      if (e.statusCode === 410 || e.statusCode === 404) dead.push(endpoint);
+      else console.error('[push] send error:', e.message);
+    }
+  }
+  dead.forEach(ep => pushSubscriptions.delete(ep));
+}
+
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
@@ -411,6 +457,16 @@ app.post("/webhook", async (req, res) => {
       ai_enabled: aiEnabledForInsert
     });
     if (userInsertError) console.error('/webhook user insert error', userInsertError.message, { storedMediaUrl });
+
+    // Send push notification to all subscribed agent dashboards
+    const senderName = body?.customer?.name?.trim() || fullPhone;
+    const pushText = message || (mediaUrl ? '📎 Media message' : 'New message');
+    sendPushToAll({
+      title: `${senderName}`,
+      body: pushText,
+      phone: fullPhone,
+      icon: '/icon-192.png'
+    }).catch(() => {});
  
     // If AI is disabled for this conversation, skip buffering/respon
     const { data: last, error: lastErr } = await supabase

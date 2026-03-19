@@ -428,6 +428,47 @@ export default function AppClient() {
     return () => clearInterval(iv);
   }, [selectedChat]);
 
+  // Register service worker and subscribe to push notifications on login
+  useEffect(() => {
+    if (!authed) return;
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+    async function setupPush() {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const keyRes = await fetch(`${SERVER}/vapid-public-key`);
+        const { publicKey } = await keyRes.json();
+        if (!publicKey) return;
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        const existing = await reg.pushManager.getSubscription();
+        const subscription = existing || await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+
+        await fetch(`${SERVER}/push-subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription, agent: agentName })
+        });
+      } catch (e) {
+        console.warn('Push setup failed:', e);
+      }
+    }
+
+    function urlBase64ToUint8Array(base64String: string) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+    }
+
+    setupPush();
+  }, [authed, agentName]);
+
   const currentChat = chats.find((c) => c.id === selectedChat);
 
   if (!authed) {
