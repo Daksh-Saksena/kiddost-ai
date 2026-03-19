@@ -276,7 +276,6 @@ export default function AppClient() {
     }));
 
     setChats(result);
-    if (!selectedChat && result.length > 0) setSelectedChat(result[0].id);
   };
 
   const loadMessages = async (phone: string) => {
