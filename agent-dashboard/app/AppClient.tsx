@@ -12,9 +12,24 @@ const SESSION_KEY = "kiddost_auth";
 
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
+type AgentProfile = { id: string; name: string };
+
+function avatarColor(name: string) {
+  const palette = ['from-blue-600 to-blue-400', 'from-purple-600 to-purple-400', 'from-emerald-600 to-emerald-400', 'from-orange-500 to-amber-400', 'from-pink-600 to-pink-400', 'from-cyan-600 to-cyan-400'];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % palette.length;
+  return palette[h];
+}
+
+function avatarInitials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
 
 function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
-  const [mode, setMode] = useState<'login' | 'create_step1' | 'create_step2'>('login');
+  const [mode, setMode] = useState<'pick' | 'pin' | 'create_step1' | 'create_step2'>('pick');
+  const [agents, setAgents] = useState<AgentProfile[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+  const [selectedAgent, setSelectedAgent] = useState<AgentProfile | null>(null);
   const [pin, setPin] = useState("");
   const [newName, setNewName] = useState("");
   const [newPin, setNewPin] = useState("");
@@ -23,15 +38,27 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    fetch(`${SERVER}/agents`)
+      .then(r => r.json())
+      .then(j => setAgents(j.agents || []))
+      .catch(() => setAgents([]))
+      .finally(() => setLoadingAgents(false));
+  }, []);
+
+  const handleSelectAgent = (agent: AgentProfile) => {
+    setSelectedAgent(agent); setPin(""); setError(""); setMode('pin');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pin.trim()) return;
+    if (!pin.trim() || !selectedAgent) return;
     setLoading(true); setError("");
     try {
       const res = await fetch(`${SERVER}/agent-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: pin.trim() }),
+        body: JSON.stringify({ pin: pin.trim(), agentId: selectedAgent.id }),
       });
       const json = await res.json();
       if (res.ok && json.name) {
@@ -68,6 +95,8 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
     finally { setLoading(false); }
   };
 
+  const subtitle = mode === 'pick' ? 'Who are you?' : mode === 'pin' ? `Welcome, ${selectedAgent?.name}` : 'New Agent';
+
   const handleCreateAgent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp.trim()) return;
@@ -101,25 +130,55 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
       <div className="mb-8 text-center">
         <div className="text-4xl mb-2">🐣</div>
         <h1 className="text-2xl font-bold text-white tracking-wide">Kiddost</h1>
-        <p className="text-gray-500 text-sm mt-1">Agent Dashboard</p>
+        <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
       </div>
 
-      {mode === 'login' && (
+      {mode === 'pick' && (
+        <div className="w-full px-8 flex flex-col items-center gap-8">
+          {loadingAgents ? (
+            <p className="text-gray-600 text-sm animate-pulse">Loading profiles...</p>
+          ) : agents.length === 0 ? (
+            <p className="text-gray-600 text-sm">No agents yet. Create the first one below.</p>
+          ) : (
+            <div className="flex flex-wrap justify-center gap-8">
+              {agents.map(agent => (
+                <button key={agent.id} onClick={() => handleSelectAgent(agent)} className="flex flex-col items-center gap-3 group">
+                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${avatarColor(agent.name)} flex items-center justify-center text-white text-2xl font-bold group-hover:scale-110 group-active:scale-95 transition-transform duration-200`} style={{ boxShadow: '0 0 25px rgba(59,130,246,0.3)' }}>
+                    {avatarInitials(agent.name)}
+                  </div>
+                  <span className="text-gray-400 text-sm font-medium group-hover:text-white transition-colors">{agent.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => { setMode('create_step1'); setError(""); }} className="flex items-center gap-2 text-gray-600 text-xs hover:text-gray-400 transition-colors mt-2">
+            <span className="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center hover:border-gray-500 transition-colors text-base leading-none">+</span>
+            Request access for new agent
+          </button>
+        </div>
+      )}
+
+      {mode === 'pin' && selectedAgent && (
         <form onSubmit={handleLogin} className="w-full px-10 flex flex-col gap-4">
+          <div className="flex flex-col items-center mb-2">
+            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${avatarColor(selectedAgent.name)} flex items-center justify-center text-white text-xl font-bold mb-2`} style={{ boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+              {avatarInitials(selectedAgent.name)}
+            </div>
+          </div>
           <div>
-            <label className="text-gray-400 text-xs mb-1 block">ENTER YOUR PIN</label>
+            <label className="text-gray-400 text-xs mb-1 block text-center">ENTER YOUR PIN</label>
             <input type="password" value={pin} onChange={(e) => setPin(e.target.value)}
               placeholder="••••••" maxLength={20} autoFocus
-              className={`${inputCls} text-center text-xl tracking-widest`} />
+              className={`${inputCls} text-center text-2xl tracking-widest`} />
           </div>
           {error && <p className="text-red-400 text-sm text-center">{error}</p>}
           <button type="submit" disabled={loading || !pin.trim()} className={btnCls}
             style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
             {loading ? "Verifying..." : "Sign In"}
           </button>
-          <button type="button" onClick={() => { setMode('create_step1'); setError(""); }}
-            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors mt-2">
-            Request access for a new agent →
+          <button type="button" onClick={() => { setMode('pick'); setError(""); setPin(""); }}
+            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
+            Switch profile
           </button>
         </form>
       )}
@@ -142,9 +201,9 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
             style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
             {loading ? "Sending OTP..." : "Send OTP to Admin"}
           </button>
-          <button type="button" onClick={() => { setMode('login'); setError(""); }}
+          <button type="button" onClick={() => { setMode('pick'); setError(""); }}
             className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
-            ← Back to Sign In
+            Back
           </button>
         </form>
       )}
