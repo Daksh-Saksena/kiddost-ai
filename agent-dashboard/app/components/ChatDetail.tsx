@@ -226,7 +226,11 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     if (!lastWithState) return;
     const enabled = !!lastWithState.ai_enabled;
     setAiEnabledLocal(enabled);
-    setHandlerLocal(lastWithState.agent ? lastWithState.agent : (enabled ? 'AI' : 'Agent'));
+    // Only update the agent name if this message actually carries one (agent messages / system messages).
+    // Customer messages (sender=other) have no agent field — preserve whatever agent name we already have.
+    if (lastWithState.sender !== 'other') {
+      setHandlerLocal(lastWithState.agent ? lastWithState.agent : (enabled ? 'AI' : 'Agent'));
+    }
   }, [messages]);
 
   const toggleAi = async (enable: boolean) => {
