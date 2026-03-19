@@ -476,8 +476,15 @@ app.post("/agent-send", async (req, res) => {
     }
 
     // Attempt to extract a whatsapp message id and status from BotSpace response
-    const whatsappId = botResp?.data?.messageId || botResp?.data?.id || botResp?.data?.message_id || null;
-    const status = botResp?.data?.status || "sent";
+    console.log('BotSpace full response data:', JSON.stringify(botResp?.data));
+    const d = botResp?.data;
+    const whatsappId =
+      d?.messageId || d?.message_id || d?.id ||
+      d?.data?.messageId || d?.data?.message_id || d?.data?.id ||
+      d?.message?.id || d?.message?.messageId ||
+      d?.payload?.messageId || d?.payload?.id ||
+      null;
+    const status = d?.status || d?.data?.status || "sent";
 
     // Save message to database with whatsapp id and status
     try {
