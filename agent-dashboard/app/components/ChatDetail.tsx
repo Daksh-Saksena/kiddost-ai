@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { avatarDataUrl } from '../avatarDataUrl';
 import { ArrowLeft, Send, MoreVertical, Check, CheckCheck } from "lucide-react";
 import { supabase } from '../../lib/supabase';
@@ -26,10 +26,35 @@ interface ChatDetailProps {
 export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void> }) {
   const [messages, setMessages] = useState<Message[]>(propMessages || []);
   const [inputValue, setInputValue] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
+
+  // Reset scroll tracking when switching chats
+  useEffect(() => {
+    prevLengthRef.current = 0;
+  }, [chatId]);
 
   useEffect(() => {
     setMessages(propMessages || []);
   }, [propMessages]);
+
+  // Smart scroll: instant on initial load, smooth on new message if already near bottom
+  useEffect(() => {
+    const end = messagesEndRef.current;
+    const container = scrollContainerRef.current;
+    if (!end || messages.length === 0) return;
+    const isInitialLoad = prevLengthRef.current === 0;
+    if (isInitialLoad) {
+      end.scrollIntoView({ behavior: 'instant' });
+    } else if (messages.length > prevLengthRef.current) {
+      const isNearBottom = container
+        ? container.scrollHeight - container.scrollTop - container.clientHeight < 200
+        : true;
+      if (isNearBottom) end.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevLengthRef.current = messages.length;
+  }, [messages]);
 
   const handleSend = async () => {
     if (inputValue.trim()) {
@@ -240,7 +265,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
         {messages.filter(m => m.sender !== 'system').map((message) => {
           const isMe = message.sender === 'me';
           return (
@@ -266,6 +291,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
             </div>
           );
         })}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className={`px-4 py-3 flex items-center gap-3 relative z-10 ${isDarkMode ? "bg-gradient-to-t from-gray-900 to-black border-t border-blue-900/30" : "bg-[#f0f0f0]"}`}>

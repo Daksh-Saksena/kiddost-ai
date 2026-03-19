@@ -22,6 +22,7 @@ interface ChatListProps {
 
 export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, chats }: ChatListProps) {
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<'latest' | 'az'>('latest');
 
   const filtered = query.trim()
     ? chats.filter(
@@ -30,6 +31,10 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
           c.lastMessage.toLowerCase().includes(query.toLowerCase())
       )
     : chats;
+
+  const sorted = sort === 'az'
+    ? [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+    : filtered; // already latest-first from AppClient
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
@@ -86,16 +91,32 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, ch
             <button onClick={() => setQuery("")} className="text-gray-500 hover:text-gray-300 text-xs ml-2">✕</button>
           )}
         </div>
+        {/* Sort pills */}
+        <div className="flex gap-2 mt-2">
+          {(['latest', 'az'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setSort(s)}
+              className={`text-xs px-3 py-1 rounded-full transition-all ${
+                sort === s
+                  ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white'
+                  : isDarkMode ? 'bg-gray-800 text-gray-400 hover:text-white' : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {s === 'latest' ? 'Latest' : 'A – Z'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Chat List */}
       <div className={`flex-1 overflow-y-auto ${isDarkMode ? "bg-black" : "bg-white"}`}>
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <p className={`text-center text-sm mt-10 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
             {query ? "No chats match your search." : "No chats yet."}
           </p>
         )}
-        {filtered.map((chat) => (
+        {sorted.map((chat) => (
           <div
             key={chat.id}
             onClick={() => onSelectChat(chat.id)}
