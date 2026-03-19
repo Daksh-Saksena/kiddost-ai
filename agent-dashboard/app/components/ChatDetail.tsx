@@ -218,13 +218,15 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     return lm && lm.agent ? lm.agent : (lm && lm.ai_enabled === false ? 'Agent' : 'AI 🤖');
   });
 
-  // sync local handler/ai state when messages prop updates
+  // sync AI/handler state when messages change
+  // Use the most recent message that has an explicit ai_enabled value — including system toggle messages
   React.useEffect(() => {
-    const lastNonSystem = [...messages].reverse().find((m) => m.sender !== 'system') || null;
-    if (lastNonSystem) {
-      setAiEnabledLocal(typeof lastNonSystem.ai_enabled !== 'undefined' ? !!lastNonSystem.ai_enabled : true);
-      setHandlerLocal(lastNonSystem.agent ? lastNonSystem.agent : (lastNonSystem.ai_enabled === false ? 'Agent' : 'AI 🤖'));
-    }
+    if (messages.length === 0) return;
+    const lastWithState = [...messages].reverse().find(m => typeof m.ai_enabled !== 'undefined');
+    if (!lastWithState) return;
+    const enabled = !!lastWithState.ai_enabled;
+    setAiEnabledLocal(enabled);
+    setHandlerLocal(lastWithState.agent ? lastWithState.agent : (enabled ? 'AI' : 'Agent'));
   }, [messages]);
 
   const toggleAi = async (enable: boolean) => {
@@ -235,9 +237,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
       });
       if (res.ok) {
-        // optimistic local update (do not insert visible system message)
         setAiEnabledLocal(!!enable);
-        setHandlerLocal(enable ? 'AI 🤖' : 'Agent');
+        setHandlerLocal(enable ? 'AI' : 'Agent');
       }
     } catch (err) {
       console.error("toggleAi error", err);
@@ -268,7 +269,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
           <p className={`text-xs ${isDarkMode ? "text-white" : "text-gray-200"}`}>Online</p>
           <div className="text-xs mt-1 flex items-center gap-2">
             <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>Handled by:</strong> {handlerLocal}</span>
-            {handlerLocal === 'AI 🤖' ? (
+            {aiEnabledLocal ? (
               <button onClick={() => toggleAi(false)} className="ml-2 px-2 py-1 text-xs rounded bg-red-600 text-white">Stop AI</button>
             ) : (
               <button onClick={() => toggleAi(true)} className="ml-2 px-2 py-1 text-xs rounded bg-green-600 text-white">Resume AI</button>

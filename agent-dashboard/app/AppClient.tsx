@@ -372,10 +372,12 @@ export default function AppClient() {
             const mapped = {
               id: String(msg.id || msg.created_at),
               text: msg.content || msg.text || '',
-              sender: ((msg.role && msg.role === 'user') ? 'other' : 'me') as 'me' | 'other',
+              sender: (msg.sender === 'system' || msg.role === 'system') ? 'system' as const
+                : (msg.role === 'user' || msg.sender === 'user') ? 'other' as const
+                : 'me' as const,
               time: msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
               agent: msg.agent ?? null,
-              ai_enabled: typeof msg.ai_enabled !== 'undefined' ? !!msg.ai_enabled : true,
+              ai_enabled: typeof msg.ai_enabled !== 'undefined' ? !!msg.ai_enabled : undefined,
               status: msg.status ?? null,
               media_url: msg.media_url ?? null,
               whatsapp_id: msg.whatsapp_id ?? null,
