@@ -23,18 +23,22 @@ interface ChatDetailProps {
   isDarkMode: boolean;
 }
 
-export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string } }) {
+export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact, onAddLabel, onRemoveLabel }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string }; onAddLabel?: (label: string) => void; onRemoveLabel?: (label: string) => void }) {
   const [messages, setMessages] = useState<Message[]>(propMessages || []);
   const [inputValue, setInputValue] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [contactName, setContactName] = useState(initialContact?.name || '');
   const [contactNotes, setContactNotes] = useState(initialContact?.notes || '');
+  const [labels, setLabels] = useState<string[]>([]);
+  const [labelInput, setLabelInput] = useState('');
 
   // Reset info panel when switching chats
   useEffect(() => {
     setContactName(initialContact?.name || '');
     setContactNotes(initialContact?.notes || '');
     setShowInfo(false);
+    setLabels([]);
+    setLabelInput('');
   }, [chatId]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -319,9 +323,51 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                 value={contactNotes}
                 onChange={e => setContactNotes(e.target.value)}
                 placeholder="Add any notes about this customer..."
-                rows={6}
+                rows={4}
                 className={`w-full rounded-xl px-4 py-3 text-sm outline-none resize-none transition-all ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`}
               />
+            </div>
+            {/* Labels */}
+            <div>
+              <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>LABELS</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {labels.map(l => (
+                  <span key={l} className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ isDarkMode ? 'bg-blue-900/60 text-blue-200' : 'bg-green-100 text-green-800'}`}>
+                    {l}
+                    <button onClick={() => { onRemoveLabel?.(l); setLabels(prev => prev.filter(x => x !== l)); }} className="ml-1 hover:opacity-70">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={labelInput}
+                  onChange={e => setLabelInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && labelInput.trim()) {
+                      const l = labelInput.trim();
+                      onAddLabel?.(l);
+                      setLabels(prev => prev.includes(l) ? prev : [...prev, l]);
+                      setLabelInput('');
+                    }
+                  }}
+                  placeholder="Type label + Enter"
+                  className={`flex-1 rounded-xl px-3 py-2 text-sm outline-none ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600' : 'bg-gray-100 border border-gray-200 text-gray-900'}`}
+                />
+                <button
+                  onClick={() => {
+                    if (labelInput.trim()) {
+                      const l = labelInput.trim();
+                      onAddLabel?.(l);
+                      setLabels(prev => prev.includes(l) ? prev : [...prev, l]);
+                      setLabelInput('');
+                    }
+                  }}
+                  className={`px-3 py-2 rounded-xl text-sm font-medium ${ isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white'}`}
+                >Add</button>
+              </div>
             </div>
           </div>
         </div>

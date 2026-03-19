@@ -256,6 +256,20 @@ export default function AppClient() {
     }
     return 'Agent';
   });
+  const [contacts, setContacts] = useState<Record<string, { name: string; notes: string }>>(() => getContacts());
+
+  // Load shared contacts from server on mount
+  useEffect(() => {
+    fetch(`${SERVER}/contacts`)
+      .then(r => r.json())
+      .then(j => {
+        if (j.contacts) {
+          setContacts(j.contacts);
+          try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(j.contacts)); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -490,10 +504,27 @@ export default function AppClient() {
           chatAvatar={currentChat?.avatar}
           onSend={sendMessage}
           onSaveContact={(name, notes) => {
+            // Save to server (shared across all agents) + local state
+            fetch(`${SERVER}/contacts`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: selectedChat, name, notes })
+            }).catch(() => {});
             saveContact(selectedChat, { name, notes });
+            setContacts(prev => ({ ...prev, [selectedChat]: { name, notes } }));
             setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: name || c.id } : c));
           }}
-          initialContact={(() => { const c = getContacts(); return c[selectedChat] || { name: '', notes: '' }; })()}
+          initialContact={contacts[selectedChat] || { name: '', notes: '' }}
+          onAddLabel={(label) => fetch(`${SERVER}/label`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: selectedChat, label })
+          }).catch(() => {})}
+          onRemoveLabel={(label) => fetch(`${SERVER}/label`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: selectedChat, label })
+          }).catch(() => {})}
         />
       ) : (
         chats.length === 0 ? (

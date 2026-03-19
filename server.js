@@ -320,6 +320,60 @@ async function sendPushToAll(payload) {
   dead.forEach(ep => pushSubscriptions.delete(ep));
 }
 
+// Shared contacts (stored in Supabase so all agents see the same names)
+app.get('/contacts', async (req, res) => {
+  const { data, error } = await supabase.from('contacts').select('phone, name, notes');
+  if (error) return res.status(500).json({ error: error.message });
+  const map: Record<string, { name: string; notes: string }> = {};
+  for (const row of (data || [])) map[row.phone] = { name: row.name || '', notes: row.notes || '' };
+  res.json({ contacts: map });
+});
+
+app.post('/contacts', async (req, res) => {
+  const { phone, name, notes } = req.body;
+  if (!phone) return res.status(400).json({ error: 'missing phone' });
+  const { error } = await supabase.from('contacts').upsert({ phone, name: name || '', notes: notes || '' }, { onConflict: 'phone' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Label endpoints — proxy to BotSpace using stored conversationId
+app.post('/label', async (req, res) => {
+  const { phone, label } = req.body;
+  if (!phone || !label) return res.status(400).json({ error: 'missing phone or label' });
+  const { data: conv } = await supabase.from('conversations').select('conversation_id').eq('phone', phone).maybeSingle();
+  const conversationId = conv?.conversation_id;
+  if (!conversationId) return res.status(404).json({ error: 'conversation_id not found for this phone' });
+  try {
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/conversation/${conversationId}/labels?apiKey=${BOTSPACE_API_KEY}`,
+      { labels: [label] },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[label] add error', e?.response?.data || e.message);
+    res.status(500).json({ error: 'BotSpace label add failed' });
+  }
+});
+
+app.delete('/label', async (req, res) => {
+  const { phone, label } = req.body;
+  if (!phone || !label) return res.status(400).json({ error: 'missing phone or label' });
+  const { data: conv } = await supabase.from('conversations').select('conversation_id').eq('phone', phone).maybeSingle();
+  const conversationId = conv?.conversation_id;
+  if (!conversationId) return res.status(404).json({ error: 'conversation_id not found for this phone' });
+  try {
+    await axios.delete(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/conversation/${conversationId}/labels/${encodeURIComponent(label)}?apiKey=${BOTSPACE_API_KEY}`
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[label] remove error', e?.response?.data || e.message);
+    res.status(500).json({ error: 'BotSpace label remove failed' });
+  }
+});
+
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
@@ -397,10 +451,15 @@ app.post("/webhook", async (req, res) => {
       .eq("phone", fullPhone)
       .maybeSingle();
 
+    const botspaceConversationId = body?.customer?.id || null;
+
     if (!existingConversation) {
       await supabase.from("conversations").insert({
-        phone: fullPhone
+        phone: fullPhone,
+        conversation_id: botspaceConversationId
       });
+    } else if (botspaceConversationId) {
+      await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
     }
 
     // Determine previous AI state for this conversation
