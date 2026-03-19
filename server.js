@@ -152,6 +152,18 @@ app.get("/", (req, res) => {
   res.send("Kiddost AI running 🚀");
 });
 
+// PIN verification — compare against DASHBOARD_PIN env var (required)
+app.post("/verify-pin", (req, res) => {
+  const { pin } = req.body;
+  const DASHBOARD_PIN = process.env.DASHBOARD_PIN;
+  if (!DASHBOARD_PIN) return res.status(500).json({ error: "no_pin_configured" });
+  if (!pin || typeof pin !== "string") return res.status(400).json({ error: "missing_pin" });
+  if (pin === DASHBOARD_PIN) {
+    return res.json({ success: true });
+  }
+  return res.status(401).json({ error: "invalid_pin" });
+});
+
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;

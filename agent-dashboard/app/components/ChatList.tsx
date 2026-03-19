@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, Moon, Sun } from "lucide-react";
+import { useState } from "react";
+import { Search, Moon, Sun, LogOut } from "lucide-react";
 
 interface Chat {
   id: string;
@@ -15,9 +16,21 @@ interface ChatListProps {
   onSelectChat: (chatId: string) => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  onLogout: () => void;
+  chats: Chat[];
 }
 
-export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, chats }: ChatListProps & { chats: Chat[] }) {
+export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, chats }: ChatListProps) {
+  const [query, setQuery] = useState("");
+
+  const filtered = query.trim()
+    ? chats.filter(
+        (c) =>
+          c.name.toLowerCase().includes(query.toLowerCase()) ||
+          c.lastMessage.toLowerCase().includes(query.toLowerCase())
+      )
+    : chats;
+
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
       {/* Header */}
@@ -27,6 +40,15 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, chats }: Cha
           : "bg-[#008069]"
       }`}>
         <div className="flex items-center justify-between">
+          <button
+            onClick={onLogout}
+            title="Logout"
+            className={`p-2 rounded-full transition-all ${
+              isDarkMode ? "hover:bg-blue-900/30 text-gray-400 hover:text-white" : "hover:bg-white/10"
+            }`}
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
           <h1 className="text-xl flex-1 text-center">Chats</h1>
           <button
             onClick={onToggleTheme}
@@ -53,17 +75,27 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, chats }: Cha
           <Search className={`w-5 h-5 ${isDarkMode ? "text-blue-400" : "text-gray-500"}`} />
           <input
             type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder={isDarkMode ? "Search transmissions..." : "Search or start new chat"}
             className={`flex-1 ml-3 bg-transparent outline-none text-sm ${
               isDarkMode ? "text-gray-300 placeholder:text-gray-600" : "text-gray-900 placeholder:text-gray-500"
             }`}
           />
+          {query && (
+            <button onClick={() => setQuery("")} className="text-gray-500 hover:text-gray-300 text-xs ml-2">✕</button>
+          )}
         </div>
       </div>
 
       {/* Chat List */}
       <div className={`flex-1 overflow-y-auto ${isDarkMode ? "bg-black" : "bg-white"}`}>
-        {chats.map((chat) => (
+        {filtered.length === 0 && (
+          <p className={`text-center text-sm mt-10 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+            {query ? "No chats match your search." : "No chats yet."}
+          </p>
+        )}
+        {filtered.map((chat) => (
           <div
             key={chat.id}
             onClick={() => onSelectChat(chat.id)}
@@ -83,13 +115,13 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, chats }: Cha
               </div>
               <div className="flex justify-between items-center mt-1.5">
                 <p className={`text-sm truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
-                {chat.unread && (
+                {chat.unread ? (
                   <span className={`ml-2 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 ${
                     isDarkMode ? "bg-gradient-to-r from-blue-500 to-cyan-500" : "bg-[#25d366]"
                   }`} style={isDarkMode ? { boxShadow: '0 0 15px rgba(59, 130, 246, 0.7)' } : {}}>
                     {chat.unread}
                   </span>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -98,3 +130,4 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, chats }: Cha
     </div>
   );
 }
+

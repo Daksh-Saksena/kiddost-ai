@@ -7,10 +7,84 @@ import "./mobile-styles.css";
 import { avatarDataUrl } from './avatarDataUrl';
 import { supabase } from "../lib/supabase";
 
+const SERVER = "https://kiddost-ai.onrender.com";
+const SESSION_KEY = "kiddost_auth";
+
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 
+function LoginScreen({ onLogin }: { onLogin: () => void }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const isDark = true;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pin.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${SERVER}/verify-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: pin.trim() }),
+      });
+      if (res.ok) {
+        localStorage.setItem(SESSION_KEY, "1");
+        onLogin();
+      } else {
+        setError("Incorrect PIN. Try again.");
+        setPin("");
+      }
+    } catch {
+      setError("Connection error. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="h-screen max-w-md mx-auto flex flex-col items-center justify-center bg-black" style={{ boxShadow: "0 0 100px rgba(59,130,246,0.3)" }}>
+      {/* Logo / branding */}
+      <div className="mb-8 text-center">
+        <div className="text-4xl mb-2">🐣</div>
+        <h1 className="text-2xl font-bold text-white tracking-wide">Kiddost</h1>
+        <p className="text-gray-500 text-sm mt-1">Agent Dashboard</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="w-full px-10 flex flex-col gap-4">
+        <div>
+          <label className="text-gray-400 text-xs mb-1 block">ENTER PIN</label>
+          <input
+            type="password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="••••••"
+            maxLength={20}
+            autoFocus
+            className="w-full rounded-xl px-5 py-4 bg-gray-900 border border-blue-500/30 text-white text-center text-xl tracking-widest outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+          />
+        </div>
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading || !pin.trim()}
+          className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 text-white font-semibold text-sm disabled:opacity-40 hover:from-blue-600 hover:to-blue-500 active:scale-95 transition-all"
+          style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}
+        >
+          {loading ? "Verifying..." : "Sign In"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function AppClient() {
+  const [authed, setAuthed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem(SESSION_KEY) === "1";
+    return false;
+  });
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -133,6 +207,10 @@ export default function AppClient() {
 
   const currentChat = chats.find((c) => c.id === selectedChat);
 
+  if (!authed) {
+    return <LoginScreen onLogin={() => setAuthed(true)} />;
+  }
+
   return (
     <div
       className={`h-screen max-w-md mx-auto shadow-2xl ${isDarkMode ? "bg-black" : "bg-white"}`}
@@ -158,6 +236,7 @@ export default function AppClient() {
             onSelectChat={(chatId) => setSelectedChat(chatId)}
             isDarkMode={isDarkMode}
             onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+            onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); }}
             chats={chats}
           />
         )
