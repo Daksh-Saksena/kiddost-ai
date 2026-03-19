@@ -288,7 +288,8 @@ app.post("/webhook", async (req, res) => {
 
     // Handle delivery / status webhooks from BotSpace / WhatsApp
     // Catch any event that carries a status field or has status-related event name
-    const isStatusEvent = body?.event === 'message-status' || body?.event === 'message-delivered' ||
+    const isStatusEvent = body?.event === 'delivery-update' ||
+      body?.event === 'message-status' || body?.event === 'message-delivered' ||
       body?.event === 'message-read' || body?.event === 'message-seen' ||
       body?.event === 'status' || body?.type === 'status' ||
       (body?.payload?.status && body?.direction === 'outgoing') ||
