@@ -3,6 +3,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import cors from "cors";
+import crypto from "crypto";
 dotenv.config();
 
 const app = express();
@@ -36,6 +37,13 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 // In-memory buffering to combine fragmented user messages per phone
 const messageBuffers = {};
 const messageTimers = {};
+
+// In-memory OTP store for agent creation: { token -> { otp, expiresAt } }
+const otpStore = {};
+
+function hashPin(pin) {
+  return crypto.createHash('sha256').update(String(pin)).digest('hex');
+}
 
 // Helper: generate AI response for a combined user message
 async function handleAIResponse(fullPhone, combinedMessage) {
@@ -152,16 +160,92 @@ app.get("/", (req, res) => {
   res.send("Kiddost AI running 🚀");
 });
 
-// PIN verification — compare against DASHBOARD_PIN env var (required)
-app.post("/verify-pin", (req, res) => {
+// Agent login — checks agents table (hashed PIN), falls back to DASHBOARD_PIN env var
+app.post("/agent-login", async (req, res) => {
+  const { pin } = req.body;
+  if (!pin || typeof pin !== "string") return res.status(400).json({ error: "missing_pin" });
+  const hashed = hashPin(pin.trim());
+
+  // Check agents table (requires supabaseService to bypass RLS)
+  if (supabaseService) {
+    const { data: agent } = await supabaseService
+      .from('agents')
+      .select('id, name')
+      .eq('pin_hash', hashed)
+      .eq('active', true)
+      .maybeSingle();
+    if (agent) return res.json({ success: true, name: agent.name });
+  }
+
+  // Fallback: DASHBOARD_PIN env var → logs in as "Admin"
+  const DASHBOARD_PIN = process.env.DASHBOARD_PIN;
+  if (DASHBOARD_PIN && pin.trim() === DASHBOARD_PIN) {
+    return res.json({ success: true, name: 'Admin' });
+  }
+
+  return res.status(401).json({ error: 'invalid_pin' });
+});
+
+// Backward compat alias
+app.post("/verify-pin", async (req, res) => {
   const { pin } = req.body;
   const DASHBOARD_PIN = process.env.DASHBOARD_PIN;
-  if (!DASHBOARD_PIN) return res.status(500).json({ error: "no_pin_configured" });
-  if (!pin || typeof pin !== "string") return res.status(400).json({ error: "missing_pin" });
-  if (pin === DASHBOARD_PIN) {
-    return res.json({ success: true });
+  if (DASHBOARD_PIN && pin === DASHBOARD_PIN) return res.json({ success: true, name: 'Admin' });
+  return res.status(401).json({ error: 'invalid_pin' });
+});
+
+// Request OTP to create a new agent — sends to ADMIN_PHONE via BotSpace WhatsApp
+app.post("/request-agent-otp", async (req, res) => {
+  const ADMIN_PHONE = process.env.ADMIN_PHONE;
+  if (!ADMIN_PHONE) return res.status(500).json({ error: 'no_admin_phone_configured' });
+
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const token = crypto.randomBytes(16).toString('hex');
+  otpStore[token] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 };
+
+  try {
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+      { name: 'Kiddost', phone: ADMIN_PHONE, text: `🔐 Kiddost Agent OTP: *${otp}*\n\nSomeone is requesting to add a new agent to the dashboard. If this was you, enter this code. Expires in 10 minutes.` },
+      { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    console.error('Failed to send OTP via BotSpace', err.response?.data || err.message);
+    return res.status(500).json({ error: 'failed_to_send_otp' });
   }
-  return res.status(401).json({ error: "invalid_pin" });
+
+  return res.json({ success: true, token });
+});
+
+// Create new agent — verify OTP then insert into agents table
+app.post("/create-agent", async (req, res) => {
+  const { token, otp, name, pin } = req.body;
+  if (!token || !otp || !name || !pin) return res.status(400).json({ error: 'missing_params' });
+  if (!supabaseService) return res.status(500).json({ error: 'missing_service_role_key' });
+
+  const stored = otpStore[token];
+  if (!stored) return res.status(400).json({ error: 'invalid_token' });
+  if (Date.now() > stored.expiresAt) {
+    delete otpStore[token];
+    return res.status(400).json({ error: 'otp_expired' });
+  }
+  if (stored.otp !== String(otp).trim()) return res.status(401).json({ error: 'invalid_otp' });
+
+  delete otpStore[token];
+
+  const pinHash = hashPin(String(pin).trim());
+  const safeName = String(name).trim().slice(0, 50);
+
+  const { error: insertError } = await supabaseService
+    .from('agents')
+    .insert({ name: safeName, pin_hash: pinHash, active: true });
+
+  if (insertError) {
+    console.error('create-agent insert error', insertError);
+    return res.status(500).json({ error: 'db_error', detail: insertError.message });
+  }
+
+  return res.json({ success: true, name: safeName });
 });
 
 app.post("/webhook", async (req, res) => {

@@ -13,77 +13,179 @@ const SESSION_KEY = "kiddost_auth";
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
+function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
+  const [mode, setMode] = useState<'login' | 'create_step1' | 'create_step2'>('login');
   const [pin, setPin] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [otp, setOtp] = useState("");
+  const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const isDark = true;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pin.trim()) return;
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
-      const res = await fetch(`${SERVER}/verify-pin`, {
+      const res = await fetch(`${SERVER}/agent-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin: pin.trim() }),
       });
-      if (res.ok) {
-        localStorage.setItem(SESSION_KEY, "1");
-        onLogin();
+      const json = await res.json();
+      if (res.ok && json.name) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name }));
+        onLogin(json.name);
       } else {
         setError("Incorrect PIN. Try again.");
         setPin("");
       }
-    } catch {
-      setError("Connection error. Try again.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Connection error. Try again."); }
+    finally { setLoading(false); }
   };
+
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || !newPin.trim()) return;
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`${SERVER}/request-agent-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (res.ok && json.token) {
+        setToken(json.token);
+        setMode('create_step2');
+      } else {
+        setError(json.error === 'no_admin_phone_configured'
+          ? "Admin phone not configured on server."
+          : "Failed to send OTP. Try again.");
+      }
+    } catch { setError("Connection error. Try again."); }
+    finally { setLoading(false); }
+  };
+
+  const handleCreateAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp.trim()) return;
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`${SERVER}/create-agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, otp: otp.trim(), name: newName.trim(), pin: newPin.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name }));
+        onLogin(json.name);
+      } else {
+        const msg = json.error === 'invalid_otp' ? "Incorrect OTP."
+          : json.error === 'otp_expired' ? "OTP expired. Request a new one."
+          : "Failed to create agent.";
+        setError(msg);
+        if (json.error === 'otp_expired') { setMode('create_step1'); setOtp(""); }
+      }
+    } catch { setError("Connection error. Try again."); }
+    finally { setLoading(false); }
+  };
+
+  const inputCls = "w-full rounded-xl px-5 py-3 bg-gray-900 border border-blue-500/30 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all";
+  const btnCls = "w-full py-4 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 text-white font-semibold text-sm disabled:opacity-40 hover:from-blue-600 hover:to-blue-500 active:scale-95 transition-all";
 
   return (
     <div className="h-screen max-w-md mx-auto flex flex-col items-center justify-center bg-black" style={{ boxShadow: "0 0 100px rgba(59,130,246,0.3)" }}>
-      {/* Logo / branding */}
       <div className="mb-8 text-center">
         <div className="text-4xl mb-2">🐣</div>
         <h1 className="text-2xl font-bold text-white tracking-wide">Kiddost</h1>
         <p className="text-gray-500 text-sm mt-1">Agent Dashboard</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="w-full px-10 flex flex-col gap-4">
-        <div>
-          <label className="text-gray-400 text-xs mb-1 block">ENTER PIN</label>
-          <input
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="••••••"
-            maxLength={20}
-            autoFocus
-            className="w-full rounded-xl px-5 py-4 bg-gray-900 border border-blue-500/30 text-white text-center text-xl tracking-widest outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-          />
-        </div>
-        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading || !pin.trim()}
-          className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 text-white font-semibold text-sm disabled:opacity-40 hover:from-blue-600 hover:to-blue-500 active:scale-95 transition-all"
-          style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}
-        >
-          {loading ? "Verifying..." : "Sign In"}
-        </button>
-      </form>
+      {mode === 'login' && (
+        <form onSubmit={handleLogin} className="w-full px-10 flex flex-col gap-4">
+          <div>
+            <label className="text-gray-400 text-xs mb-1 block">ENTER YOUR PIN</label>
+            <input type="password" value={pin} onChange={(e) => setPin(e.target.value)}
+              placeholder="••••••" maxLength={20} autoFocus
+              className={`${inputCls} text-center text-xl tracking-widest`} />
+          </div>
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          <button type="submit" disabled={loading || !pin.trim()} className={btnCls}
+            style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
+            {loading ? "Verifying..." : "Sign In"}
+          </button>
+          <button type="button" onClick={() => { setMode('create_step1'); setError(""); }}
+            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors mt-2">
+            Request access for a new agent →
+          </button>
+        </form>
+      )}
+
+      {mode === 'create_step1' && (
+        <form onSubmit={handleRequestOtp} className="w-full px-10 flex flex-col gap-4">
+          <p className="text-gray-500 text-xs text-center">An OTP will be sent to the admin’s WhatsApp to verify this request.</p>
+          <div>
+            <label className="text-gray-400 text-xs mb-1 block">AGENT NAME</label>
+            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Priya" maxLength={30} autoFocus className={inputCls} />
+          </div>
+          <div>
+            <label className="text-gray-400 text-xs mb-1 block">CHOOSE A PIN</label>
+            <input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)}
+              placeholder="Pick a secret PIN" maxLength={20} className={inputCls} />
+          </div>
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          <button type="submit" disabled={loading || !newName.trim() || !newPin.trim()} className={btnCls}
+            style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
+            {loading ? "Sending OTP..." : "Send OTP to Admin"}
+          </button>
+          <button type="button" onClick={() => { setMode('login'); setError(""); }}
+            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
+            ← Back to Sign In
+          </button>
+        </form>
+      )}
+
+      {mode === 'create_step2' && (
+        <form onSubmit={handleCreateAgent} className="w-full px-10 flex flex-col gap-4">
+          <p className="text-gray-500 text-xs text-center">Enter the 6-digit OTP sent to the admin’s WhatsApp.</p>
+          <div>
+            <label className="text-gray-400 text-xs mb-1 block">OTP</label>
+            <input type="text" inputMode="numeric" value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456" maxLength={6} autoFocus
+              className={`${inputCls} text-center text-2xl tracking-widest`} />
+          </div>
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          <button type="submit" disabled={loading || otp.length < 6} className={btnCls}
+            style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
+            {loading ? "Creating agent..." : "Create Agent"}
+          </button>
+          <button type="button" onClick={() => { setMode('create_step1'); setError(""); setOtp(""); }}
+            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
+            ← Back
+          </button>
+        </form>
+      )}
     </div>
   );
 }
 
 export default function AppClient() {
   const [authed, setAuthed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") return localStorage.getItem(SESSION_KEY) === "1";
+    if (typeof window !== "undefined") {
+      try { return !!JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').name; } catch { return false; }
+    }
     return false;
+  });
+  const [agentName, setAgentName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try { return JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').name || 'Agent'; } catch { return 'Agent'; }
+    }
+    return 'Agent';
   });
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -149,7 +251,7 @@ export default function AppClient() {
     await fetch("https://kiddost-ai.onrender.com/agent-send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: selectedChat, message: text, agent: 'Daksh' }),
+      body: JSON.stringify({ phone: selectedChat, message: text, agent: agentName }),
     });
   };
 
@@ -208,7 +310,7 @@ export default function AppClient() {
   const currentChat = chats.find((c) => c.id === selectedChat);
 
   if (!authed) {
-    return <LoginScreen onLogin={() => setAuthed(true)} />;
+    return <LoginScreen onLogin={(name) => { setAuthed(true); setAgentName(name); }} />;
   }
 
   return (
@@ -236,7 +338,7 @@ export default function AppClient() {
             onSelectChat={(chatId) => setSelectedChat(chatId)}
             isDarkMode={isDarkMode}
             onToggleTheme={() => setIsDarkMode(!isDarkMode)}
-            onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); }}
+            onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); }}
             chats={chats}
           />
         )
