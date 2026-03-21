@@ -12,7 +12,7 @@ app.use(express.json({ limit: '95mb' }));
 // Restrict CORS to the Vercel frontend origin
 app.use(cors({
   origin: "https://kiddost-ai.vercel.app",
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "DELETE"],
   allowedHeaders: ["Content-Type"]
 }));
 const PORT = process.env.PORT || 10000;
