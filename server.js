@@ -618,6 +618,65 @@ app.post("/webhook", async (req, res) => {
     res.status(200).json({ error: true });
   }
 });
+// List approved WhatsApp templates from BotSpace
+app.get('/templates', async (req, res) => {
+  try {
+    const resp = await axios.get(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/templates`,
+      { params: { apiKey: BOTSPACE_API_KEY } }
+    );
+    res.json(resp.data);
+  } catch (e) {
+    console.error('[templates] fetch error', e?.response?.data || e.message);
+    res.status(500).json({ error: 'failed_to_fetch_templates', detail: e?.response?.data || e.message });
+  }
+});
+
+// Send a WhatsApp template message and save it to the messages table
+app.post('/send-template', async (req, res) => {
+  const { phone, templateName, languageCode, components, agent: agentName } = req.body;
+  if (!phone || !templateName) return res.status(400).json({ error: 'missing fields' });
+
+  let botResp;
+  try {
+    botResp = await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-template-message`,
+      { phone, templateName, languageCode: languageCode || 'en', components: components || [] },
+      { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (e) {
+    console.error('[send-template] BotSpace error', e?.response?.data || e.message);
+    return res.status(500).json({ error: 'botspace_error', detail: e?.response?.data || e.message });
+  }
+
+  const d = botResp?.data;
+  const whatsappId = d?.data?.id || d?.data?.messageId || d?.messageId || d?.id || null;
+
+  // Build a readable preview of the message from the filled-in variables
+  const bodyParams = (components || []).find(c => c.type === 'body')?.parameters || [];
+  const preview = bodyParams.length
+    ? `[${templateName}] ${bodyParams.map(p => p.text).join(', ')}`
+    : `[Template: ${templateName}]`;
+
+  try {
+    await supabase.from('messages').insert({
+      phone,
+      role: 'assistant',
+      content: preview,
+      sender: 'agent',
+      agent: agentName || 'Agent',
+      ai_enabled: false,
+      whatsapp_id: whatsappId,
+      status: 'sent',
+    });
+    await supabase.from('conversations').update({ ai_paused: true }).eq('phone', phone);
+  } catch (dbErr) {
+    console.error('[send-template] DB error', dbErr?.message || dbErr);
+  }
+
+  res.json({ ok: true, whatsapp_id: whatsappId });
+});
+
 app.post("/agent-send", async (req, res) => {
   try {
 

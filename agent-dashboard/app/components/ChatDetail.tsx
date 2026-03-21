@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { avatarDataUrl } from '../avatarDataUrl';
-import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X } from "lucide-react";
+import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X, FileText, ChevronLeft } from "lucide-react";
 import { supabase } from '../../lib/supabase';
 
 interface Message {
@@ -31,6 +31,63 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [contactNotes, setContactNotes] = useState(initialContact?.notes || '');
   const [labels, setLabels] = useState<string[]>(initialLabels);
   const [labelInput, setLabelInput] = useState('');
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [templateVars, setTemplateVars] = useState<Record<string, string>>({});
+  const [templateSending, setTemplateSending] = useState(false);
+
+  const SERVER = 'https://kiddost-ai.onrender.com';
+
+  function getTemplateBody(t: any): string {
+    const comps: any[] = t?.components || [];
+    const body = comps.find(c => (c.type || '').toUpperCase() === 'BODY');
+    return body?.text || '';
+  }
+
+  function countVars(text: string): number {
+    const m = text.match(/\{\{\d+\}\}/g) || [];
+    if (!m.length) return 0;
+    return Math.max(...m.map((s: string) => parseInt(s.replace(/\D/g, ''))));
+  }
+
+  const openTemplateModal = async () => {
+    setShowTemplateModal(true);
+    setSelectedTemplate(null);
+    setTemplateVars({});
+    if (templates.length > 0) return;
+    setTemplatesLoading(true);
+    try {
+      const res = await fetch(`${SERVER}/templates`);
+      const json = await res.json();
+      const raw = json.data || json.templates || json;
+      setTemplates(Array.isArray(raw) ? raw.filter((t: any) => (t.status || '').toUpperCase() === 'APPROVED' || !t.status) : []);
+    } catch { setTemplates([]); }
+    finally { setTemplatesLoading(false); }
+  };
+
+  const sendTemplate = async () => {
+    if (!selectedTemplate || templateSending) return;
+    setTemplateSending(true);
+    const bodyText = getTemplateBody(selectedTemplate);
+    const varCount = countVars(bodyText);
+    const components = varCount > 0 ? [{
+      type: 'body',
+      parameters: Array.from({ length: varCount }, (_, i) => ({ type: 'text', text: templateVars[String(i + 1)] || '' }))
+    }] : [];
+    try {
+      await fetch(`${SERVER}/send-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: chatId, templateName: selectedTemplate.name, languageCode: selectedTemplate.language || 'en', components })
+      });
+      setShowTemplateModal(false);
+      setSelectedTemplate(null);
+      setTemplateVars({});
+    } catch { /* silent */ }
+    finally { setTemplateSending(false); }
+  };
 
   // Reset info panel when switching chats
   useEffect(() => {
@@ -402,11 +459,109 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Template picker modal */}
+      {showTemplateModal && (
+        <div className={`absolute inset-0 z-50 flex flex-col ${isDarkMode ? 'bg-gray-950' : 'bg-white'}`}>
+          {/* Header */}
+          <div className={`flex items-center gap-3 px-4 py-4 border-b ${isDarkMode ? 'border-blue-900/30 text-white' : 'border-gray-200 text-gray-900'}`}>
+            {selectedTemplate ? (
+              <button onClick={() => { setSelectedTemplate(null); setTemplateVars({}); }} className="hover:opacity-70">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            ) : (
+              <button onClick={() => setShowTemplateModal(false)} className="hover:opacity-70">
+                <X className="w-5 h-5" />
+              </button>
+            )}
+            <h2 className="font-semibold text-base flex-1">
+              {selectedTemplate ? selectedTemplate.name : 'Send Template'}
+            </h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+            {/* Step 1: template list */}
+            {!selectedTemplate && (
+              templatesLoading ? (
+                <p className={`text-center text-sm py-10 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading templates…</p>
+              ) : templates.length === 0 ? (
+                <p className={`text-center text-sm py-10 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No approved templates found.</p>
+              ) : templates.map((t: any) => {
+                const body = getTemplateBody(t);
+                return (
+                  <button
+                    key={t.id || t.name}
+                    onClick={() => { setSelectedTemplate(t); setTemplateVars({}); }}
+                    className={`w-full text-left rounded-xl px-4 py-3 transition-all ${
+                      isDarkMode ? 'bg-gray-900 border border-blue-900/30 hover:border-blue-500/50 text-white' : 'bg-gray-50 border border-gray-200 hover:border-[#008069] text-gray-900'
+                    }`}
+                  >
+                    <p className="font-medium text-sm mb-1">{t.name}</p>
+                    {body && <p className={`text-xs line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{body}</p>}
+                    {t.language && <p className={`text-[10px] mt-1 ${isDarkMode ? 'text-blue-500' : 'text-[#008069]'}`}>{t.language}</p>}
+                  </button>
+                );
+              })
+            )}
+
+            {/* Step 2: fill variables */}
+            {selectedTemplate && (() => {
+              const bodyText = getTemplateBody(selectedTemplate);
+              const varCount = countVars(bodyText);
+              return (
+                <div className="flex flex-col gap-4">
+                  {bodyText && (
+                    <div className={`rounded-xl px-4 py-3 text-sm ${isDarkMode ? 'bg-gray-900 text-gray-300 border border-blue-900/30' : 'bg-gray-50 text-gray-700 border border-gray-200'}`}>
+                      <p className={`text-[10px] font-semibold mb-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>PREVIEW</p>
+                      {bodyText}
+                    </div>
+                  )}
+                  {varCount > 0 && (
+                    <div className="flex flex-col gap-3">
+                      <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>FILL IN VARIABLES</p>
+                      {Array.from({ length: varCount }, (_, i) => (
+                        <div key={i + 1}>
+                          <label className={`text-xs mb-1 block ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{'{{' + (i + 1) + '}}'}</label>
+                          <input
+                            type="text"
+                            value={templateVars[String(i + 1)] || ''}
+                            onChange={e => setTemplateVars(prev => ({ ...prev, [String(i + 1)]: e.target.value }))}
+                            placeholder={`Value for {{${i + 1}}}`}
+                            className={`w-full rounded-xl px-4 py-2.5 text-sm outline-none ${
+                              isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={sendTemplate}
+                    disabled={templateSending}
+                    className={`w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-all ${
+                      isDarkMode ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white hover:from-blue-600 hover:to-blue-500' : 'bg-[#008069] text-white hover:bg-[#017a5f]'
+                    }`}
+                  >
+                    {templateSending ? 'Sending…' : 'Send Template'}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       <div className={`px-4 py-3 flex items-center gap-3 relative z-10 ${isDarkMode ? "bg-gradient-to-t from-gray-900 to-black border-t border-blue-900/30" : "bg-[#f0f0f0]"}`}>
         <label className="cursor-pointer">
           <input type="file" onChange={uploadMedia} className="hidden" />
           <div className={`px-3 py-2 rounded-full ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'}`}>+</div>
         </label>
+        <button
+          onClick={openTemplateModal}
+          title="Send Template"
+          className={`p-2 rounded-full transition-all flex-shrink-0 ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-white text-[#008069] hover:bg-gray-100'}`}
+        >
+          <FileText className="w-5 h-5" />
+        </button>
         <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyPress={handleKeyPress} placeholder={isDarkMode ? "Transmit message..." : "Type a message"} className={`flex-1 rounded-full px-5 py-3 outline-none text-sm ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white text-gray-900"} transition-all`} />
         <button onClick={handleSend} className={`p-3 rounded-full active:scale-95 transition-all ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
           <Send className="w-5 h-5" />
