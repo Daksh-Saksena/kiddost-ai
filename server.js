@@ -625,10 +625,22 @@ app.get('/templates', async (req, res) => {
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/templates`,
       { params: { apiKey: BOTSPACE_API_KEY } }
     );
+    // Return raw response so client can inspect structure
+    console.log('[templates] raw BotSpace response:', JSON.stringify(resp.data).slice(0, 1000));
     res.json(resp.data);
   } catch (e) {
     console.error('[templates] fetch error', e?.response?.data || e.message);
-    res.status(500).json({ error: 'failed_to_fetch_templates', detail: e?.response?.data || e.message });
+    // Try alternate URL if first fails
+    try {
+      const resp2 = await axios.get(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/templates`,
+        { params: { apiKey: BOTSPACE_API_KEY } }
+      );
+      console.log('[templates] alt URL raw response:', JSON.stringify(resp2.data).slice(0, 1000));
+      res.json(resp2.data);
+    } catch (e2) {
+      res.status(500).json({ error: 'failed_to_fetch_templates', detail: e?.response?.data || e.message, alt_detail: e2?.response?.data || e2.message });
+    }
   }
 });
 

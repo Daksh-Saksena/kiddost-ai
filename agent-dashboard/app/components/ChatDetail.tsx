@@ -61,8 +61,12 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     try {
       const res = await fetch(`${SERVER}/templates`);
       const json = await res.json();
-      const raw = json.data || json.templates || json;
-      setTemplates(Array.isArray(raw) ? raw.filter((t: any) => (t.status || '').toUpperCase() === 'APPROVED' || !t.status) : []);
+      console.log('[templates] raw server response:', json);
+      // Try every common envelope shape BotSpace might return
+      const raw = json.data || json.templates || json.messageTemplates || json.items || json;
+      const list = Array.isArray(raw) ? raw : [];
+      console.log('[templates] parsed list:', list);
+      setTemplates(list);
     } catch { setTemplates([]); }
     finally { setTemplatesLoading(false); }
   };
