@@ -36,6 +36,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [templateVars, setTemplateVars] = useState<string[]>([]);
+  const [templateSending, setTemplateSending] = useState(false);
   const [manualTemplateId, setManualTemplateId] = useState('');
 
   const SERVER = 'https://kiddost-ai.onrender.com';
@@ -56,19 +57,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     setShowTemplateModal(true);
     setSelectedTemplate(null);
     setTemplateVars([]);
-    if (templates.length > 0) return;
-    setTemplatesLoading(true);
-    try {
-      const res = await fetch(`${SERVER}/templates`);
-      const json = await res.json();
-      console.log('[templates] raw server response:', JSON.stringify(json));
-      // Try every common envelope shape BotSpace might return
-      const raw = json.data || json.templates || json.messageTemplates || json.items || json;
-      const list = Array.isArray(raw) ? raw : [];
-      console.log('[templates] parsed list:', list);
-      setTemplates(list);
-    } catch { setTemplates([]); }
-    finally { setTemplatesLoading(false); }
+    // BotSpace has no list-templates API — skip fetch, go straight to manual entry
   };
 
   const sendTemplate = async () => {
