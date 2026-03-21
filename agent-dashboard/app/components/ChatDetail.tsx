@@ -56,7 +56,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     setShowTemplateModal(true);
     setSelectedTemplate(null);
     setTemplateVars([]);
-
+    if (templates.length > 0) return;
+    setTemplatesLoading(true);
     try {
       const res = await fetch(`${SERVER}/templates`);
       const json = await res.json();

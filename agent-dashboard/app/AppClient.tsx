@@ -253,17 +253,17 @@ export default function AppClient() {
     }
     return 'Agent';
   });
-  const [agentId, setAgentId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      try { return JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null; } catch { return null; }
-    }
-    return null;
-  });
+  const [agentId, setAgentId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePin, setDeletePin] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [contacts, setContacts] = useState<Record<string, { name: string; notes: string; labels?: string[] }>>(() => getContacts());
+
+  // Read agentId from localStorage after mount (avoids SSR hydration mismatch)
+  useEffect(() => {
+    try { setAgentId(JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null); } catch {}
+  }, []);
 
   // Load shared contacts from server on mount
   useEffect(() => {
