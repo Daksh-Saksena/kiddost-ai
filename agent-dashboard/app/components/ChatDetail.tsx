@@ -36,7 +36,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [templateVars, setTemplateVars] = useState<string[]>([]);
-  const [templateSending, setTemplateSending] = useState(false);
+  const [manualTemplateId, setManualTemplateId] = useState('');
 
   const SERVER = 'https://kiddost-ai.onrender.com';
 
@@ -61,7 +61,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     try {
       const res = await fetch(`${SERVER}/templates`);
       const json = await res.json();
-      console.log('[templates] raw server response:', json);
+      console.log('[templates] raw server response:', JSON.stringify(json));
       // Try every common envelope shape BotSpace might return
       const raw = json.data || json.templates || json.messageTemplates || json.items || json;
       const list = Array.isArray(raw) ? raw : [];
@@ -72,7 +72,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   };
 
   const sendTemplate = async () => {
-    if (!selectedTemplate || templateSending) return;
+    const tid = selectedTemplate ? (selectedTemplate.id || selectedTemplate.name) : manualTemplateId.trim();
+    if (!tid || templateSending) return;
     setTemplateSending(true);
     try {
       await fetch(`${SERVER}/send-template`, {
@@ -80,13 +81,14 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: chatId,
-          templateId: selectedTemplate.id || selectedTemplate.name,
+          templateId: tid,
           variables: templateVars.filter(v => v.trim() !== ''),
         })
       });
       setShowTemplateModal(false);
       setSelectedTemplate(null);
       setTemplateVars([]);
+      setManualTemplateId('');
     } catch { /* silent */ }
     finally { setTemplateSending(false); }
   };
@@ -486,7 +488,59 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
               templatesLoading ? (
                 <p className={`text-center text-sm py-10 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading templates…</p>
               ) : templates.length === 0 ? (
-                <p className={`text-center text-sm py-10 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No approved templates found.</p>
+                // Fallback: manual template ID entry when listing API is unavailable
+                <div className="flex flex-col gap-4 pt-2">
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    Could not load template list. Enter the template ID manually (find it in your BotSpace dashboard).
+                  </p>
+                  <div>
+                    <label className={`text-xs font-semibold mb-1.5 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TEMPLATE ID</label>
+                    <input
+                      type="text"
+                      value={manualTemplateId}
+                      onChange={e => setManualTemplateId(e.target.value)}
+                      placeholder="e.g. payment_reminder"
+                      className={`w-full rounded-xl px-4 py-3 text-sm outline-none ${
+                        isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
+                      }`}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>VARIABLES (if any)</p>
+                      <button
+                        onClick={() => setTemplateVars(prev => [...prev, ''])}
+                        className={`text-xs px-2 py-1 rounded-lg ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-gray-100 text-[#008069] hover:bg-gray-200'}`}
+                      >+ Add</button>
+                    </div>
+                    {templateVars.map((v, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <span className={`text-xs w-6 text-center flex-shrink-0 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{i + 1}</span>
+                        <input
+                          type="text"
+                          value={v}
+                          onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                          placeholder={`Variable ${i + 1}`}
+                          className={`flex-1 rounded-xl px-3 py-2 text-sm outline-none ${
+                            isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
+                          }`}
+                        />
+                        <button onClick={() => setTemplateVars(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={sendTemplate}
+                    disabled={templateSending || !manualTemplateId.trim()}
+                    className={`w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-all ${
+                      isDarkMode ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white hover:from-blue-600 hover:to-blue-500' : 'bg-[#008069] text-white hover:bg-[#017a5f]'
+                    }`}
+                  >
+                    {templateSending ? 'Sending…' : 'Send Template'}
+                  </button>
+                </div>
               ) : templates.map((t: any) => {
                 const body = getTemplateBody(t);
                 return (

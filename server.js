@@ -629,7 +629,8 @@ app.get('/templates', async (req, res) => {
     console.log('[templates] raw BotSpace response:', JSON.stringify(resp.data).slice(0, 1000));
     res.json(resp.data);
   } catch (e) {
-    console.error('[templates] fetch error', e?.response?.data || e.message);
+    const d1 = e?.response?.data || e.message;
+    console.error('[templates] URL1 error status:', e?.response?.status, 'body:', JSON.stringify(d1));
     // Try alternate URL if first fails
     try {
       const resp2 = await axios.get(
@@ -639,7 +640,9 @@ app.get('/templates', async (req, res) => {
       console.log('[templates] alt URL raw response:', JSON.stringify(resp2.data).slice(0, 1000));
       res.json(resp2.data);
     } catch (e2) {
-      res.status(500).json({ error: 'failed_to_fetch_templates', detail: e?.response?.data || e.message, alt_detail: e2?.response?.data || e2.message });
+      const d2 = e2?.response?.data || e2.message;
+      console.error('[templates] URL2 error status:', e2?.response?.status, 'body:', JSON.stringify(d2));
+      res.status(500).json({ error: 'failed_to_fetch_templates', detail: d1, alt_detail: d2 });
     }
   }
 });
