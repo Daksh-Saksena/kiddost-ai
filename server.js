@@ -646,14 +646,16 @@ app.get('/templates', async (req, res) => {
 
 // Send a WhatsApp template message and save it to the messages table
 app.post('/send-template', async (req, res) => {
-  const { phone, templateName, languageCode, components, agent: agentName } = req.body;
-  if (!phone || !templateName) return res.status(400).json({ error: 'missing fields' });
+  const { phone, name, templateId, variables, mediaVariable, agent: agentName } = req.body;
+  if (!phone || !templateId) return res.status(400).json({ error: 'missing fields' });
 
   let botResp;
   try {
+    const payload = { name: name || '', phone, templateId, variables: variables || [] };
+    if (mediaVariable) payload.mediaVariable = mediaVariable;
     botResp = await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-template-message`,
-      { phone, templateName, languageCode: languageCode || 'en', components: components || [] },
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+      payload,
       { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (e) {
@@ -664,11 +666,7 @@ app.post('/send-template', async (req, res) => {
   const d = botResp?.data;
   const whatsappId = d?.data?.id || d?.data?.messageId || d?.messageId || d?.id || null;
 
-  // Build a readable preview of the message from the filled-in variables
-  const bodyParams = (components || []).find(c => c.type === 'body')?.parameters || [];
-  const preview = bodyParams.length
-    ? `[${templateName}] ${bodyParams.map(p => p.text).join(', ')}`
-    : `[Template: ${templateName}]`;
+  const preview = `[Template: ${templateId}]${variables?.length ? ' ' + variables.join(', ') : ''}`;
 
   try {
     await supabase.from('messages').insert({
