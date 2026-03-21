@@ -390,7 +390,7 @@ app.post('/label', async (req, res) => {
 });
 
 app.delete('/label', async (req, res) => {
-  const { phone, label } = req.body;
+  const { phone, label } = req.query;
   if (!phone || !label) return res.status(400).json({ error: 'missing phone or label' });
 
   // Remove from Supabase

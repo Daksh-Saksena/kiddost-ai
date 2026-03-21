@@ -564,10 +564,8 @@ export default function AppClient() {
             });
           }}
           onRemoveLabel={(label) => {
-            fetch(`${SERVER}/label`, {
+            fetch(`${SERVER}/label?phone=${encodeURIComponent(selectedChat)}&label=${encodeURIComponent(label)}`, {
               method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: selectedChat, label })
             }).catch(() => {});
             setContacts(prev => {
               const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
