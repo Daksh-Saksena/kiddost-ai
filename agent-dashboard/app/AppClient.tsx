@@ -232,6 +232,7 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
 
 const CONTACTS_KEY = 'kiddost_contacts';
 function getContacts(): Record<string, { name: string; notes: string; labels?: string[] }> {
+  if (typeof window === 'undefined') return {};
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) || '{}'); } catch { return {}; }
 }
 function saveContact(phone: string, data: { name: string; notes: string; labels?: string[] }) {
@@ -241,28 +242,26 @@ function saveContact(phone: string, data: { name: string; notes: string; labels?
 }
 
 export default function AppClient() {
-  const [authed, setAuthed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      try { return !!JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').name; } catch { return false; }
-    }
-    return false;
-  });
-  const [agentName, setAgentName] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      try { return JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').name || 'Agent'; } catch { return 'Agent'; }
-    }
-    return 'Agent';
-  });
+  const [authed, setAuthed] = useState<boolean>(false);
+  const [agentName, setAgentName] = useState<string>('Agent');
   const [agentId, setAgentId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePin, setDeletePin] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  const [contacts, setContacts] = useState<Record<string, { name: string; notes: string; labels?: string[] }>>(() => getContacts());
+  const [contacts, setContacts] = useState<Record<string, { name: string; notes: string; labels?: string[] }>>({});
 
-  // Read agentId from localStorage after mount (avoids SSR hydration mismatch)
+  // Read all localStorage state after mount to avoid SSR hydration mismatch
   useEffect(() => {
-    try { setAgentId(JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null); } catch {}
+    try {
+      const session = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
+      if (session.name) {
+        setAuthed(true);
+        setAgentName(session.name);
+        setAgentId(session.id ?? null);
+      }
+    } catch {}
+    setContacts(getContacts());
   }, []);
 
   // Load shared contacts from server on mount
@@ -283,9 +282,12 @@ export default function AppClient() {
   const [messages, setMessages] = useState<Message[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   // Track last-seen message timestamp per phone to calculate unread counts
-  const lastSeenRef = useRef<Record<string, string>>(
-    (() => { try { return JSON.parse(localStorage.getItem('kiddost_lastSeen') || '{}'); } catch { return {}; } })()
-  );
+  const lastSeenRef = useRef<Record<string, string>>({});
+
+  // Load lastSeen from localStorage after mount
+  useEffect(() => {
+    try { lastSeenRef.current = JSON.parse(localStorage.getItem('kiddost_lastSeen') || '{}'); } catch {}
+  }, []);
 
   const markRead = (phone: string) => {
     lastSeenRef.current[phone] = new Date().toISOString();
