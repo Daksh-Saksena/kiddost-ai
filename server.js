@@ -495,6 +495,14 @@ app.delete('/label', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.delete('/reset-conversation', async (req, res) => {
+  const { phone } = req.query;
+  if (!phone) return res.status(400).json({ error: 'missing phone' });
+  const { error } = await supabase.from('messages').delete().eq('phone', phone);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, message: `Cleared conversation history for ${phone}` });
+});
+
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
