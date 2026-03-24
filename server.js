@@ -98,9 +98,33 @@ function findBestExampleChat(customerMessage) {
 }
 
 // Format an example chat into a readable block for the AI prompt
+function sanitizeExampleText(text) {
+  return text
+    // Remove URLs
+    .replace(/https?:\/\/\S+/g, "[link]")
+    // Remove Indian rupee prices e.g. Rs 500, Rs. 1000, ₹500
+    .replace(/(?:Rs\.?\s*|₹\s*)\d[\d,]*/gi, "[price]")
+    // Remove time ranges e.g. 9:30 AM, 5:45-7:45 PM, 6-8pm
+    .replace(/\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)/g, "[time]")
+    .replace(/\d{1,2}(?::\d{2})?\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?/g, "[time range]")
+    // Remove session/number counts e.g. "11 sessions", "3 hours"
+    .replace(/\b\d+\s+(?:session|hour|hr)s?\b/gi, "[X sessions]")
+    // Remove specific days/dates e.g. "coming Monday", "24/06/25"
+    .replace(/\b(?:coming\s+)?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/gi, "[day]")
+    .replace(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g, "[date]")
+    // Remove image omitted artifacts
+    .replace(/\u200e\[.*?\]\s*KidDost Tech Pvt Ltd:.*?omitted/g, "")
+    .replace(/image omitted/gi, "")
+    // Remove timestamps inside text e.g. [24/06/25, 1:24:52 PM]
+    .replace(/\[[\d\/]+,\s[\d:]+\s(?:AM|PM)\]/g, "")
+    // Remove proper names (simple heuristic: standalone capitalized word not at start of line)
+    .replace(/(?<=[A-Za-z,] )([A-Z][a-z]+)(?= ,|\?|!|\.|$)/g, "[name]")
+    .trim();
+}
+
 function formatExampleChat(chat) {
   return chat.msgs.slice(0, 40).map(m =>
-    `${m.role === "kiddost" ? "KidDost" : "Customer"}: ${m.text}`
+    `${m.role === "kiddost" ? "KidDost" : "Customer"}: ${sanitizeExampleText(m.text)}`
   ).join("\n");
 }
 // ────────────────────────────────────────────────────────────────────────────
