@@ -441,15 +441,30 @@ async function uploadToBotspace(mediaUrl) {
 // Serve the KidDost welcome flyer image
 app.use('/static', express.static(__dirname));
 
-// Send welcome template to a new user
+// Send 3-part welcome sequence to a new user
 async function sendWelcome(fullPhone) {
-  try {
+  const sendText = async (text) => {
     await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-      { name: '', phone: fullPhone, templateId: 'session', variables: [] },
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+      { name: 'KidDost', phone: fullPhone, text },
       { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
     );
-    console.log('[welcome] template sent to', fullPhone);
+  };
+  try {
+    // 1. Greeting
+    await sendText('Hi, thank you for contacting KidDost.');
+    await new Promise(r => setTimeout(r, 800));
+    // 2. Flyer image
+    const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
+      { name: 'KidDost', phone: fullPhone, mediaUrl: `${SERVER_URL}/static/image.png`, mediaType: 'image', label: '' },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    await new Promise(r => setTimeout(r, 800));
+    // 3. Follow-up
+    await sendText('Feel free to let us know if you have any questions.');
+    console.log('[welcome] sent to', fullPhone);
   } catch (e) {
     console.error('[welcome] failed:', e.response?.data || e.message);
   }
