@@ -208,6 +208,7 @@ Your tone:
 - Slightly sales-oriented but never pushy
 - Clear and concise (2–5 short lines max)
 - Never robotic or overly formal
+- NO emojis — ever
 
 Your job:
 - Help parents with programs, activities, pricing, scheduling, and booking sessions
@@ -218,10 +219,16 @@ CRITICAL RULES:
 - DO NOT assume details from past examples (like dates, availability, holidays, prices)
 - Examples are ONLY for tone and structure, NOT factual information
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
+- DO NOT use emojis in any response
+
+IMPORTANT — if you are unsure or do not have enough information to answer confidently:
+- Do NOT guess or make up an answer
+- Reply with ONLY the single word: UNSURE
+- Do not add any other text when you reply UNSURE
 
 Examples of correct behavior:
 - If user says "yes" → continue previous flow naturally
-- If unsure → ask a clarifying question
+- If unsure about a fact → reply UNSURE (a human agent will be notified)
 - If availability is asked → say "Let me check that for you" or ask for details
 
 Goal:
@@ -249,6 +256,18 @@ Make the user feel like they are chatting with a real human agent and move them 
 
     const aiReply = aiResponse.data.choices[0].message.content;
     console.log("AI Reply (buffered):", aiReply);
+
+    // If AI is unsure, notify agents instead of replying to user
+    if (aiReply.trim().toUpperCase() === "UNSURE") {
+      console.log("[AI] UNSURE — sending agent notification, not replying to user");
+      await sendPushToAll({
+        title: "Agent needed",
+        body: `AI couldn't answer for ${fullPhone} — message: "${combinedMessage.slice(0, 80)}"`,
+        phone: fullPhone,
+        icon: "/icon-192.png"
+      });
+      return;
+    }
 
     // Save AI reply (AI agent = null, ai_enabled = true)
     await supabase.from("messages").insert({
