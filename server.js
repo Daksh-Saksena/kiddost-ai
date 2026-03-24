@@ -230,6 +230,14 @@ async function handleAIResponse(fullPhone, combinedMessage) {
       : "";
 
     // Ensure the AI sees the combined version of the recent user input
+    // If we have a program description from the example chat, inject it as a fake
+    // prior Q&A so the AI treats it as something it already said (far more reliable than
+    // a system prompt instruction it tends to ignore).
+    const fewShotMessages = programDescription ? [
+      { role: "user", content: "What programs or activities do you offer for young children?" },
+      { role: "assistant", content: programDescription }
+    ] : [];
+
     const messagesForAI = [
       {
         role: "system",
@@ -269,6 +277,7 @@ Make the user feel like they are chatting with a real human agent and move them 
           (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           exampleBlock
       },
+      ...fewShotMessages,
       ...history,
       { role: "user", content: combinedMessage }
     ];
