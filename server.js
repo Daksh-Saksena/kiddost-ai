@@ -985,7 +985,7 @@ app.post('/send-template', async (req, res) => {
   const d = botResp?.data;
   const whatsappId = d?.data?.id || d?.data?.messageId || d?.messageId || d?.id || null;
 
-  const TEMPLATE_PREVIEWS: Record<string, string> = {
+  const TEMPLATE_PREVIEWS = {
     session: 'Hi, would you like to go ahead with the session today?',
   };
   const preview = TEMPLATE_PREVIEWS[templateId] || `[Template: ${templateId}]${variables?.length ? ' ' + variables.join(', ') : ''}`;
