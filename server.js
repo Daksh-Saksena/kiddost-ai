@@ -146,6 +146,7 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 // In-memory buffering to combine fragmented user messages per phone
+const MESSAGE_BUFFER_DELAY_MS = 10000; // ← change this to adjust how long to wait before sending to AI (in milliseconds)
 const messageBuffers = {};
 const messageTimers = {};
 
@@ -732,7 +733,7 @@ app.post("/webhook", async (req, res) => {
         clearTimeout(messageTimers[fullPhone]);
       }
 
-      // wait 10 seconds (user requested 10s buffer) before sending combined text to AI
+      // wait MESSAGE_BUFFER_DELAY_MS before sending combined text to AI
       messageTimers[fullPhone] = setTimeout(async () => {
         const combined = (messageBuffers[fullPhone] || []).join(" ").trim();
         // reset buffer
@@ -744,7 +745,7 @@ app.post("/webhook", async (req, res) => {
         } catch (e) {
           console.error('buffered AI handler error', e?.message || e);
         }
-      }, 10000);
+      }, MESSAGE_BUFFER_DELAY_MS);
     }
 
     // respond quickly to webhook sender
