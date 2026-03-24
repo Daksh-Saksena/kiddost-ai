@@ -146,7 +146,7 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 // In-memory buffering to combine fragmented user messages per phone
-const MESSAGE_BUFFER_DELAY_MS = 10000; // ← change this to adjust how long to wait before sending to AI (in milliseconds)
+const MESSAGE_BUFFER_DELAY_MS = 100; // ← change this to adjust how long to wait before sending to AI (in milliseconds)
 const messageBuffers = {};
 const messageTimers = {};
 
