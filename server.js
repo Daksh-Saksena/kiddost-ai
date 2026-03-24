@@ -127,6 +127,14 @@ function formatExampleChat(chat) {
     `${m.role === "kiddost" ? "KidDost" : "Customer"}: ${sanitizeExampleText(m.text)}`
   ).join("\n");
 }
+
+// Extract the "we engage the child with..." program description line from an example chat
+function extractProgramDescription(chat) {
+  const line = chat.msgs.find(m =>
+    m.role === "kiddost" && /we engage the child with/i.test(m.text)
+  );
+  return line ? sanitizeExampleText(line.text) : null;
+}
 // ────────────────────────────────────────────────────────────────────────────
 
 const app = express();
@@ -216,8 +224,9 @@ async function handleAIResponse(fullPhone, combinedMessage) {
 
     // Find the most similar past conversation to use as a reference example
     const exampleChat = findBestExampleChat(combinedMessage);
+    const programDescription = exampleChat ? extractProgramDescription(exampleChat) : null;
     const exampleBlock = exampleChat
-      ? `\n\n---\nHere is an example of a real KidDost conversation. Use it as your primary reference.\n\nYOU MUST use the exact activities and programs mentioned in this example (e.g. puzzles, LEGO, art and craft, worksheets, storybook reading, memory games, park visits). These are the REAL activities KidDost offers — do not invent different ones.\n\nDO NOT copy:\n- specific names of people\n- specific dates or session availability\n- specific prices or fees\n- specific locations or addresses\n\nExample:\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
+      ? `\n\n---\n${programDescription ? `KIDDOST PROGRAM DESCRIPTION (extracted from a real conversation — when the user asks about activities or programs, use this description word for word, do not swap these activities for others):\n"${programDescription}"\n\n` : ""}Full example conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n\nDO NOT copy from the example: specific names, dates, prices, locations, or availability.\n---`
       : "";
 
     // Ensure the AI sees the combined version of the recent user input
@@ -1113,8 +1122,9 @@ app.get('/debug-prompt', async (req, res) => {
     const history = Array.isArray(data) ? data.reverse() : [];
 
     const exampleChat = findBestExampleChat(message);
+    const programDescription = exampleChat ? extractProgramDescription(exampleChat) : null;
     const exampleBlock = exampleChat
-      ? `\n\n---\nHere is a real KidDost conversation. This is your primary source of truth for what KidDost offers.\n\nThe age mentioned in the example is just context — the ACTIVITIES listed (puzzles, memory games, art and craft, board games, LEGO building, storybook reading, worksheets, park visits etc.) are what KidDost offers to ALL age groups. Use these exact activities when answering questions about programs, regardless of the specific age in the example.\n\nDO NOT copy:\n- specific names of people\n- specific dates or session availability\n- specific prices or fees\n- specific locations or addresses\n\nExample:\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
+      ? `\n\n---\n${programDescription ? `KIDDOST PROGRAM DESCRIPTION (extracted from a real conversation — when the user asks about activities or programs, use this description word for word, do not swap these activities for others):\n"${programDescription}"\n\n` : ""}Full example conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n\nDO NOT copy from the example: specific names, dates, prices, locations, or availability.\n---`
       : "";
 
     const systemPrompt = `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore.\n\nYour tone:\n- Friendly, warm, and human-like (like a real WhatsApp agent)\n- Slightly sales-oriented but never pushy\n- Clear and concise (2–5 short lines max)\n- Never robotic or overly formal\n- NO emojis — ever\n\nYour job:\n- Help parents with programs, activities, pricing, scheduling, and booking sessions\n- Guide the conversation naturally towards booking a trial session\n\nCRITICAL RULES:\n- Always base your answer on the CURRENT conversation context\n- Use ONLY the activities mentioned in the example conversation below — NEVER invent activities not found there\n- DO NOT copy specific names, dates, prices, or availability from the example conversation\n- If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming\n- DO NOT use emojis in any response\n\nIMPORTANT — if you are unsure or do not have enough information to answer confidently:\n- Do NOT guess or make up an answer\n- Reply with ONLY the single word: UNSURE\n- Do not add any other text when you reply UNSURE\n\nExamples of correct behavior:\n- If user says "yes" → continue previous flow naturally\n- If unsure about a fact → reply UNSURE (a human agent will be notified)\n- If availability is asked → say "Let me check that for you" or ask for details\n\nGoal:\nMake the user feel like they are chatting with a real human agent and move them towards booking.` +
