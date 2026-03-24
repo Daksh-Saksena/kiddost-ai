@@ -1108,6 +1108,9 @@ app.get('/debug-prompt', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Debug endpoint: return recent messages (for troubleshooting frontend visibility)
+app.get('/debug-messages', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('messages')
