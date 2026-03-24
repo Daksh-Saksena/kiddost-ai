@@ -438,9 +438,45 @@ async function uploadToBotspace(mediaUrl) {
   }
 }
 
+// Serve the KidDost welcome flyer image
+app.use('/static', express.static(__dirname));
+
+// Send 3-part welcome sequence to a new user
+async function sendWelcome(fullPhone) {
+  const send = async (payload) => {
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+      { name: 'User', phone: fullPhone, ...payload },
+      { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+    );
+  };
+  try {
+    // 1. Greeting text
+    await send({ text: 'Hi, thank you for contacting KidDost.' });
+    // Small delay so messages arrive in order
+    await new Promise(r => setTimeout(r, 800));
+    // 2. Flyer image — upload to BotSpace first to get a mediaId
+    const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
+    const imageUrl = `${SERVER_URL}/static/image.png`;
+    const mediaId = await uploadToBotspace(imageUrl);
+    if (mediaId) {
+      await send({ type: 'media', mediaId });
+    } else {
+      // Fallback: send the URL as a link if upload fails
+      await send({ text: imageUrl });
+    }
+    await new Promise(r => setTimeout(r, 800));
+    // 3. Closing text
+    await send({ text: 'Feel free to let us know if you have any questions.' });
+    console.log('[welcome] sent to', fullPhone);
+  } catch (e) {
+    console.error('[welcome] failed:', e.response?.data || e.message);
+  }
+}
+
 // Health check
 app.get("/", (req, res) => {
-  res.send("Kiddost AI running 🚀");
+  res.send("Kiddost AI running");
 });
 
 // List all active agents (names + ids only, no PINs) — used by login profile picker
@@ -775,6 +811,8 @@ app.post("/webhook", async (req, res) => {
         phone: fullPhone,
         conversation_id: botspaceConversationId
       });
+      // Trigger welcome sequence for brand-new users (don't await — fire and forget)
+      sendWelcome(fullPhone).catch(e => console.error('[welcome] error', e.message));
     } else if (botspaceConversationId) {
       await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
     }
