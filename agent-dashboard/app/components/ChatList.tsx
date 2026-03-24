@@ -257,6 +257,21 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
                 }`}
               />
             </div>
+            <button
+              onClick={() => {
+                const phone = formatPhone(newPhone.trim());
+                if (!phone) return;
+                setShowNewConvo(false);
+                setNewPhone('');
+                onSelectChat(phone);
+              }}
+              disabled={!newPhone.trim()}
+              className={`w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40 transition-all ${
+                isDarkMode ? 'bg-gray-800 border border-blue-500/30 text-blue-300 hover:bg-gray-700' : 'bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Open Chat
+            </button>
             <div>
               <label className={`text-xs font-semibold mb-2 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>SEND TEMPLATE</label>
               <div className="flex flex-col gap-2">
