@@ -234,7 +234,7 @@ async function handleAIResponse(fullPhone, combinedMessage) {
     // prior Q&A so the AI treats it as something it already said (far more reliable than
     // a system prompt instruction it tends to ignore).
     const fewShotMessages = programDescription ? [
-      { role: "user", content: "What programs or activities do you offer for young children?" },
+      { role: "user", content: "Hi, what programs or activities do you offer for young children?" },
       { role: "assistant", content: programDescription }
     ] : [];
 
@@ -286,7 +286,8 @@ Make the user feel like they are chatting with a real human agent and move them 
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4o-mini",
-        messages: messagesForAI
+        messages: messagesForAI,
+        temperature: 0
       },
       {
         headers: {
