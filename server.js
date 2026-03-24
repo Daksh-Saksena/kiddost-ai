@@ -5,7 +5,83 @@ import { createClient } from "@supabase/supabase-js";
 import cors from "cors";
 import crypto from "crypto";
 import webpush from "web-push";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ── Load & parse example WhatsApp chat transcripts ──────────────────────────
+// Format per line: [DD/MM/YY, HH:MM:SS AM/PM] Name: message
+const CHATS_DIR = path.join(__dirname, "chats");
+const KIDDOST_LABEL = "KidDost Tech Pvt Ltd";
+const STOP_WORDS = new Set(["i","me","my","we","our","you","your","the","a","an","is","it","in","on","at","to","of","and","or","for","with","be","am","are","was","were","do","did","can","will","have","has","had","not","this","that","so","just","ok","okay","hi","hello","thank","thanks","please","sure","yes","no","get","let","us","know","if","would","could","also","he","she","they","them","what","when","how","why","who","its","any","all","now","up","more","but","by","as","from","been","then","than","there","about","after","before","may","might","use"]);
+
+function parseChatFile(filePath) {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const lines = raw.split(/\r?\n/);
+  const msgs = [];
+  const lineRe = /^\[[\d\/]+,\s[\d:]+(?:\s[AP]M)?\]\s([^:]+):\s([\s\S]*)/;
+  let cur = null;
+  for (const line of lines) {
+    const m = line.match(lineRe);
+    if (m) {
+      if (cur) msgs.push(cur);
+      const speaker = m[1].trim();
+      const text = m[2].trim();
+      // Skip system messages and media/call placeholders
+      if (/end-to-end encrypted|omitted|Missed|This message was deleted|edited/i.test(text)) { cur = null; continue; }
+      cur = { role: speaker === KIDDOST_LABEL ? "kiddost" : "customer", text };
+    } else if (cur && line.trim()) {
+      cur.text += " " + line.trim();
+    }
+  }
+  if (cur) msgs.push(cur);
+  return msgs;
+}
+
+function scoreKeywords(text) {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+// Load all chats at startup
+const EXAMPLE_CHATS = [];
+try {
+  const files = fs.readdirSync(CHATS_DIR).filter(f => f.endsWith(".txt"));
+  for (const file of files) {
+    const msgs = parseChatFile(path.join(CHATS_DIR, file));
+    if (msgs.length > 2) {
+      const fullText = msgs.map(m => m.text).join(" ");
+      EXAMPLE_CHATS.push({ file, msgs, keywords: scoreKeywords(fullText) });
+    }
+  }
+  console.log(`[chat-examples] Loaded ${EXAMPLE_CHATS.length} example conversations`);
+} catch (e) {
+  console.error("[chat-examples] Failed to load chats:", e.message);
+}
+
+// Find the most relevant example conversation for a given customer message
+function findBestExampleChat(customerMessage) {
+  if (!EXAMPLE_CHATS.length) return null;
+  const queryWords = new Set(scoreKeywords(customerMessage));
+  if (!queryWords.size) return null;
+  let best = null, bestScore = 0;
+  for (const chat of EXAMPLE_CHATS) {
+    const overlap = chat.keywords.filter(w => queryWords.has(w)).length;
+    const score = overlap / Math.sqrt(chat.keywords.length || 1);
+    if (score > bestScore) { bestScore = score; best = chat; }
+  }
+  return bestScore > 0 ? best : EXAMPLE_CHATS[0];
+}
+
+// Format an example chat into a readable block for the AI prompt
+function formatExampleChat(chat) {
+  return chat.msgs.slice(0, 40).map(m =>
+    `${m.role === "kiddost" ? "KidDost" : "Customer"}: ${m.text}`
+  ).join("\n");
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 const app = express();
 app.use(express.json({ limit: '95mb' }));
@@ -91,12 +167,18 @@ async function handleAIResponse(fullPhone, combinedMessage) {
       return;
     }
 
+    // Find the most similar past conversation to use as a reference example
+    const exampleChat = findBestExampleChat(combinedMessage);
+    const exampleBlock = exampleChat
+      ? `\n\nHere is a real example of how KidDost has handled a similar conversation — use this as a guide for tone, style, and the kind of information to provide (do NOT copy names or personal details):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\``
+      : "";
+
     // Ensure the AI sees the combined version of the recent user input
     const messagesForAI = [
       {
         role: "system",
         content:
-          "You are a friendly WhatsApp assistant for Kiddost. Help parents understand programs, classes, and enrollment."
+          "You are a friendly WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore. Help parents understand programs, activities, pricing, scheduling, and enrollment. Keep replies concise and warm, like a WhatsApp chat — avoid long walls of text. Never share personal details from example conversations." + exampleBlock
       },
       ...history,
       { role: "user", content: combinedMessage }
