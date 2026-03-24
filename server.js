@@ -446,7 +446,7 @@ async function sendWelcome(fullPhone) {
   try {
     await axios.post(
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-      { name: '', phone: fullPhone, templateId: '69bc1073458369132b23ee03', variables: [] },
+      { name: '', phone: fullPhone, templateId: 'session', variables: [] },
       { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
     );
     console.log('[welcome] template sent to', fullPhone);
