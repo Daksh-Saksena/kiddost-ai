@@ -128,12 +128,17 @@ function formatExampleChat(chat) {
   ).join("\n");
 }
 
-// Extract the "we engage the child with..." program description line from an example chat
+// Extract the "we engage the child with..." program description line from an example chat.
+// Strips the age prefix ("For 4 year old age category") so the AI uses the age from
+// the actual conversation instead of copying the example's age verbatim.
 function extractProgramDescription(chat) {
   const line = chat.msgs.find(m =>
     m.role === "kiddost" && /we engage the child with/i.test(m.text)
   );
-  return line ? sanitizeExampleText(line.text) : null;
+  if (!line) return null;
+  const text = sanitizeExampleText(line.text);
+  // Strip leading age prefix e.g. "For 4 year old age category we engage..."
+  return text.replace(/^For\s+[\d.]+(?:\s+(?:year|month))?\s*(?:year|month)?\s*old\s+(?:age\s+category\s+)?/i, "").trim();
 }
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -227,7 +232,7 @@ async function handleAIResponse(fullPhone, combinedMessage) {
     // - what the user is actually asking about (handles follow-ups like "For 4?")
     // - whether they're asking about activities/programs
     // - a good search query to find the right example chat
-    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage };
+    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, childAge: null };
     try {
       const intentRes = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -239,7 +244,8 @@ async function handleAIResponse(fullPhone, combinedMessage) {
               content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
 Return ONLY valid JSON with these fields:
 - "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
-- "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations (e.g. "activities 3 year old", "pricing per session", "trial booking")
+- "childAge": the child's age as a number if mentioned anywhere in the conversation (e.g. 3, 4, 5), or null if not mentioned
+- "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations. If asking about activities, include the child's age (e.g. "activities 4 year old", "activities 3 year old")
 Consider the full conversation context when deciding intent.`
             },
             ...history,
@@ -261,6 +267,8 @@ Consider the full conversation context when deciding intent.`
     const programDescription = (intent.isAskingAboutActivities && exampleChat)
       ? extractProgramDescription(exampleChat)
       : null;
+    // Prepend child's age to the injected activities so the AI uses the right age
+    const childAgeLabel = intent.childAge ? `For a ${intent.childAge}-year-old, ` : "";
     const exampleBlock = exampleChat
       ? `\n\n---\nExample conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
       : "";
@@ -268,7 +276,7 @@ Consider the full conversation context when deciding intent.`
     // If asking about activities, inject the real description directly into the user
     // message — the AI is responding *to* it, so it cannot ignore it.
     const userMessageForAI = programDescription
-      ? `${combinedMessage}\n\n[Use EXACTLY these activities in your reply, word for word — do not add or swap any: "${programDescription}"]`
+      ? `${combinedMessage}\n\n[Use EXACTLY these activities in your reply — do not add or swap any: "${childAgeLabel}${programDescription}"]`
       : combinedMessage;
 
     const messagesForAI = [
