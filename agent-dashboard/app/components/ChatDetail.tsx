@@ -41,6 +41,11 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   const SERVER = 'https://kiddost-ai.onrender.com';
 
+  // Known templates — shown even when BotSpace listing API is unavailable
+  const KNOWN_TEMPLATES = [
+    { id: '69bc1073458369132b23ee03', name: 'KidDost Welcome', body: 'Hi, thank you for contacting KidDost. [flyer image + contact info]', language: 'en' },
+  ];
+
   function getTemplateBody(t: any): string {
     const comps: any[] = t?.components || [];
     const body = comps.find(c => (c.type || '').toUpperCase() === 'BODY');
@@ -57,7 +62,19 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     setShowTemplateModal(true);
     setSelectedTemplate(null);
     setTemplateVars([]);
-    // BotSpace has no list-templates API — skip fetch, go straight to manual entry
+    setTemplatesLoading(true);
+    try {
+      const res = await fetch(`${SERVER}/templates`);
+      const json = await res.json();
+      const fetched: any[] = json?.templates || json?.data || [];
+      // Merge server results with known templates (deduplicate by id)
+      const knownNotInFetched = KNOWN_TEMPLATES.filter(k => !fetched.find((f: any) => (f.id || f.name) === k.id));
+      setTemplates([...fetched, ...knownNotInFetched]);
+    } catch {
+      setTemplates(KNOWN_TEMPLATES);
+    } finally {
+      setTemplatesLoading(false);
+    }
   };
 
   const sendTemplate = async () => {
