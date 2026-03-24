@@ -722,8 +722,11 @@ app.delete('/label', async (req, res) => {
 app.delete('/reset-conversation', async (req, res) => {
   const { phone } = req.query;
   if (!phone) return res.status(400).json({ error: 'missing phone' });
-  const { error } = await supabase.from('messages').delete().eq('phone', phone);
-  if (error) return res.status(500).json({ error: error.message });
+  const { error: msgErr } = await supabase.from('messages').delete().eq('phone', phone);
+  if (msgErr) return res.status(500).json({ error: msgErr.message });
+  // Also remove from conversations table so the welcome flow re-triggers on next message
+  const { error: convErr } = await supabase.from('conversations').delete().eq('phone', phone);
+  if (convErr) return res.status(500).json({ error: convErr.message });
   res.json({ ok: true, message: `Cleared conversation history for ${phone}` });
 });
 
