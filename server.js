@@ -809,7 +809,8 @@ app.post("/webhook", async (req, res) => {
 
     const botspaceConversationId = body?.customer?.id || null;
 
-    if (!existingConversation) {
+    const isNewUser = !existingConversation;
+    if (isNewUser) {
       await supabase.from("conversations").insert({
         phone: fullPhone,
         conversation_id: botspaceConversationId
@@ -903,8 +904,8 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ success: true, ai_skipped: true });
     }
 
-    // Only buffer text messages for AI (ignore pure media for AI)
-    if (message) {
+    // Only buffer text messages for AI (ignore pure media for AI, and skip for brand-new users)
+    if (message && !isNewUser) {
       if (!messageBuffers[fullPhone]) messageBuffers[fullPhone] = [];
       messageBuffers[fullPhone].push(message);
 
