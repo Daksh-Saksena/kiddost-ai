@@ -6,7 +6,7 @@ import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X } from "lucide-react";
 const SERVER = 'https://kiddost-ai.onrender.com';
 
 const KNOWN_TEMPLATES = [
-  { id: 'session', name: 'KidDost Welcome', body: 'Hi, thank you for contacting KidDost. [flyer image + contact info]' },
+  { id: 'session', name: 'Session Today?', body: 'Hi, Would you like to go ahead with the session today?' },
 ];
 
 interface Chat {

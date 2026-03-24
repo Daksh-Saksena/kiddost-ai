@@ -43,7 +43,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   // Known templates — shown even when BotSpace listing API is unavailable
   const KNOWN_TEMPLATES = [
-    { id: 'session', name: 'KidDost Welcome', body: 'Hi, thank you for contacting KidDost. [flyer image + contact info]', language: 'en' },
+    { id: 'session', name: 'Session Today?', body: 'Hi, Would you like to go ahead with the session today?', language: 'en' },
   ];
 
   function getTemplateBody(t: any): string {
