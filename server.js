@@ -222,21 +222,53 @@ async function handleAIResponse(fullPhone, combinedMessage) {
       return;
     }
 
-    // Find the most similar past conversation to use as a reference example
-    const exampleChat = findBestExampleChat(combinedMessage);
-    const programDescription = exampleChat ? extractProgramDescription(exampleChat) : null;
+    // ── STEP 1: Intent extraction ────────────────────────────────────────────
+    // A small, cheap AI call that reads the full conversation context and decides:
+    // - what the user is actually asking about (handles follow-ups like "For 4?")
+    // - whether they're asking about activities/programs
+    // - a good search query to find the right example chat
+    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage };
+    try {
+      const intentRes = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
+Return ONLY valid JSON with these fields:
+- "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
+- "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations (e.g. "activities 3 year old", "pricing per session", "trial booking")
+Consider the full conversation context when deciding intent.`
+            },
+            ...history,
+            { role: "user", content: combinedMessage }
+          ],
+          temperature: 0,
+          response_format: { type: "json_object" }
+        },
+        { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" } }
+      );
+      intent = JSON.parse(intentRes.data.choices[0].message.content);
+      console.log("[Intent]", intent);
+    } catch (e) {
+      console.log("[Intent] extraction failed, falling back:", e.message);
+    }
+
+    // ── STEP 2: Retrieve relevant example using the extracted search query ───
+    const exampleChat = findBestExampleChat(intent.searchQuery || combinedMessage);
+    const programDescription = (intent.isAskingAboutActivities && exampleChat)
+      ? extractProgramDescription(exampleChat)
+      : null;
     const exampleBlock = exampleChat
-      ? `\n\n---\nExample conversation (use for tone and style only — do NOT use activities from here):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
+      ? `\n\n---\nExample conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
       : "";
 
-    // Detect if user is asking about programs/activities
-    const isActivityQuestion = /program|activit|what do you (offer|have)|what.*for (my|her|him|the kid)/i.test(combinedMessage);
-
-    // If asking about activities, append the real answer directly to the user message.
-    // This is the most reliable way to force the AI to use our content — it's part of
-    // what the AI is directly responding to, not a distant system instruction it ignores.
-    const userMessageForAI = (isActivityQuestion && programDescription)
-      ? `${combinedMessage}\n\n[ANSWER THESE USING EXACTLY THESE ACTIVITIES — do not add, remove or swap any: "${programDescription}"]`
+    // If asking about activities, inject the real description directly into the user
+    // message — the AI is responding *to* it, so it cannot ignore it.
+    const userMessageForAI = programDescription
+      ? `${combinedMessage}\n\n[Use EXACTLY these activities in your reply, word for word — do not add or swap any: "${programDescription}"]`
       : combinedMessage;
 
     const messagesForAI = [
@@ -274,7 +306,7 @@ Examples of correct behavior:
 
 Goal:
 Make the user feel like they are chatting with a real human agent and move them towards booking.` +
-          (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (use for company philosophy, contact, and general info — NOT for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+          (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           exampleBlock
       },
       ...history,
