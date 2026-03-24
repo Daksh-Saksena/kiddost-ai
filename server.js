@@ -226,17 +226,18 @@ async function handleAIResponse(fullPhone, combinedMessage) {
     const exampleChat = findBestExampleChat(combinedMessage);
     const programDescription = exampleChat ? extractProgramDescription(exampleChat) : null;
     const exampleBlock = exampleChat
-      ? `\n\n---\n${programDescription ? `KIDDOST PROGRAM DESCRIPTION (extracted from a real conversation — when the user asks about activities or programs, use this description word for word, do not swap these activities for others):\n"${programDescription}"\n\n` : ""}Full example conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n\nDO NOT copy from the example: specific names, dates, prices, locations, or availability.\n---`
+      ? `\n\n---\nExample conversation (use for tone and style only — do NOT use activities from here):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
       : "";
 
-    // Ensure the AI sees the combined version of the recent user input
-    // If we have a program description from the example chat, inject it as a fake
-    // prior Q&A so the AI treats it as something it already said (far more reliable than
-    // a system prompt instruction it tends to ignore).
-    const fewShotMessages = programDescription ? [
-      { role: "user", content: "Hi, what programs or activities do you offer for young children?" },
-      { role: "assistant", content: programDescription }
-    ] : [];
+    // Detect if user is asking about programs/activities
+    const isActivityQuestion = /program|activit|what do you (offer|have)|what.*for (my|her|him|the kid)/i.test(combinedMessage);
+
+    // If asking about activities, append the real answer directly to the user message.
+    // This is the most reliable way to force the AI to use our content — it's part of
+    // what the AI is directly responding to, not a distant system instruction it ignores.
+    const userMessageForAI = (isActivityQuestion && programDescription)
+      ? `${combinedMessage}\n\n[ANSWER THESE USING EXACTLY THESE ACTIVITIES — do not add, remove or swap any: "${programDescription}"]`
+      : combinedMessage;
 
     const messagesForAI = [
       {
@@ -257,7 +258,6 @@ Your job:
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
-- Use ONLY the activities mentioned in the example conversation below — NEVER invent activities not found there
 - DO NOT copy specific names, dates, prices, or availability from the example conversation
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
@@ -274,12 +274,11 @@ Examples of correct behavior:
 
 Goal:
 Make the user feel like they are chatting with a real human agent and move them towards booking.` +
-          (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+          (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (use for company philosophy, contact, and general info — NOT for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           exampleBlock
       },
-      ...fewShotMessages,
       ...history,
-      { role: "user", content: combinedMessage }
+      { role: "user", content: userMessageForAI }
     ];
 
     const aiResponse = await axios.post(
