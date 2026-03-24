@@ -61,6 +61,28 @@ try {
   console.error("[chat-examples] Failed to load chats:", e.message);
 }
 
+// Fetch KidDost website content at startup for AI knowledge base
+let KIDDOST_WEBSITE_CONTENT = "";
+(async () => {
+  try {
+    const { data } = await axios.get("https://www.kiddost.com", {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; KidDostBot/1.0)" },
+      timeout: 15000
+    });
+    let text = data.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+    text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    text = text.replace(/<[^>]+>/g, " ");
+    text = text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    text = text.replace(/\s+/g, " ").trim();
+    // Keep first 4000 chars of meaningful content (skip leading CSS junk)
+    const idx = text.indexOf("KidDost");
+    KIDDOST_WEBSITE_CONTENT = text.substring(idx >= 0 ? idx : 0, (idx >= 0 ? idx : 0) + 4000);
+    console.log("[website] Loaded KidDost website content:", KIDDOST_WEBSITE_CONTENT.length, "chars");
+  } catch (e) {
+    console.error("[website] Failed to fetch website content:", e.message);
+  }
+})();
+
 // Find the most relevant example conversation for a given customer message
 function findBestExampleChat(customerMessage) {
   if (!EXAMPLE_CHATS.length) return null;
@@ -202,7 +224,9 @@ Examples of correct behavior:
 - If availability is asked → say "Let me check that for you" or ask for details
 
 Goal:
-Make the user feel like they are chatting with a real human agent and move them towards booking.` + exampleBlock
+Make the user feel like they are chatting with a real human agent and move them towards booking.` +
+          (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+          exampleBlock
       },
       ...history,
       { role: "user", content: combinedMessage }
