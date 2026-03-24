@@ -129,16 +129,50 @@ function formatExampleChat(chat) {
 }
 
 // Extract the "we engage the child with..." program description line from an example chat.
-// Strips the age prefix ("For 4 year old age category") so the AI uses the age from
-// the actual conversation instead of copying the example's age verbatim.
+// Strips the age prefix so the AI uses the age from the conversation, not the example.
 function extractProgramDescription(chat) {
   const line = chat.msgs.find(m =>
     m.role === "kiddost" && /we engage the child with/i.test(m.text)
   );
   if (!line) return null;
   const text = sanitizeExampleText(line.text);
-  // Strip leading age prefix e.g. "For 4 year old age category we engage..."
-  return text.replace(/^For\s+[\d.]+(?:\s+(?:year|month))?\s*(?:year|month)?\s*old\s+(?:age\s+category\s+)?/i, "").trim();
+  return text.replace(/^(?:[\w]+,\s*)?[Ff]or\s+[\d.]+(?:\.5)?\s*(?:year|month)?(?:\s*(?:year|month))?\s*old\s+(?:age\s+category\s+)?/i, "").trim();
+}
+
+// Scan ALL example chats and return the program description whose stated age is
+// closest to childAge. Falls back to any chat with an "engage" line if none match.
+function findProgramDescriptionForAge(childAge) {
+  let best = null;
+  let bestDiff = Infinity;
+
+  for (const chat of EXAMPLE_CHATS) {
+    const line = chat.msgs.find(m =>
+      m.role === "kiddost" && /we engage the child with/i.test(m.text)
+    );
+    if (!line) continue;
+
+    // Try to extract the age from the line e.g. "For 4 year old..." → 4
+    const ageMatch = line.text.match(/[Ff]or\s+([\d.]+)(?:\.5)?\s*(?:year|month)?(?:\s*(?:year|month))?\s*old/i);
+    if (ageMatch) {
+      const lineAge = parseFloat(ageMatch[1]);
+      const diff = Math.abs(lineAge - childAge);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        const text = sanitizeExampleText(line.text);
+        best = text.replace(/^(?:[\w]+,\s*)?[Ff]or\s+[\d.]+(?:\.5)?\s*(?:year|month)?(?:\s*(?:year|month))?\s*old\s+(?:age\s+category\s+)?/i, "").trim();
+      }
+    }
+  }
+
+  // Fallback: use any chat with an engage line
+  if (!best) {
+    for (const chat of EXAMPLE_CHATS) {
+      const desc = extractProgramDescription(chat);
+      if (desc) { best = desc; break; }
+    }
+  }
+
+  return best;
 }
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -264,8 +298,12 @@ Consider the full conversation context when deciding intent.`
 
     // ── STEP 2: Retrieve relevant example using the extracted search query ───
     const exampleChat = findBestExampleChat(intent.searchQuery || combinedMessage);
-    const programDescription = (intent.isAskingAboutActivities && exampleChat)
-      ? extractProgramDescription(exampleChat)
+    // If we know the child's age, scan ALL chats for the closest age-matched description.
+    // Otherwise fall back to the best matching chat's description.
+    const programDescription = intent.isAskingAboutActivities
+      ? (intent.childAge != null
+          ? findProgramDescriptionForAge(intent.childAge)
+          : extractProgramDescription(exampleChat))
       : null;
     // Prepend child's age to the injected activities so the AI uses the right age
     const childAgeLabel = intent.childAge ? `For a ${intent.childAge}-year-old, ` : "";
