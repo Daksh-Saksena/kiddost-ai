@@ -311,11 +311,9 @@ Consider the full conversation context when deciding intent.`
       ? `\n\n---\nExample conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
       : "";
 
-    // If asking about activities, inject the real description directly into the user
-    // message — the AI is responding *to* it, so it cannot ignore it.
-    const userMessageForAI = programDescription
-      ? `${combinedMessage}\n\n[Use EXACTLY these activities in your reply — do not add or swap any: "${childAgeLabel}${programDescription}"]`
-      : combinedMessage;
+    // The system prompt now has all exact age-based activity scripts.
+    // Do NOT inject example activities — they conflict with the system prompt scripts.
+    const userMessageForAI = combinedMessage;
 
     const messagesForAI = [
       {
@@ -351,13 +349,14 @@ PRICING / SERVICES / QUOTATION:
 - Then based on age:
   • Under 6 months: "Looking at the young age of the child and long hours requirement we might not be the right fit for you."
   • Under 1 year (but 6m+): "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won't be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English."
-  • Age 1: "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
+  • Age 1 to under 2 (including 1.5 years, 18 months): "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
   • Age 4 to 8: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
   • Age above 8: "We apologise, but our services are designed for children up to 8 years of age. Unfortunately, we would not be the right fit for your child. We hope you find the right support!"
 - For ages 8 and below: after the age-based activity answer, you MUST write exactly [PRICING_IMAGE] on its own line — this is mandatory, do not skip or omit this marker. Then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
 - End with: "Feel free to let us know if you have any questions."
+- IMPORTANT: Do NOT add any nanny disclaimer or qualification details unless the user specifically asked about nanny services.
 
 NANNY SERVICES (age > 1 year):
 - Ask child's age, give the age-appropriate activity answer, then write [PRICING_IMAGE] on its own line, then: "Please refer to our pricing details mentioned above", then: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
@@ -1358,13 +1357,14 @@ PRICING / SERVICES / QUOTATION:
 - Then based on age:
   • Under 6 months: "Looking at the young age of the child and long hours requirement we might not be the right fit for you."
   • Under 1 year (but 6m+): "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won't be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English."
-  • Age 1: "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
+  • Age 1 to under 2 (including 1.5 years, 18 months): "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
   • Age 4 to 8: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
   • Age above 8: "We apologise, but our services are designed for children up to 8 years of age. Unfortunately, we would not be the right fit for your child. We hope you find the right support!"
 - For ages 8 and below: after the age-based activity answer, you MUST write exactly [PRICING_IMAGE] on its own line — this is mandatory, do not skip or omit this marker. Then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
 - End with: "Feel free to let us know if you have any questions."
+- IMPORTANT: Do NOT add any nanny disclaimer or qualification details unless the user specifically asked about nanny services.
 
 NANNY SERVICES (age > 1 year):
 - Ask child's age, give the age-appropriate activity answer, then write [PRICING_IMAGE] on its own line, then: "Please refer to our pricing details mentioned above", then: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
