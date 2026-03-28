@@ -467,6 +467,12 @@ Goal: Make the user feel like they are chatting with a real human agent and move
           shouldSendFeelFree = true;
           part = part.replace(FEEL_FREE_PATTERN, '').trim();
         }
+        // If the AI says "Please refer to our pricing details" but forgot the image marker, send image first
+        if (/please refer to our pricing details/i.test(part) && !pricingImageSent) {
+          pricingImageSent = true;
+          await sendAIImage('pricing.jpeg');
+          await new Promise(r => setTimeout(r, 600));
+        }
         if (part) {
           await sendAIText(part);
           await new Promise(r => setTimeout(r, 400));
