@@ -354,8 +354,9 @@ PRICING / SERVICES / QUOTATION:
   • Age 1: "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
-  • Age 4 and above: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
-- After the age-based activity answer, write exactly [PRICING_IMAGE] on its own line, then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
+  • Age 4 to 8: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
+  • Age above 8: "We apologise, but our services are designed for children up to 8 years of age. Unfortunately, we would not be the right fit for your child. We hope you find the right support!"
+- For ages 8 and below: after the age-based activity answer, you MUST write exactly [PRICING_IMAGE] on its own line — this is mandatory, do not skip or omit this marker. Then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
 - End with: "Feel free to let us know if you have any questions."
 
 NANNY SERVICES (age > 1 year):
@@ -446,19 +447,42 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     // Split reply on image markers and send segments in order
     const IMAGE_MARKERS = { '[PRICING_IMAGE]': 'pricing.jpeg', '[MONTH_IMAGE]': 'month.jpeg' };
     const MARKER_PATTERN = /\[(PRICING_IMAGE|MONTH_IMAGE)\]/g;
+    const FEEL_FREE_PATTERN = /feel free to let us know if you have any questions\.?/i;
+    const FEEL_FREE_TEXT = 'Feel free to let us know if you have any questions.';
     const parts = aiReply.split(MARKER_PATTERN);
     // parts alternates: text, markerName, text, markerName, text ...
+    let pricingImageSent = false;
+    let shouldSendFeelFree = false;
     for (let i = 0; i < parts.length; i++) {
-      const part = parts[i].trim();
+      let part = parts[i].trim();
       if (!part) continue;
       const filename = IMAGE_MARKERS[`[${part}]`];
       if (filename) {
+        if (filename === 'pricing.jpeg') pricingImageSent = true;
         await sendAIImage(filename);
         await new Promise(r => setTimeout(r, 600));
       } else {
-        await sendAIText(part);
-        await new Promise(r => setTimeout(r, 400));
+        // Extract "Feel free" sentence to always send as its own final message
+        if (FEEL_FREE_PATTERN.test(part)) {
+          shouldSendFeelFree = true;
+          part = part.replace(FEEL_FREE_PATTERN, '').trim();
+        }
+        if (part) {
+          await sendAIText(part);
+          await new Promise(r => setTimeout(r, 400));
+        }
       }
+    }
+    // Fallback: if AI gave age-based activities but skipped the [PRICING_IMAGE] marker, send it now
+    if (programDescription && !pricingImageSent) {
+      await new Promise(r => setTimeout(r, 400));
+      await sendAIImage('pricing.jpeg');
+      await new Promise(r => setTimeout(r, 600));
+    }
+    // Send "Feel free" as its own final message
+    if (shouldSendFeelFree) {
+      await new Promise(r => setTimeout(r, 400));
+      await sendAIText(FEEL_FREE_TEXT);
     }
 
     console.log("Buffered message sent successfully");
@@ -1331,8 +1355,9 @@ PRICING / SERVICES / QUOTATION:
   • Age 1: "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
-  • Age 4 and above: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
-- After the age-based activity answer, write exactly [PRICING_IMAGE] on its own line, then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
+  • Age 4 to 8: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
+  • Age above 8: "We apologise, but our services are designed for children up to 8 years of age. Unfortunately, we would not be the right fit for your child. We hope you find the right support!"
+- For ages 8 and below: after the age-based activity answer, you MUST write exactly [PRICING_IMAGE] on its own line — this is mandatory, do not skip or omit this marker. Then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
 - End with: "Feel free to let us know if you have any questions."
 
 NANNY SERVICES (age > 1 year):
