@@ -354,14 +354,14 @@ PRICING / SERVICES / QUOTATION (if child age not yet known):
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
   • Age 4 and above: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
-- After the age-based activity answer, say: "Please refer to our pricing details mentioned above" then add: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
+- After the age-based activity answer, write exactly [PRICING_IMAGE] on its own line, then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
 - End with: "Feel free to let us know if you have any questions."
 
 NANNY SERVICES (age > 1 year):
-- Ask child's age, give the age-appropriate activity answer, then add: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- Ask child's age, give the age-appropriate activity answer, then write [PRICING_IMAGE] on its own line, then: "Please refer to our pricing details mentioned above", then: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 
 MONTHLY PACKAGES:
-- "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+- Write exactly [MONTH_IMAGE] on its own line, then on a new line: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - End with: "Feel free to let us know if you have any questions."
 
 MEMBER QUALIFICATIONS:
@@ -421,33 +421,44 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       return;
     }
 
-    // Save AI reply (AI agent = null, ai_enabled = true)
-    await supabase.from("messages").insert({
-      phone: fullPhone,
-      role: "assistant",
-      content: aiReply,
-      sender: "ai",
-      agent: null,
-      ai_enabled: true
-    });
+    // Helper: send a text message via BotSpace and save to DB
+    const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
+    const sendAIText = async (text) => {
+      await supabase.from("messages").insert({
+        phone: fullPhone, role: "assistant", content: text, sender: "ai", agent: null, ai_enabled: true
+      });
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+        { name: "User", phone: fullPhone, text },
+        { params: { apiKey: BOTSPACE_API_KEY }, headers: { "Content-Type": "application/json" } }
+      );
+    };
+    const sendAIImage = async (filename) => {
+      const mediaUrl = `${SERVER_URL}/static/${filename}`;
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
+        { name: 'KidDost', phone: fullPhone, mediaUrl, mediaType: 'image', label: '' },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    };
 
-    // Send message back via BotSpace
-    await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-      {
-        name: "User",
-        phone: fullPhone,
-        text: aiReply
-      },
-      {
-        params: {
-          apiKey: BOTSPACE_API_KEY
-        },
-        headers: {
-          "Content-Type": "application/json"
-        }
+    // Split reply on image markers and send segments in order
+    const IMAGE_MARKERS = { '[PRICING_IMAGE]': 'pricing.jpeg', '[MONTH_IMAGE]': 'month.jpeg' };
+    const MARKER_PATTERN = /\[(PRICING_IMAGE|MONTH_IMAGE)\]/g;
+    const parts = aiReply.split(MARKER_PATTERN);
+    // parts alternates: text, markerName, text, markerName, text ...
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      if (!part) continue;
+      const filename = IMAGE_MARKERS[`[${part}]`];
+      if (filename) {
+        await sendAIImage(filename);
+        await new Promise(r => setTimeout(r, 600));
+      } else {
+        await sendAIText(part);
+        await new Promise(r => setTimeout(r, 400));
       }
-    );
+    }
 
     console.log("Buffered message sent successfully");
   } catch (err) {
@@ -1320,14 +1331,14 @@ PRICING / SERVICES / QUOTATION:
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
   • Age 4 and above: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
-- After the age-based activity answer, say: "Please refer to our pricing details mentioned above" then add: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
+- After the age-based activity answer, write exactly [PRICING_IMAGE] on its own line, then on a new line: "Please refer to our pricing details mentioned above", then: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer at discounted price of ₹500 per hour."
 - End with: "Feel free to let us know if you have any questions."
 
 NANNY SERVICES (age > 1 year):
-- Ask child's age, give the age-appropriate activity answer, then add: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- Ask child's age, give the age-appropriate activity answer, then write [PRICING_IMAGE] on its own line, then: "Please refer to our pricing details mentioned above", then: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 
 MONTHLY PACKAGES:
-- "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+- Write exactly [MONTH_IMAGE] on its own line, then on a new line: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - End with: "Feel free to let us know if you have any questions."
 
 MEMBER QUALIFICATIONS:
