@@ -421,7 +421,8 @@ PRICING / SERVICES / QUOTATION:
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
   • If they asked about full pricing/services: mention the trial session at ₹500/hour.
-  • If they just asked to see the pricing table or asked a follow-up: just briefly say "Please refer to the pricing details above."
+  • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
+- IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
 - Do NOT add nanny disclaimer unless the user specifically asked about nanny services.
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
@@ -535,8 +536,8 @@ Goal: Make the user feel like they are chatting with a real human agent and move
           shouldSendFeelFree = true;
           part = part.replace(FEEL_FREE_PATTERN, '').trim();
         }
-        // If the AI says "Please refer to our pricing details" but forgot the image marker, send image first
-        if (/please refer to our pricing details/i.test(part) && !pricingImageSent) {
+        // If the AI mentions pricing details but forgot the image marker, send image first
+        if (/please refer to.*pricing/i.test(part) && !pricingImageSent) {
           pricingImageSent = true;
           await sendAIImage('pricing.jpeg');
           await new Promise(r => setTimeout(r, 600));
@@ -1468,7 +1469,8 @@ PRICING / SERVICES / QUOTATION:
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
   • If they asked about full pricing/services: mention the trial session at ₹500/hour.
-  • If they just asked to see the pricing table or asked a follow-up: just briefly say "Please refer to the pricing details above."
+  • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
+- IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
 - Do NOT add nanny disclaimer unless the user specifically asked about nanny services.
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
