@@ -533,6 +533,38 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       await sendAIText(FEEL_FREE_TEXT);
     }
 
+    // ── Push notifications ──────────────────────────────────────────────────
+    // Patterns where the AI is deferring and a human needs to follow up
+    const NEEDS_HUMAN_PATTERNS = [
+      /let me check.*(?:get back|come back)/i,
+      /allow me to check/i,
+      /check.*slot.*availability/i,
+      /check.*availability.*come back/i,
+      /get back to you/i,
+      /come back to you/i,
+      /share.*location/i,
+      /your location.*confirm/i,
+    ];
+    const needsHuman = NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
+
+    if (needsHuman) {
+      // Strong alert — agent action required
+      sendPushToAll({
+        title: "Assistance needed",
+        body: `Follow-up required for ${fullPhone}: "${aiReply.slice(0, 100)}"`,
+        phone: fullPhone,
+        icon: "/icon-192.png"
+      }).catch(() => {});
+    } else {
+      // Quiet activity ping — just so agents stay aware
+      sendPushToAll({
+        title: "New message",
+        body: `AI replied to ${fullPhone}: "${aiReply.slice(0, 100)}"`,
+        phone: fullPhone,
+        icon: "/icon-192.png"
+      }).catch(() => {});
+    }
+
     console.log("Buffered message sent successfully");
   } catch (err) {
     console.error("handleAIResponse error", err.response?.data || err.message || err);
