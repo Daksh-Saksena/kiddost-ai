@@ -279,7 +279,7 @@ async function handleAIResponse(fullPhone, combinedMessage) {
     // - what the user is actually asking about (handles follow-ups like "For 4?")
     // - whether they're asking about activities/programs
     // - a good search query to find the right example chat
-    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, childAge: null, childNames: [] };
+    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, children: [] };
     try {
       const intentRes = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -291,10 +291,9 @@ async function handleAIResponse(fullPhone, combinedMessage) {
               content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
 Return ONLY valid JSON with these fields:
 - "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
-- "childAge": the child's age as a number if mentioned ANYWHERE in the full conversation history (e.g. 3, 4, 1.5), or null if not mentioned at all
-- "childNames": an array of child first names mentioned anywhere in the conversation (e.g. ["Ram", "Priya"]), or [] if none
-- "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations. If asking about activities, include the child's age (e.g. "activities 4 year old", "activities 3 year old")
-Consider the full conversation context when deciding intent.`
+- "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": number or null }. If the same child is mentioned with both name and age, combine them into one entry. If a new age is mentioned for a different (second) child, add a separate entry. Example: [{"name":"Ram","age":4},{"name":null,"age":2}]
+- "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations. If asking about activities, include the child's age.
+Consider the FULL conversation history carefully — do not confuse one child's age with another's.`
             },
             ...history,
             { role: "user", content: combinedMessage }
@@ -305,55 +304,76 @@ Consider the full conversation context when deciding intent.`
         { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" } }
       );
       intent = JSON.parse(intentRes.data.choices[0].message.content);
-      if (!Array.isArray(intent.childNames)) intent.childNames = [];
+      if (!Array.isArray(intent.children)) intent.children = [];
       console.log("[Intent]", intent);
     } catch (e) {
       console.log("[Intent] extraction failed, falling back:", e.message);
     }
 
-    // ── Update conversation vars with any new discoveries ────────────────────
+    // ── Update conversation vars with any new child discoveries ─────────────
+    // convVars.children = [{name, age}, ...] — merge by name or by position
     let varsUpdated = false;
-    if (intent.childAge != null && convVars.childAge !== intent.childAge) {
-      convVars.childAge = intent.childAge;
-      varsUpdated = true;
-    }
-    if (intent.childNames && intent.childNames.length > 0) {
-      const existing = new Set(convVars.childNames || []);
-      for (const name of intent.childNames) {
-        if (!existing.has(name)) { existing.add(name); varsUpdated = true; }
+    const storedChildren = Array.isArray(convVars.children) ? convVars.children : [];
+    for (const ic of intent.children) {
+      if (ic.name == null && ic.age == null) continue;
+      // Try to find existing match: same name (if named), or a nameless child slot
+      let matched = null;
+      if (ic.name) {
+        matched = storedChildren.find(c => c.name && c.name.toLowerCase() === ic.name.toLowerCase());
       }
-      if (varsUpdated) convVars.childNames = [...existing];
+      if (!matched) {
+        // For unnamed children, see if there's an existing unnamed slot with same age or no age yet
+        matched = storedChildren.find(c => !c.name && (c.age == null || c.age === ic.age));
+      }
+      if (matched) {
+        if (ic.name && matched.name !== ic.name) { matched.name = ic.name; varsUpdated = true; }
+        if (ic.age != null && matched.age !== ic.age) { matched.age = ic.age; varsUpdated = true; }
+      } else {
+        storedChildren.push({ name: ic.name || null, age: ic.age != null ? ic.age : null });
+        varsUpdated = true;
+      }
     }
     if (varsUpdated) {
+      convVars.children = storedChildren;
       supabase.from('conversations').update({ vars: convVars }).eq('phone', fullPhone)
-        .then(() => console.log('[vars] saved:', convVars))
+        .then(() => console.log('[vars] saved:', JSON.stringify(convVars)))
         .catch(e => console.log('[vars] save failed:', e.message));
     }
 
     // ── STEP 2: Retrieve relevant example using the extracted search query ───
     const exampleChat = findBestExampleChat(intent.searchQuery || combinedMessage);
-    // If we know the child's age, scan ALL chats for the closest age-matched description.
-    // Otherwise fall back to the best matching chat's description.
-    const programDescription = intent.isAskingAboutActivities
-      ? (intent.childAge != null
-          ? findProgramDescriptionForAge(intent.childAge)
-          : extractProgramDescription(exampleChat))
+    // For activities, find the best age-matched description.
+    // Use the age of the child being discussed — prefer named child if name appears in message.
+    const allChildren = storedChildren.length > 0 ? storedChildren : intent.children;
+    let activeChildAge = null;
+    let activeChildName = null;
+    if (allChildren.length === 1) {
+      activeChildAge = allChildren[0].age;
+      activeChildName = allChildren[0].name;
+    } else if (allChildren.length > 1) {
+      // Try to detect which child the current message is about
+      const mentionedChild = allChildren.find(c => c.name && new RegExp(c.name, 'i').test(combinedMessage));
+      const active = mentionedChild || allChildren[allChildren.length - 1];
+      activeChildAge = active.age;
+      activeChildName = active.name;
+    }
+    const programDescription = intent.isAskingAboutActivities && activeChildAge != null
+      ? findProgramDescriptionForAge(activeChildAge)
       : null;
-    // Prepend child's age to the injected activities so the AI uses the right age
-    const childAgeLabel = intent.childAge ? `For a ${intent.childAge}-year-old, ` : "";
     const exampleBlock = exampleChat
       ? `\n\n---\nExample conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
       : "";
 
     // Build a known-facts block from conversation vars
-    const knownFacts = [];
-    const ageToUse = convVars.childAge ?? intent.childAge;
-    if (ageToUse != null) knownFacts.push(`- Child's age: ${ageToUse} years old`);
-    if (convVars.childNames && convVars.childNames.length > 0) {
-      knownFacts.push(`- Child name(s): ${convVars.childNames.join(', ')}`);
-    }
-    const varsBlock = knownFacts.length > 0
-      ? `\n\nKNOWN FACTS about this family (do NOT ask for this information again, use it naturally in your reply):\n${knownFacts.join('\n')}`
+    const childFacts = allChildren
+      .filter(c => c.name || c.age != null)
+      .map(c => {
+        if (c.name && c.age != null) return `- ${c.name}: ${c.age} years old`;
+        if (c.name) return `- Child named ${c.name} (age unknown)`;
+        return `- Unnamed child: ${c.age} years old`;
+      });
+    const varsBlock = childFacts.length > 0
+      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}`
       : '';
 
     // The system prompt now has all exact age-based activity scripts.
