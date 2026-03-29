@@ -344,7 +344,7 @@ RESPONSE PLAYBOOK — these are guidelines, not word-for-word scripts. You have 
 
 PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
-- If age is not known yet, ask: "Sure, could you please share your child's age with us?"
+- If age is not known yet, naturally ask for the child's age — phrase it conversationally, e.g. "Could you share your child's age?" or "May I know how old your child is?" — do NOT start with "Sure,"
 - Once age is known, give the appropriate activities response (paraphrasing is fine, keep the core activities accurate):
   • Under 6 months: Explain this is too young and you might not be the right fit.
   • 6m–under 1 year: Explain the age category starts from 1 year, but you've made exceptions for infants — verbal interaction, rhymes, flashcards. Clarify no massage/bathing. Female graduates, English interaction.
@@ -514,6 +514,9 @@ app.use('/static', express.static(__dirname));
 // Send 3-part welcome sequence to a new user
 async function sendWelcome(fullPhone) {
   const sendText = async (text) => {
+    await supabase.from('messages').insert({
+      phone: fullPhone, role: 'assistant', content: text, sender: 'ai', agent: null, ai_enabled: true
+    });
     await axios.post(
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
       { name: 'KidDost', phone: fullPhone, text },
@@ -524,11 +527,15 @@ async function sendWelcome(fullPhone) {
     // 1. Greeting
     await sendText('Hi, thank you for contacting KidDost.');
     await new Promise(r => setTimeout(r, 800));
-    // 2. Flyer image
+    // 2. Flyer image (send via BotSpace; save a placeholder to DB so dashboard shows it)
     const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
+    const imageUrl = `${SERVER_URL}/static/image.png`;
+    await supabase.from('messages').insert({
+      phone: fullPhone, role: 'assistant', content: '', media_url: imageUrl, sender: 'ai', agent: null, ai_enabled: true
+    });
     await axios.post(
       `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
-      { name: 'KidDost', phone: fullPhone, mediaUrl: `${SERVER_URL}/static/image.png`, mediaType: 'image', label: '' },
+      { name: 'KidDost', phone: fullPhone, mediaUrl: imageUrl, mediaType: 'image', label: '' },
       { headers: { 'Content-Type': 'application/json' } }
     );
     await new Promise(r => setTimeout(r, 800));
@@ -1351,7 +1358,7 @@ RESPONSE PLAYBOOK — these are guidelines, not word-for-word scripts. You have 
 
 PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
-- If age is not known yet, ask: "Sure, could you please share your child's age with us?"
+- If age is not known yet, naturally ask for the child's age — phrase it conversationally, e.g. "Could you share your child's age?" or "May I know how old your child is?" — do NOT start with "Sure,"
 - Once age is known, give the appropriate activities response (paraphrasing is fine, keep the core activities accurate):
   • Under 6 months: Explain this is too young and you might not be the right fit.
   • 6m–under 1 year: Explain the age category starts from 1 year, but you've made exceptions for infants — verbal interaction, rhymes, flashcards. Clarify no massage/bathing. Female graduates, English interaction.
