@@ -245,6 +245,19 @@ async function handleAIResponse(fullPhone, combinedMessage) {
 
     const history = Array.isArray(data) ? data.reverse() : [];
 
+    // Load conversation variables (child names/ages stored across messages)
+    let convVars = {};
+    try {
+      const { data: convData } = await supabase
+        .from('conversations')
+        .select('vars')
+        .eq('phone', fullPhone)
+        .maybeSingle();
+      convVars = convData?.vars || {};
+    } catch (e) {
+      console.log('[vars] failed to load:', e.message);
+    }
+
     // Before generating AI response, check most recent message's ai_enabled flag
     const { data: last, error: lastErr } = await supabase
       .from("messages")
@@ -266,7 +279,7 @@ async function handleAIResponse(fullPhone, combinedMessage) {
     // - what the user is actually asking about (handles follow-ups like "For 4?")
     // - whether they're asking about activities/programs
     // - a good search query to find the right example chat
-    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, childAge: null };
+    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, childAge: null, childNames: [] };
     try {
       const intentRes = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -278,7 +291,8 @@ async function handleAIResponse(fullPhone, combinedMessage) {
               content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
 Return ONLY valid JSON with these fields:
 - "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
-- "childAge": the child's age as a number if mentioned anywhere in the conversation (e.g. 3, 4, 5), or null if not mentioned
+- "childAge": the child's age as a number if mentioned ANYWHERE in the full conversation history (e.g. 3, 4, 1.5), or null if not mentioned at all
+- "childNames": an array of child first names mentioned anywhere in the conversation (e.g. ["Ram", "Priya"]), or [] if none
 - "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations. If asking about activities, include the child's age (e.g. "activities 4 year old", "activities 3 year old")
 Consider the full conversation context when deciding intent.`
             },
@@ -291,9 +305,29 @@ Consider the full conversation context when deciding intent.`
         { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" } }
       );
       intent = JSON.parse(intentRes.data.choices[0].message.content);
+      if (!Array.isArray(intent.childNames)) intent.childNames = [];
       console.log("[Intent]", intent);
     } catch (e) {
       console.log("[Intent] extraction failed, falling back:", e.message);
+    }
+
+    // ── Update conversation vars with any new discoveries ────────────────────
+    let varsUpdated = false;
+    if (intent.childAge != null && convVars.childAge !== intent.childAge) {
+      convVars.childAge = intent.childAge;
+      varsUpdated = true;
+    }
+    if (intent.childNames && intent.childNames.length > 0) {
+      const existing = new Set(convVars.childNames || []);
+      for (const name of intent.childNames) {
+        if (!existing.has(name)) { existing.add(name); varsUpdated = true; }
+      }
+      if (varsUpdated) convVars.childNames = [...existing];
+    }
+    if (varsUpdated) {
+      supabase.from('conversations').update({ vars: convVars }).eq('phone', fullPhone)
+        .then(() => console.log('[vars] saved:', convVars))
+        .catch(e => console.log('[vars] save failed:', e.message));
     }
 
     // ── STEP 2: Retrieve relevant example using the extracted search query ───
@@ -310,6 +344,17 @@ Consider the full conversation context when deciding intent.`
     const exampleBlock = exampleChat
       ? `\n\n---\nExample conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n---`
       : "";
+
+    // Build a known-facts block from conversation vars
+    const knownFacts = [];
+    const ageToUse = convVars.childAge ?? intent.childAge;
+    if (ageToUse != null) knownFacts.push(`- Child's age: ${ageToUse} years old`);
+    if (convVars.childNames && convVars.childNames.length > 0) {
+      knownFacts.push(`- Child name(s): ${convVars.childNames.join(', ')}`);
+    }
+    const varsBlock = knownFacts.length > 0
+      ? `\n\nKNOWN FACTS about this family (do NOT ask for this information again, use it naturally in your reply):\n${knownFacts.join('\n')}`
+      : '';
 
     // The system prompt now has all exact age-based activity scripts.
     // Do NOT inject example activities — they conflict with the system prompt scripts.
@@ -389,6 +434,7 @@ NEW SESSION / LOCATION:
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
           (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+          varsBlock +
           exampleBlock
       },
       ...history,
