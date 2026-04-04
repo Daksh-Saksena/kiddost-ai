@@ -64,6 +64,9 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
       if (res.ok && json.name) {
         localStorage.setItem(SESSION_KEY, JSON.stringify({ name: json.name, id: selectedAgent.id }));
         setPin("");
+        onLogin(json.name);
+      } else if (!res.ok) {
+        setError(json.error === 'invalid_pin' ? "Incorrect PIN." : "Login failed. Try again.");
       }
     } catch { setError("Connection error. Try again."); }
     finally { setLoading(false); }
