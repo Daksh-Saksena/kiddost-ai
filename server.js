@@ -1037,7 +1037,7 @@ app.post("/webhook", async (req, res) => {
       (Date.now() - new Date(lastUserBefore.created_at).getTime() >= LONG_GAP_MS)
     );
 
-    // If incoming media URL is provided, try to fetch it and store in Supabase storage
+    // If incoming media URL is provided, try to fetch it and store
     let storedMediaUrl = mediaUrl || null;
     if (mediaUrl && supabaseService) {
       try {
