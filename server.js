@@ -1018,7 +1018,7 @@ app.post("/webhook", async (req, res) => {
 
     const aiEnabledForInsert = lastBefore && typeof lastBefore.ai_enabled !== 'undefined' ? lastBefore.ai_enabled : true;
     //const LONG_GAP_MS = 14 * 24 * 60 * 60 * 1000;
-    const LONG_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+    const LONG_GAP_MS = 1000;
     const shouldWelcomeBack = !!(
       !isNewUser &&
       lastBefore?.created_at &&
