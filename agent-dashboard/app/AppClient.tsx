@@ -413,8 +413,9 @@ export default function AppClient() {
   };
 
   useEffect(() => {
+    if (!authed) return;
     loadChats();
-  }, [pinnedChatIds]);
+  }, [authed, pinnedChatIds]);
 
   useEffect(() => {
     if (selectedChat) {
@@ -426,6 +427,7 @@ export default function AppClient() {
   }, [selectedChat]);
 
   useEffect(() => {
+    if (!authed) return;
     const channel = supabase
       .channel("realtime-messages")
       .on(
@@ -482,17 +484,18 @@ export default function AppClient() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedChat]);
+  }, [selectedChat, authed, pinnedChatIds]);
 
   // Polling fallback: refresh chats/messages every 5s
   useEffect(() => {
+    if (!authed) return;
     const iv = setInterval(() => {
       loadChats();
       if (selectedChat) loadMessages(selectedChat);
     }, 5000);
 
     return () => clearInterval(iv);
-  }, [selectedChat]);
+  }, [selectedChat, authed, pinnedChatIds]);
 
   // Register service worker and subscribe to push notifications on login
   useEffect(() => {

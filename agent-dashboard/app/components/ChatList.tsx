@@ -210,6 +210,8 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
                 <p className={`text-sm truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                   <button
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); onTogglePin(chat.id); }}
                     title={chat.pinned ? "Unpin chat" : "Pin chat"}
                     className={`p-1.5 rounded-full transition-all ${
