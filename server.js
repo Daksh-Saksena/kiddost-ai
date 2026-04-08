@@ -220,6 +220,7 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 const MESSAGE_BUFFER_DELAY_MS = 100; // ← change this to adjust how long to wait before sending to AI (in milliseconds)
 const messageBuffers = {};
 const messageTimers = {};
+const welcomeBackFlags = {};
 
 // In-memory OTP store for agent creation: { token -> { otp, expiresAt } }
 const otpStore = {};
@@ -229,8 +230,9 @@ function hashPin(pin) {
 }
 
 // Helper: generate AI response for a combined user message
-async function handleAIResponse(fullPhone, combinedMessage) {
+async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
   try {
+    const { prependWelcomeBack = false } = options;
     // Fetch last 10 messages for conversation memory
     const { data, error } = await supabase
       .from("messages")
@@ -512,6 +514,11 @@ Goal: Make the user feel like they are chatting with a real human agent and move
         { headers: { 'Content-Type': 'application/json' } }
       );
     };
+
+    if (prependWelcomeBack) {
+      await sendAIText('Welcome back! Great to hear from you again.');
+      await new Promise(r => setTimeout(r, 400));
+    }
 
     // Split reply on image markers and send segments in order
     const IMAGE_MARKERS = { '[PRICING_IMAGE]': 'pricing.jpeg', '[MONTH_IMAGE]': 'month.jpeg' };
@@ -1010,6 +1017,12 @@ app.post("/webhook", async (req, res) => {
     }
 
     const aiEnabledForInsert = lastBefore && typeof lastBefore.ai_enabled !== 'undefined' ? lastBefore.ai_enabled : true;
+    const LONG_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+    const shouldWelcomeBack = !!(
+      !isNewUser &&
+      lastBefore?.created_at &&
+      (Date.now() - new Date(lastBefore.created_at).getTime() >= LONG_GAP_MS)
+    );
 
     // If incoming media URL is provided, try to fetch it and store in Supabase storage
     let storedMediaUrl = mediaUrl || null;
@@ -1080,6 +1093,7 @@ app.post("/webhook", async (req, res) => {
     if (message && !isNewUser) {
       if (!messageBuffers[fullPhone]) messageBuffers[fullPhone] = [];
       messageBuffers[fullPhone].push(message);
+      if (shouldWelcomeBack) welcomeBackFlags[fullPhone] = true;
 
       // clear previous timer if any
       if (messageTimers[fullPhone]) {
@@ -1089,11 +1103,13 @@ app.post("/webhook", async (req, res) => {
       // wait MESSAGE_BUFFER_DELAY_MS before sending combined text to AI
       messageTimers[fullPhone] = setTimeout(async () => {
         const combined = (messageBuffers[fullPhone] || []).join(" ").trim();
+        const prependWelcomeBack = !!welcomeBackFlags[fullPhone];
         // reset buffer
         messageBuffers[fullPhone] = [];
+        welcomeBackFlags[fullPhone] = false;
         try {
           if (combined) {
-            await handleAIResponse(fullPhone, combined);
+            await handleAIResponse(fullPhone, combined, { prependWelcomeBack });
           }
         } catch (e) {
           console.error('buffered AI handler error', e?.message || e);
