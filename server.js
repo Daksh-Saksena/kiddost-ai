@@ -1628,9 +1628,10 @@ app.post('/calendar/extract', async (req, res) => {
           {
             role: 'system',
             content: `You extract confirmed session booking details from a WhatsApp conversation.
+TODAY'S DATE is ${new Date().toISOString().split('T')[0]} (${new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).
 Return ONLY valid JSON with these fields (use null if not found):
 - "title": short session title, e.g. "KidDost Session" or include child name if mentioned
-- "date": ISO date string YYYY-MM-DD (use the CURRENT year ${new Date().getFullYear()} if year is not mentioned)
+- "date": ISO date string YYYY-MM-DD. When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year. When "tomorrow" is mentioned, use tomorrow's date. When "next Monday" etc is mentioned, calculate from today.
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format (if duration mentioned, calculate it; if not, assume 1 hour after start)
 - "notes": any extra details like location, special instructions
@@ -1666,22 +1667,30 @@ app.get('/calendar/events', async (req, res) => {
   }
 });
 
-// Create event
+// Create event (supports repeat_count for weekly recurring)
 app.post('/calendar/events', async (req, res) => {
   try {
-    const { phone, title, date, start_time, end_time, notes, created_by } = req.body;
+    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'title and date required' });
-    const { data, error } = await supabase.from('calendar_events').insert({
-      phone: phone || null,
-      title,
-      date,
-      start_time: start_time || null,
-      end_time: end_time || null,
-      notes: notes || null,
-      created_by: created_by || null,
-    }).select().single();
+    const count = Math.min(Math.max(parseInt(repeat_count) || 1, 1), 52); // cap at 52 weeks
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+      const d = new Date(date + 'T00:00:00');
+      d.setDate(d.getDate() + i * 7);
+      const dateStr = d.toISOString().split('T')[0];
+      rows.push({
+        phone: phone || null,
+        title: count > 1 ? `${title} (${i + 1}/${count})` : title,
+        date: dateStr,
+        start_time: start_time || null,
+        end_time: end_time || null,
+        notes: notes || null,
+        created_by: created_by || null,
+      });
+    }
+    const { data, error } = await supabase.from('calendar_events').insert(rows).select();
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ event: data });
+    return res.json({ events: data, count });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

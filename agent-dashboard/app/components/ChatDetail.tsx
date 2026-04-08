@@ -328,12 +328,13 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [calStart, setCalStart] = useState('');
   const [calEnd, setCalEnd] = useState('');
   const [calNotes, setCalNotes] = useState('');
+  const [calRepeat, setCalRepeat] = useState(1);
   const [calSaving, setCalSaving] = useState(false);
   const [calSuccess, setCalSuccess] = useState(false);
 
   const extractAndShowCalendar = async () => {
     setCalExtracting(true);
-    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes('');
+    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1);
     setCalSuccess(false);
     try {
       const res = await fetch(`${SERVER}/calendar/extract`, {
@@ -369,7 +370,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       await fetch(`${SERVER}/calendar/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null }),
+        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, repeat_count: calRepeat > 1 ? calRepeat : undefined }),
       });
       setCalSuccess(true);
       setTimeout(() => { setShowCalModal(false); setCalSuccess(false); }, 1200);
@@ -747,12 +748,25 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                   <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>
                   <textarea value={calNotes} onChange={e => setCalNotes(e.target.value)} placeholder="Location, special instructions..." rows={2} className={`${calInputCls} resize-none`} />
                 </div>
+                <div>
+                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>REPEAT WEEKLY</label>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min={1} max={20} value={calRepeat} onChange={e => setCalRepeat(parseInt(e.target.value))} className="flex-1 accent-blue-500" />
+                    <span className={`text-sm font-semibold min-w-[3rem] text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{calRepeat === 1 ? 'Once' : `${calRepeat}x`}</span>
+                  </div>
+                  {calRepeat > 1 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Creates {calRepeat} weekly sessions starting {calDate || 'selected date'}</p>}
+                  <div className="flex gap-2 mt-2">
+                    {[1, 4, 8, 11].map(n => (
+                      <button key={n} type="button" onClick={() => setCalRepeat(n)} className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${calRepeat === n ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white') : (isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600')}`}>{n === 1 ? 'Once' : `${n}x`}</button>
+                    ))}
+                  </div>
+                </div>
                 <button
                   onClick={saveCalEvent}
                   disabled={calSaving || !calTitle.trim() || !calDate}
                   className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white hover:bg-[#006d5b]'}`}
                 >
-                  {calSaving ? 'Saving...' : 'Save to Calendar'}
+                  {calSaving ? 'Saving...' : calRepeat > 1 ? `Save ${calRepeat} Sessions` : 'Save to Calendar'}
                 </button>
               </>
             )}

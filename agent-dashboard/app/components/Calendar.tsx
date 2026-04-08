@@ -52,6 +52,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [formEnd, setFormEnd] = useState("");
   const [formNotes, setFormNotes] = useState("");
   const [formPhone, setFormPhone] = useState("");
+  const [formRepeat, setFormRepeat] = useState(1);
   const [saving, setSaving] = useState(false);
 
   const fetchEvents = async () => {
@@ -94,6 +95,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setFormEnd("");
     setFormNotes("");
     setFormPhone("");
+    setFormRepeat(1);
     setShowModal(true);
   };
 
@@ -122,7 +124,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         await fetch(`${SERVER}/calendar/events`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, created_by: agentName || null }),
+          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, created_by: agentName || null, repeat_count: formRepeat > 1 ? formRepeat : undefined }),
         });
       }
       setShowModal(false);
@@ -299,12 +301,52 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
               <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} placeholder="Any extra details..." rows={2} className={`${inputCls} resize-none`} />
             </div>
 
+            {!editEvent && (
+              <div>
+                <label className={`text-xs font-medium mb-1 block ${subtext}`}>REPEAT WEEKLY</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    value={formRepeat}
+                    onChange={e => setFormRepeat(parseInt(e.target.value))}
+                    className="flex-1 accent-blue-500"
+                  />
+                  <span className={`text-sm font-semibold min-w-[3rem] text-center ${text}`}>
+                    {formRepeat === 1 ? 'Once' : `${formRepeat}x`}
+                  </span>
+                </div>
+                {formRepeat > 1 && (
+                  <p className={`text-xs mt-1 ${subtext}`}>
+                    Creates {formRepeat} weekly sessions starting {formDate || 'selected date'}
+                  </p>
+                )}
+                <div className="flex gap-2 mt-2">
+                  {[1, 4, 8, 11].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setFormRepeat(n)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                        formRepeat === n
+                          ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white'
+                          : isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {n === 1 ? 'Once' : `${n}x`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <button
               onClick={handleSave}
               disabled={saving || !formTitle.trim() || !formDate}
               className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-[#008069] text-white hover:bg-[#006d5b]"}`}
             >
-              {saving ? "Saving..." : editEvent ? "Update Event" : "Create Event"}
+              {saving ? "Saving..." : editEvent ? "Update Event" : formRepeat > 1 ? `Create ${formRepeat} Sessions` : "Create Event"}
             </button>
           </div>
         </div>
