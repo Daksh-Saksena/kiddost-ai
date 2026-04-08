@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase";
 const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 
-type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[] };
+type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[]; pinned?: boolean };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
@@ -234,6 +234,7 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
 }
 
 const CONTACTS_KEY = 'kiddost_contacts';
+const PINNED_CHATS_KEY = 'kiddost_pinned_chats';
 function getContacts(): Record<string, { name: string; notes: string; labels?: string[] }> {
   if (typeof window === 'undefined') return {};
   try { return JSON.parse(localStorage.getItem(CONTACTS_KEY) || '{}'); } catch { return {}; }
@@ -242,6 +243,19 @@ function saveContact(phone: string, data: { name: string; notes: string; labels?
   const all = getContacts();
   all[phone] = data;
   try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(all)); } catch {}
+}
+
+function getPinnedStore(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PINNED_CHATS_KEY) || '{}');
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {}
+  return {};
+}
+
+function setPinnedStore(store: Record<string, string[]>) {
+  try { localStorage.setItem(PINNED_CHATS_KEY, JSON.stringify(store)); } catch {}
 }
 
 export default function AppClient() {
@@ -283,6 +297,7 @@ export default function AppClient() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   // Track last-seen message timestamp per phone to calculate unread counts
   const lastSeenRef = useRef<Record<string, string>>({});
@@ -291,6 +306,29 @@ export default function AppClient() {
   useEffect(() => {
     try { lastSeenRef.current = JSON.parse(localStorage.getItem('kiddost_lastSeen') || '{}'); } catch {}
   }, []);
+
+  const agentScopedKey = `${agentId || 'no-id'}::${agentName || 'Agent'}`;
+
+  useEffect(() => {
+    if (!authed) {
+      setPinnedChatIds([]);
+      return;
+    }
+    const store = getPinnedStore();
+    const scoped = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
+    setPinnedChatIds(scoped);
+  }, [authed, agentScopedKey]);
+
+  const togglePinChat = (chatId: string) => {
+    setPinnedChatIds((prev) => {
+      const next = prev.includes(chatId) ? prev.filter((id) => id !== chatId) : [...prev, chatId];
+      const store = getPinnedStore();
+      store[agentScopedKey] = next;
+      setPinnedStore(store);
+      setChats((current) => current.map((c) => c.id === chatId ? { ...c, pinned: !prev.includes(chatId) } : c));
+      return next;
+    });
+  };
 
   const markRead = (phone: string) => {
     lastSeenRef.current[phone] = new Date().toISOString();
@@ -333,6 +371,7 @@ export default function AppClient() {
       unread: unreadCount[r.phone] || 0,
       lastMsgAt: r.created_at,
       labels: contacts[r.phone]?.labels || [],
+      pinned: pinnedChatIds.includes(r.phone),
     }));
 
     setChats(result);
@@ -375,7 +414,7 @@ export default function AppClient() {
 
   useEffect(() => {
     loadChats();
-  }, []);
+  }, [pinnedChatIds]);
 
   useEffect(() => {
     if (selectedChat) {
@@ -590,6 +629,7 @@ export default function AppClient() {
         ) : (
           <ChatList
             onSelectChat={(chatId) => setSelectedChat(chatId)}
+            onTogglePin={togglePinChat}
             isDarkMode={isDarkMode}
             onToggleTheme={() => setIsDarkMode(!isDarkMode)}
             onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}

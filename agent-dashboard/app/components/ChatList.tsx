@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X } from "lucide-react";
+import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X, Pin } from "lucide-react";
 
 const SERVER = 'https://kiddost-ai.onrender.com';
 
@@ -18,6 +18,7 @@ interface Chat {
   unread?: number;
   agent?: string | null;
   labels?: string[];
+  pinned?: boolean;
 }
 
 interface ChatListProps {
@@ -27,9 +28,10 @@ interface ChatListProps {
   onLogout: () => void;
   onDeleteAccount?: () => void;
   chats: Chat[];
+  onTogglePin: (chatId: string) => void;
 }
 
-export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats }: ChatListProps) {
+export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats, onTogglePin }: ChatListProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
   const [showNewConvo, setShowNewConvo] = useState(false);
@@ -75,11 +77,13 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
       )
     : chats;
 
-  const sorted = sort === 'az'
+  const baseSorted = sort === 'az'
     ? [...filtered].sort((a, b) => a.name.localeCompare(b.name))
     : sort === 'agent'
     ? [...filtered].sort((a, b) => (a.agent || 'AI').localeCompare(b.agent || 'AI'))
     : filtered;
+
+  const sorted = [...baseSorted].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
@@ -196,12 +200,26 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
             </div>
             <div className="flex-1 ml-4 min-w-0">
               <div className="flex justify-between items-baseline">
-                <h3 className={`font-medium truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
+                <div className="flex items-center gap-2 min-w-0">
+                  <h3 className={`font-medium truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
+                  {chat.pinned && <Pin className={`w-3.5 h-3.5 flex-shrink-0 ${isDarkMode ? 'text-yellow-300' : 'text-amber-500'}`} fill="currentColor" />}
+                </div>
                 <span className={`text-xs ml-2 flex-shrink-0 ${isDarkMode ? "text-blue-400" : "text-gray-500"}`}>{chat.time}</span>
               </div>
               <div className="flex justify-between items-center mt-1.5">
                 <p className={`text-sm truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onTogglePin(chat.id); }}
+                    title={chat.pinned ? "Unpin chat" : "Pin chat"}
+                    className={`p-1.5 rounded-full transition-all ${
+                      chat.pinned
+                        ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-amber-100 text-amber-600'
+                        : isDarkMode ? 'text-gray-500 hover:text-yellow-300 hover:bg-yellow-500/10' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                    }`}
+                  >
+                    <Pin className="w-3.5 h-3.5" fill={chat.pinned ? 'currentColor' : 'none'} />
+                  </button>
                   {chat.agent && (
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       isDarkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700/40' : 'bg-gray-100 text-gray-600'
