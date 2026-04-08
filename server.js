@@ -1002,6 +1002,7 @@ app.post("/webhook", async (req, res) => {
 
     // Determine previous AI state for this conversation
     let lastBefore = null;
+    let lastUserBefore = null;
     try {
       const { data: lb, error: lbErr } = await supabase
         .from("messages")
@@ -1012,17 +1013,28 @@ app.post("/webhook", async (req, res) => {
         .maybeSingle();
 
       if (!lbErr) lastBefore = lb;
+
+      const { data: lub, error: lubErr } = await supabase
+        .from("messages")
+        .select("created_at")
+        .eq("phone", fullPhone)
+        .eq("sender", "user")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!lubErr) lastUserBefore = lub;
     } catch (e) {
       lastBefore = null;
+      lastUserBefore = null;
     }
 
     const aiEnabledForInsert = lastBefore && typeof lastBefore.ai_enabled !== 'undefined' ? lastBefore.ai_enabled : true;
-    //const LONG_GAP_MS = 14 * 24 * 60 * 60 * 1000;
-    const LONG_GAP_MS = 1000;
+    const LONG_GAP_MS = 14 * 24 * 60 * 60 * 1000;
     const shouldWelcomeBack = !!(
       !isNewUser &&
-      lastBefore?.created_at &&
-      (Date.now() - new Date(lastBefore.created_at).getTime() >= LONG_GAP_MS)
+      lastUserBefore?.created_at &&
+      (Date.now() - new Date(lastUserBefore.created_at).getTime() >= LONG_GAP_MS)
     );
 
     // If incoming media URL is provided, try to fetch it and store in Supabase storage
