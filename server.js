@@ -1627,15 +1627,26 @@ app.post('/calendar/extract', async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: `You extract confirmed session booking details from a WhatsApp conversation.
-TODAY'S DATE is ${new Date().toISOString().split('T')[0]} (${new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).
+            content: (() => {
+              const now = new Date();
+              const cal = [];
+              for (let i = 0; i < 14; i++) {
+                const d = new Date(now); d.setDate(now.getDate() + i);
+                cal.push(`${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toISOString().split('T')[0]}`);
+              }
+              return `You extract confirmed session booking details from a WhatsApp conversation.
+TODAY is ${now.toISOString().split('T')[0]} (${now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).
+UPCOMING CALENDAR (next 14 days):
+${cal.join('\n')}
+Use this calendar to resolve day names like "Sunday", "this Friday", "next Wednesday" to the correct YYYY-MM-DD date.
 Return ONLY valid JSON with these fields (use null if not found):
 - "title": short session title, e.g. "KidDost Session" or include child name if mentioned
-- "date": ISO date string YYYY-MM-DD. When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year. When "tomorrow" is mentioned, use tomorrow's date. When "next Monday" etc is mentioned, calculate from today.
+- "date": ISO date string YYYY-MM-DD. When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year. When "tomorrow" is mentioned, use tomorrow's date. When a weekday name is mentioned, pick the NEAREST UPCOMING match from the calendar above.
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format (if duration mentioned, calculate it; if not, assume 1 hour after start)
 - "notes": any extra details like location, special instructions
-Only extract if a session/booking/appointment appears to be confirmed or scheduled. If nothing is confirmed, return {"title":null}.`
+Only extract if a session/booking/appointment appears to be confirmed or scheduled. If nothing is confirmed, return {"title":null}.`;
+            })()
           },
           { role: 'user', content: chatText }
         ],
@@ -1719,6 +1730,96 @@ app.delete('/calendar/events/:id', async (req, res) => {
     const { error } = await supabase.from('calendar_events').delete().eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// AI calendar command — natural language to actions
+app.post('/calendar/ai-command', async (req, res) => {
+  try {
+    const { command } = req.body;
+    if (!command) return res.status(400).json({ error: 'command required' });
+
+    // Fetch ALL calendar events
+    const { data: allEvents, error: fetchErr } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .order('date', { ascending: true });
+    if (fetchErr) return res.status(500).json({ error: fetchErr.message });
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const cal14 = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(now); d.setDate(now.getDate() + i);
+      cal14.push(`${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toISOString().split('T')[0]}`);
+    }
+
+    const eventList = (allEvents || []).map(e =>
+      `ID:${e.id} | "${e.title}" | ${e.date} ${e.start_time || ''}-${e.end_time || ''} | phone:${e.phone || 'N/A'} | notes:${e.notes || ''}`
+    ).join('\n');
+
+    const aiRes = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a calendar assistant. TODAY is ${todayStr} (${now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).
+UPCOMING 14 DAYS:\n${cal14.join('\n')}
+
+CURRENT CALENDAR EVENTS:\n${eventList || '(no events)'}
+
+The user will give you a natural language command about the calendar. You must return ONLY valid JSON:
+{
+  "actions": [
+    { "type": "delete", "id": "<event UUID>" },
+    { "type": "create", "title": "...", "date": "YYYY-MM-DD", "start_time": "HH:MM" or null, "end_time": "HH:MM" or null, "phone": "..." or null, "notes": "..." or null }
+  ],
+  "summary": "Short human-readable summary of what you did, e.g. 'Deleted 5 sessions for Aarav'"
+}
+Rules:
+- Match event titles/names loosely (case-insensitive, partial match is fine).
+- For "remove all sessions of X" → delete all events whose title contains X.
+- For "move X to Y" → delete old + create new.
+- For "add session for X on Sunday at 3pm" → create with the correct date from the calendar above.
+- If the command is unclear or matches nothing, return { "actions": [], "summary": "No matching events found" }.
+- NEVER invent event IDs. Only use IDs from the list above.`
+        },
+        { role: 'user', content: command }
+      ],
+      temperature: 0,
+      response_format: { type: 'json_object' }
+    }, { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' } });
+
+    const parsed = JSON.parse(aiRes.data.choices[0].message.content);
+    const actions = parsed.actions || [];
+    let deleted = 0, created = 0;
+
+    for (const action of actions) {
+      if (action.type === 'delete' && action.id) {
+        const { error } = await supabase.from('calendar_events').delete().eq('id', action.id);
+        if (!error) deleted++;
+      } else if (action.type === 'create' && action.title && action.date) {
+        const { error } = await supabase.from('calendar_events').insert({
+          title: action.title,
+          date: action.date,
+          start_time: action.start_time || null,
+          end_time: action.end_time || null,
+          phone: action.phone || null,
+          notes: action.notes || null,
+          created_by: 'AI Command',
+        });
+        if (!error) created++;
+      }
+    }
+
+    return res.json({
+      summary: parsed.summary || `Done: ${deleted} deleted, ${created} created`,
+      deleted,
+      created,
+      totalActions: actions.length,
+    });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

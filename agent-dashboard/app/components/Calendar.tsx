@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send } from "lucide-react";
 
 const SERVER = "https://kiddost-ai.onrender.com";
 
@@ -54,6 +54,11 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [formPhone, setFormPhone] = useState("");
   const [formRepeat, setFormRepeat] = useState(1);
   const [saving, setSaving] = useState(false);
+
+  // AI command bar state
+  const [aiCmd, setAiCmd] = useState("");
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiResult, setAiResult] = useState<string | null>(null);
 
   const fetchEvents = async () => {
     const from = `${year}-${pad(month + 1)}-01`;
@@ -139,6 +144,30 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
       fetchEvents();
       if (selectedEvents.length <= 1) setSelectedDate(null);
     } catch { /* silent */ }
+  };
+
+  const runAiCommand = async () => {
+    const cmd = aiCmd.trim();
+    if (!cmd || aiRunning) return;
+    setAiRunning(true);
+    setAiResult(null);
+    try {
+      const res = await fetch(`${SERVER}/calendar/ai-command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: cmd }),
+      });
+      const json = await res.json();
+      setAiResult(json.summary || json.error || "Done");
+      setAiCmd("");
+      fetchEvents();
+      setTimeout(() => setAiResult(null), 4000);
+    } catch {
+      setAiResult("Something went wrong");
+      setTimeout(() => setAiResult(null), 3000);
+    } finally {
+      setAiRunning(false);
+    }
   };
 
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
@@ -256,6 +285,34 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             <p className={`text-sm ${subtext}`}>Tap a date to view events</p>
           </div>
         )}
+      </div>
+
+      {/* AI Command Bar */}
+      <div className={`px-3 py-2 border-t ${border} ${isDarkMode ? "bg-gray-950" : "bg-white"}`}>
+        {aiResult && (
+          <div className={`mb-2 px-3 py-2 rounded-xl text-xs font-medium ${isDarkMode ? "bg-blue-900/30 text-blue-300" : "bg-green-50 text-green-700"}`}>
+            <Sparkles className="w-3 h-3 inline mr-1.5" />{aiResult}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <Sparkles className={`w-4 h-4 flex-shrink-0 ${aiRunning ? "animate-spin" : ""} ${isDarkMode ? "text-blue-400" : "text-[#008069]"}`} />
+          <input
+            type="text"
+            value={aiCmd}
+            onChange={e => setAiCmd(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && runAiCommand()}
+            placeholder={aiRunning ? "Thinking..." : "AI: \"remove all sessions of Aarav\"..."}
+            disabled={aiRunning}
+            className={`flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-all ${isDarkMode ? "bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500" : "bg-gray-100 border border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-[#008069]"}`}
+          />
+          <button
+            onClick={runAiCommand}
+            disabled={aiRunning || !aiCmd.trim()}
+            className={`p-2.5 rounded-full transition-all disabled:opacity-30 active:scale-95 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-[#008069] text-white hover:bg-[#006d5b]"}`}
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Create/Edit Modal */}
