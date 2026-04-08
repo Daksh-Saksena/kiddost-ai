@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { avatarDataUrl } from '../avatarDataUrl';
-import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X, FileText, ChevronLeft } from "lucide-react";
+import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X, FileText, ChevronLeft, CalendarPlus } from "lucide-react";
 import { supabase } from '../../lib/supabase';
 
 interface Message {
@@ -23,7 +23,7 @@ interface ChatDetailProps {
   isDarkMode: boolean;
 }
 
-export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact, initialLabels = [], onAddLabel, onRemoveLabel }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string }; initialLabels?: string[]; onAddLabel?: (label: string) => void; onRemoveLabel?: (label: string) => void }) {
+export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact, initialLabels = [], onAddLabel, onRemoveLabel, agentName }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string }; initialLabels?: string[]; onAddLabel?: (label: string) => void; onRemoveLabel?: (label: string) => void; agentName?: string }) {
   const [messages, setMessages] = useState<Message[]>(propMessages || []);
   const [inputValue, setInputValue] = useState("");
   const [showInfo, setShowInfo] = useState(false);
@@ -320,6 +320,65 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     }
   };
 
+  // ── Calendar extraction state ──────────────────────────────────
+  const [showCalModal, setShowCalModal] = useState(false);
+  const [calExtracting, setCalExtracting] = useState(false);
+  const [calTitle, setCalTitle] = useState('');
+  const [calDate, setCalDate] = useState('');
+  const [calStart, setCalStart] = useState('');
+  const [calEnd, setCalEnd] = useState('');
+  const [calNotes, setCalNotes] = useState('');
+  const [calSaving, setCalSaving] = useState(false);
+  const [calSuccess, setCalSuccess] = useState(false);
+
+  const extractAndShowCalendar = async () => {
+    setCalExtracting(true);
+    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes('');
+    setCalSuccess(false);
+    try {
+      const res = await fetch(`${SERVER}/calendar/extract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: chatId }),
+      });
+      const json = await res.json();
+      const ex = json.extracted;
+      if (ex && ex.title) {
+        setCalTitle(ex.title);
+        setCalDate(ex.date || '');
+        setCalStart(ex.startTime || ex.start_time || '');
+        setCalEnd(ex.endTime || ex.end_time || '');
+        setCalNotes(ex.notes || '');
+      } else {
+        setCalTitle('KidDost Session');
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        setCalDate(tomorrow.toISOString().split('T')[0]);
+      }
+    } catch {
+      setCalTitle('KidDost Session');
+    } finally {
+      setCalExtracting(false);
+      setShowCalModal(true);
+    }
+  };
+
+  const saveCalEvent = async () => {
+    if (!calTitle.trim() || !calDate) return;
+    setCalSaving(true);
+    try {
+      await fetch(`${SERVER}/calendar/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null }),
+      });
+      setCalSuccess(true);
+      setTimeout(() => { setShowCalModal(false); setCalSuccess(false); }, 1200);
+    } catch { /* silent */ }
+    finally { setCalSaving(false); }
+  };
+
+  const calInputCls = `w-full rounded-xl px-4 py-3 text-sm outline-none transition-all ${isDarkMode ? 'bg-gray-800 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`;
+
   return (
     <div className={`flex flex-col h-full relative overflow-hidden ${isDarkMode ? "bg-black" : "bg-[#efeae2]"}`}>
       {isDarkMode && (
@@ -351,6 +410,9 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
             )}
           </div>
         </div>
+        <button className={`relative z-10 mr-2 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`} onClick={extractAndShowCalendar} disabled={calExtracting} title="Add to Calendar">
+          <CalendarPlus className={`w-5 h-5 ${calExtracting ? 'animate-pulse' : ''}`} />
+        </button>
         <button className={`relative z-10 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`} onClick={() => setShowInfo(true)}>
           <Info className="w-6 h-6" />
         </button>
@@ -640,6 +702,63 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
           <Send className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Calendar extraction confirmation modal */}
+      {showCalModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCalModal(false)}>
+          <div
+            className={`w-full max-w-md rounded-t-2xl p-6 pb-10 shadow-2xl flex flex-col gap-4 ${isDarkMode ? 'bg-gray-900 border-t border-blue-900/40' : 'bg-white border-t border-gray-200'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h2 className={`font-semibold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                {calSuccess ? '✓ Event Created!' : 'Add to Calendar'}
+              </h2>
+              <button onClick={() => setShowCalModal(false)} className="hover:opacity-70">
+                <X className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+              </button>
+            </div>
+            {calSuccess ? (
+              <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>Session saved to calendar.</p>
+            ) : (
+              <>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  AI extracted these details from the last 8 messages. Edit anything before saving.
+                </p>
+                <div>
+                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TITLE</label>
+                  <input type="text" value={calTitle} onChange={e => setCalTitle(e.target.value)} placeholder="Session title" className={calInputCls} />
+                </div>
+                <div>
+                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>DATE</label>
+                  <input type="date" value={calDate} onChange={e => setCalDate(e.target.value)} className={calInputCls} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>START</label>
+                    <input type="time" value={calStart} onChange={e => setCalStart(e.target.value)} className={calInputCls} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>END</label>
+                    <input type="time" value={calEnd} onChange={e => setCalEnd(e.target.value)} className={calInputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>
+                  <textarea value={calNotes} onChange={e => setCalNotes(e.target.value)} placeholder="Location, special instructions..." rows={2} className={`${calInputCls} resize-none`} />
+                </div>
+                <button
+                  onClick={saveCalEvent}
+                  disabled={calSaving || !calTitle.trim() || !calDate}
+                  className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white hover:bg-[#006d5b]'}`}
+                >
+                  {calSaving ? 'Saving...' : 'Save to Calendar'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

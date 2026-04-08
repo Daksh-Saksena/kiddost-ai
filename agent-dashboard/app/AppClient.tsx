@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChatList } from "./components/ChatList";
 import { ChatDetail } from "./components/ChatDetail";
+import { Calendar } from "./components/Calendar";
 import "./mobile-styles.css";
 import { avatarDataUrl } from './avatarDataUrl';
 import { supabase } from "../lib/supabase";
@@ -295,6 +296,7 @@ export default function AppClient() {
   }, []);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
@@ -573,7 +575,9 @@ export default function AppClient() {
       className={`h-screen max-w-md mx-auto shadow-2xl ${isDarkMode ? "bg-black" : "bg-white"}`}
       style={isDarkMode ? { boxShadow: "0 0 100px rgba(59, 130, 246, 0.3)" } : { boxShadow: "0 0 50px rgba(0, 0, 0, 0.1)" }}
     >
-      {selectedChat ? (
+      {showCalendar ? (
+        <Calendar isDarkMode={isDarkMode} onBack={() => setShowCalendar(false)} agentName={agentName} />
+      ) : selectedChat ? (
         <ChatDetail
           chatId={selectedChat}
           onBack={() => setSelectedChat(null)}
@@ -582,6 +586,7 @@ export default function AppClient() {
           chatName={currentChat?.name}
           chatAvatar={currentChat?.avatar}
           onSend={sendMessage}
+          agentName={agentName}
           onSaveContact={(name, notes) => {
             // Save to server (shared across all agents) + local state
             fetch(`${SERVER}/contacts`, {
@@ -633,6 +638,7 @@ export default function AppClient() {
           <ChatList
             onSelectChat={(chatId) => setSelectedChat(chatId)}
             onTogglePin={togglePinChat}
+            onOpenCalendar={() => setShowCalendar(true)}
             isDarkMode={isDarkMode}
             onToggleTheme={() => setIsDarkMode(!isDarkMode)}
             onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}

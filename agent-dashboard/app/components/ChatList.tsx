@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X, Pin } from "lucide-react";
+import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X, Pin, CalendarDays } from "lucide-react";
 
 const SERVER = 'https://kiddost-ai.onrender.com';
 
@@ -29,9 +29,10 @@ interface ChatListProps {
   onDeleteAccount?: () => void;
   chats: Chat[];
   onTogglePin: (chatId: string) => void;
+  onOpenCalendar: () => void;
 }
 
-export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats, onTogglePin }: ChatListProps) {
+export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats, onTogglePin, onOpenCalendar }: ChatListProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
   const [showNewConvo, setShowNewConvo] = useState(false);
@@ -115,6 +116,15 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
             </button>
           )}
           <h1 className="text-xl flex-1 text-center">Chats</h1>
+          <button
+            onClick={onOpenCalendar}
+            title="Calendar"
+            className={`p-2 rounded-full transition-all ${
+              isDarkMode ? "hover:bg-blue-900/30 text-gray-400 hover:text-white" : "hover:bg-white/10"
+            }`}
+          >
+            <CalendarDays className="w-5 h-5" />
+          </button>
           <button
             onClick={() => { setShowNewConvo(true); setNewPhone(''); setNewConvoError(''); setNewConvoSuccess(false); }}
             title="New conversation"

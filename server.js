@@ -1601,6 +1601,120 @@ app.get('/proxy-image', async (req, res) => {
     return res.status(500).send('proxy error');
   }
 });
+// ── Calendar Events ─────────────────────────────────────────────────────────
+
+// AI: read last N messages and extract session date/time
+app.post('/calendar/extract', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: 'missing phone' });
+
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('role, content, sender, created_at')
+      .eq('phone', phone)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    if (!msgs || msgs.length === 0) return res.json({ extracted: null });
+
+    const chatText = msgs.reverse().map(m => `${m.sender || m.role}: ${m.content}`).join('\n');
+
+    const aiRes = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You extract confirmed session booking details from a WhatsApp conversation.
+Return ONLY valid JSON with these fields (use null if not found):
+- "title": short session title, e.g. "KidDost Session" or include child name if mentioned
+- "date": ISO date string YYYY-MM-DD (use the CURRENT year ${new Date().getFullYear()} if year is not mentioned)
+- "startTime": HH:MM in 24h format
+- "endTime": HH:MM in 24h format (if duration mentioned, calculate it; if not, assume 1 hour after start)
+- "notes": any extra details like location, special instructions
+Only extract if a session/booking/appointment appears to be confirmed or scheduled. If nothing is confirmed, return {"title":null}.`
+          },
+          { role: 'user', content: chatText }
+        ],
+        temperature: 0,
+        response_format: { type: 'json_object' }
+      },
+      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+    );
+
+    const extracted = JSON.parse(aiRes.data.choices[0].message.content);
+    return res.json({ extracted, chatSnippet: chatText.slice(0, 300) });
+  } catch (e) {
+    console.error('/calendar/extract error', e?.message || e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// List events (optional ?from=YYYY-MM-DD&to=YYYY-MM-DD)
+app.get('/calendar/events', async (req, res) => {
+  try {
+    let query = supabase.from('calendar_events').select('*').order('date', { ascending: true }).order('start_time', { ascending: true });
+    if (req.query.from) query = query.gte('date', req.query.from);
+    if (req.query.to) query = query.lte('date', req.query.to);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ events: data || [] });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Create event
+app.post('/calendar/events', async (req, res) => {
+  try {
+    const { phone, title, date, start_time, end_time, notes, created_by } = req.body;
+    if (!title || !date) return res.status(400).json({ error: 'title and date required' });
+    const { data, error } = await supabase.from('calendar_events').insert({
+      phone: phone || null,
+      title,
+      date,
+      start_time: start_time || null,
+      end_time: end_time || null,
+      notes: notes || null,
+      created_by: created_by || null,
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ event: data });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Update event
+app.put('/calendar/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = {};
+    for (const key of ['phone', 'title', 'date', 'start_time', 'end_time', 'notes']) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    const { data, error } = await supabase.from('calendar_events').update(updates).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ event: data });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Delete event
+app.delete('/calendar/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
