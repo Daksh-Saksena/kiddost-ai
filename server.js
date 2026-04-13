@@ -1716,7 +1716,7 @@ app.get('/calendar/events', async (req, res) => {
 // Create event (supports repeat_count for weekly recurring)
 app.post('/calendar/events', async (req, res) => {
   try {
-    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count, is_trial } = req.body;
+    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count, is_trial, assigned_member } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'title and date required' });
     const count = Math.min(Math.max(parseInt(repeat_count) || 1, 1), 52); // cap at 52 weeks
     const rows = [];
@@ -1733,6 +1733,7 @@ app.post('/calendar/events', async (req, res) => {
         notes: notes || null,
         created_by: created_by || null,
         is_trial: is_trial === true || is_trial === 'true' ? true : false,
+        assigned_member: assigned_member || null,
       });
     }
     const { data, error } = await supabase.from('calendar_events').insert(rows).select();
@@ -1748,7 +1749,7 @@ app.put('/calendar/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = {};
-    for (const key of ['phone', 'title', 'date', 'start_time', 'end_time', 'notes', 'is_trial']) {
+    for (const key of ['phone', 'title', 'date', 'start_time', 'end_time', 'notes', 'is_trial', 'assigned_member']) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     const { data, error } = await supabase.from('calendar_events').update(updates).eq('id', id).select().single();
@@ -1810,15 +1811,22 @@ The user will give you a natural language command about the calendar. You must r
 {
   "actions": [
     { "type": "delete", "id": "<event UUID>" },
-    { "type": "create", "title": "...", "date": "YYYY-MM-DD", "start_time": "HH:MM" or null, "end_time": "HH:MM" or null, "phone": "..." or null, "notes": "..." or null }
+    { "type": "create", "title": "...", "date": "YYYY-MM-DD", "start_time": "HH:MM" or null, "end_time": "HH:MM" or null, "phone": "..." or null, "notes": "..." or null, "is_trial": true/false }
   ],
-  "summary": "Short human-readable summary of what you did, e.g. 'Deleted 5 sessions for Aarav'"
+  "summary": "Short human-readable summary of what you did, e.g. 'Created 4 weekly sessions for Aarav every Sunday in April'"
 }
 Rules:
 - Match event titles/names loosely (case-insensitive, partial match is fine).
 - For "remove all sessions of X" → delete all events whose title contains X.
 - For "move X to Y" → delete old + create new.
 - For "add session for X on Sunday at 3pm" → create with the correct date from the calendar above.
+- RECURRING / REPEATING: When the user says "weekly", "every Sunday", "for a month", "for 3 months", etc., create MULTIPLE individual create actions — one for each week:
+  • "for a month" or "monthly" = 4 weekly sessions
+  • "for 2 months" = 8 weekly sessions
+  • "for 3 months" = 12 weekly sessions
+  • "for X weeks" = X sessions
+  • "11 sessions" or "11 times" = 11 weekly sessions
+  Each session should be exactly 7 days apart, starting from the first date. Number them in the title like "Session (1/4)", "Session (2/4)" etc.
 - If the command is unclear or matches nothing, return { "actions": [], "summary": "No matching events found" }.
 - NEVER invent event IDs. Only use IDs from the list above.`
         },
@@ -1844,6 +1852,7 @@ Rules:
           end_time: action.end_time || null,
           phone: action.phone || null,
           notes: action.notes || null,
+          is_trial: action.is_trial === true,
           created_by: 'AI Command',
         });
         if (!error) created++;
@@ -1856,6 +1865,99 @@ Rules:
       created,
       totalActions: actions.length,
     });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Calendar stats — member stats, customer stats, totals
+app.get('/calendar/stats', async (req, res) => {
+  try {
+    const { data: allEvents, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .order('date', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    const events = allEvents || [];
+
+    // Calculate hours per event
+    const getHours = (e) => {
+      if (e.start_time && e.end_time) {
+        const [sh, sm] = e.start_time.split(':').map(Number);
+        const [eh, em] = e.end_time.split(':').map(Number);
+        return Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
+      }
+      return 1; // default 1 hour if no times
+    };
+
+    // Member stats (assigned_member)
+    const memberMap = {};
+    const customerMap = {};
+
+    for (const e of events) {
+      const hours = getHours(e);
+      // Member stats
+      const member = e.assigned_member || 'Unassigned';
+      if (!memberMap[member]) memberMap[member] = { sessions: 0, hours: 0, trials: 0 };
+      memberMap[member].sessions++;
+      memberMap[member].hours += hours;
+      if (e.is_trial) memberMap[member].trials++;
+
+      // Customer stats (by phone)
+      const customer = e.phone || 'Unknown';
+      if (!customerMap[customer]) customerMap[customer] = { sessions: 0, hours: 0, trials: 0, titles: new Set() };
+      customerMap[customer].sessions++;
+      customerMap[customer].hours += hours;
+      if (e.is_trial) customerMap[customer].trials++;
+      customerMap[customer].titles.add(e.title.replace(/\s*\(\d+\/\d+\)$/, '')); // strip numbering
+    }
+
+    // Convert Sets to arrays
+    for (const k of Object.keys(customerMap)) {
+      customerMap[k].titles = [...customerMap[k].titles];
+    }
+
+    const totalSessions = events.length;
+    const totalHours = events.reduce((sum, e) => sum + getHours(e), 0);
+    const totalTrials = events.filter(e => e.is_trial).length;
+
+    return res.json({
+      totalSessions,
+      totalHours: Math.round(totalHours * 10) / 10,
+      totalTrials,
+      members: Object.entries(memberMap).map(([name, s]) => ({
+        name,
+        sessions: s.sessions,
+        hours: Math.round(s.hours * 10) / 10,
+        trials: s.trials,
+      })).sort((a, b) => b.sessions - a.sessions),
+      customers: Object.entries(customerMap).map(([phone, s]) => ({
+        phone,
+        sessions: s.sessions,
+        hours: Math.round(s.hours * 10) / 10,
+        trials: s.trials,
+        titles: s.titles,
+      })).sort((a, b) => b.sessions - a.sessions),
+    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Assign member to multiple events at once (batch)
+app.post('/calendar/assign-member', async (req, res) => {
+  try {
+    const { event_ids, assigned_member } = req.body;
+    if (!event_ids || !Array.isArray(event_ids) || !assigned_member) {
+      return res.status(400).json({ error: 'event_ids (array) and assigned_member required' });
+    }
+    const { data, error } = await supabase
+      .from('calendar_events')
+      .update({ assigned_member })
+      .in('id', event_ids)
+      .select();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ updated: data?.length || 0 });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

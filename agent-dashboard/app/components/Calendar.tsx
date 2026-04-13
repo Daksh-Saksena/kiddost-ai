@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send, BarChart3, User } from "lucide-react";
 
 const SERVER = "https://kiddost-ai.onrender.com";
 
@@ -16,6 +16,24 @@ interface CalendarEvent {
   created_by: string | null;
   created_at: string;
   is_trial?: boolean;
+  assigned_member?: string | null;
+}
+
+interface StatEntry {
+  name?: string;
+  phone?: string;
+  sessions: number;
+  hours: number;
+  trials: number;
+  titles?: string[];
+}
+
+interface Stats {
+  totalSessions: number;
+  totalHours: number;
+  totalTrials: number;
+  members: StatEntry[];
+  customers: StatEntry[];
 }
 
 interface CalendarProps {
@@ -55,12 +73,22 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [formPhone, setFormPhone] = useState("");
   const [formRepeat, setFormRepeat] = useState(1);
   const [formTrial, setFormTrial] = useState(false);
+  const [formMember, setFormMember] = useState("");
   const [saving, setSaving] = useState(false);
 
   // AI command bar state
   const [aiCmd, setAiCmd] = useState("");
   const [aiRunning, setAiRunning] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
+
+  // Stats state
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [statsTab, setStatsTab] = useState<'members' | 'customers'>('members');
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  // Known members (fetched from all events)
+  const knownMembers = Array.from(new Set(events.map(e => e.assigned_member).filter(Boolean) as string[]));
 
   const fetchEvents = async () => {
     const from = `${year}-${pad(month + 1)}-01`;
@@ -104,6 +132,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setFormPhone("");
     setFormRepeat(1);
     setFormTrial(false);
+    setFormMember("");
     setShowModal(true);
   };
 
@@ -116,6 +145,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setFormNotes(ev.notes || "");
     setFormPhone(ev.phone || "");
     setFormTrial(ev.is_trial || false);
+    setFormMember(ev.assigned_member || "");
     setShowModal(true);
   };
 
@@ -127,13 +157,13 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         await fetch(`${SERVER}/calendar/events/${editEvent.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, is_trial: formTrial }),
+          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, is_trial: formTrial, assigned_member: formMember.trim() || null }),
         });
       } else {
         await fetch(`${SERVER}/calendar/events`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, created_by: agentName || null, repeat_count: formRepeat > 1 ? formRepeat : undefined, is_trial: formTrial }),
+          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, created_by: agentName || null, repeat_count: formRepeat > 1 ? formRepeat : undefined, is_trial: formTrial, assigned_member: formMember.trim() || null }),
         });
       }
       setShowModal(false);
@@ -174,6 +204,21 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     }
   };
 
+  const fetchStats = async () => {
+    setLoadingStats(true);
+    try {
+      const res = await fetch(`${SERVER}/calendar/stats`);
+      const json = await res.json();
+      setStats(json);
+    } catch { setStats(null); }
+    finally { setLoadingStats(false); }
+  };
+
+  const toggleStats = () => {
+    if (!showStats) fetchStats();
+    setShowStats(!showStats);
+  };
+
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   const bg = isDarkMode ? "bg-black" : "bg-white";
@@ -192,6 +237,9 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         </button>
         <CalendarDays className="w-5 h-5 text-white" />
         <h1 className="text-lg font-semibold text-white flex-1">Calendar</h1>
+        <button onClick={toggleStats} className={`text-white hover:opacity-70 transition-opacity mr-2 ${showStats ? 'opacity-100' : 'opacity-70'}`} title="Stats">
+          <BarChart3 className="w-5 h-5" />
+        </button>
         <button onClick={() => openCreateModal()} className="text-white hover:opacity-70 transition-opacity" title="New event">
           <Plus className="w-6 h-6" />
         </button>
@@ -272,6 +320,11 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
                           </p>
                         )}
                         {ev.phone && <p className={`text-xs mt-0.5 ${subtext}`}>{ev.phone}</p>}
+                        {ev.assigned_member && (
+                          <p className={`text-xs mt-0.5 flex items-center gap-1 ${isDarkMode ? 'text-blue-400' : 'text-[#008069]'}`}>
+                            <User className="w-3 h-3" />{ev.assigned_member}
+                          </p>
+                        )}
                         {ev.notes && <p className={`text-xs mt-1 ${subtext}`}>{ev.notes}</p>}
                       </div>
                       <div className="flex items-center gap-1 ml-2 flex-shrink-0">
@@ -324,6 +377,93 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         </div>
       </div>
 
+      {/* Stats View */}
+      {showStats && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowStats(false)}>
+          <div
+            className={`w-full max-w-md rounded-t-2xl shadow-2xl flex flex-col ${isDarkMode ? "bg-gray-900 border-t border-blue-900/40" : "bg-white border-t border-gray-200"}`}
+            style={{ maxHeight: '85vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 pb-3 flex items-center justify-between">
+              <h2 className={`font-semibold text-base flex items-center gap-2 ${text}`}>
+                <BarChart3 className="w-4 h-4" /> Stats
+              </h2>
+              <button onClick={() => setShowStats(false)} className="hover:opacity-70"><X className={`w-5 h-5 ${subtext}`} /></button>
+            </div>
+
+            {loadingStats ? (
+              <div className={`p-8 text-center ${subtext}`}>Loading stats...</div>
+            ) : stats ? (
+              <div className="flex-1 overflow-y-auto px-5 pb-8">
+                {/* Totals */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className={`rounded-xl p-3 text-center ${cardBg} border ${border}`}>
+                    <p className={`text-2xl font-bold ${text}`}>{stats.totalSessions}</p>
+                    <p className={`text-[10px] uppercase font-medium ${subtext}`}>Sessions</p>
+                  </div>
+                  <div className={`rounded-xl p-3 text-center ${cardBg} border ${border}`}>
+                    <p className={`text-2xl font-bold ${text}`}>{stats.totalHours}</p>
+                    <p className={`text-[10px] uppercase font-medium ${subtext}`}>Hours</p>
+                  </div>
+                  <div className={`rounded-xl p-3 text-center ${cardBg} border ${border}`}>
+                    <p className={`text-2xl font-bold text-orange-400`}>{stats.totalTrials}</p>
+                    <p className={`text-[10px] uppercase font-medium ${subtext}`}>Trials</p>
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-1 mb-4">
+                  {(['members', 'customers'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setStatsTab(tab)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        statsTab === tab
+                          ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white'
+                          : isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {tab === 'members' ? 'Members' : 'Customers'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Member / Customer list */}
+                <div className="flex flex-col gap-2">
+                  {(statsTab === 'members' ? stats.members : stats.customers).map((entry, i) => (
+                    <div key={i} className={`rounded-xl p-3 ${cardBg} border ${border}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`text-sm font-semibold ${text}`}>
+                          {statsTab === 'members'
+                            ? (entry as StatEntry & { name?: string }).name || 'Unassigned'
+                            : (entry as StatEntry & { phone?: string }).phone || 'Unknown'}
+                        </p>
+                        {entry.trials > 0 && (
+                          <span className="text-[10px] font-bold bg-orange-400 text-white px-1.5 py-0.5 rounded">{entry.trials} trial{entry.trials > 1 ? 's' : ''}</span>
+                        )}
+                      </div>
+                      <div className="flex gap-4">
+                        <p className={`text-xs ${subtext}`}><span className={`font-semibold ${text}`}>{entry.sessions}</span> sessions</p>
+                        <p className={`text-xs ${subtext}`}><span className={`font-semibold ${text}`}>{entry.hours}</span> hrs</p>
+                      </div>
+                      {statsTab === 'customers' && (entry as any).titles?.length > 0 && (
+                        <p className={`text-[10px] mt-1 ${subtext}`}>{(entry as any).titles.join(', ')}</p>
+                      )}
+                    </div>
+                  ))}
+                  {(statsTab === 'members' ? stats.members : stats.customers).length === 0 && (
+                    <p className={`text-sm text-center py-4 ${subtext}`}>No data yet</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className={`p-8 text-center ${subtext}`}>Failed to load stats</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}>
@@ -360,6 +500,41 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             <div>
               <label className={`text-xs font-medium mb-1 block ${subtext}`}>PHONE (optional)</label>
               <input type="tel" value={formPhone} onChange={e => setFormPhone(e.target.value)} placeholder="+919606746900" className={inputCls} />
+            </div>
+
+            <div>
+              <label className={`text-xs font-medium mb-1 block ${subtext}`}>ASSIGNED MEMBER</label>
+              <input
+                type="text"
+                value={formMember}
+                onChange={e => setFormMember(e.target.value)}
+                placeholder="Member name"
+                list="member-suggestions"
+                className={inputCls}
+              />
+              {knownMembers.length > 0 && (
+                <datalist id="member-suggestions">
+                  {knownMembers.map(m => <option key={m} value={m} />)}
+                </datalist>
+              )}
+              {knownMembers.length > 0 && (
+                <div className="flex gap-1.5 mt-2 flex-wrap">
+                  {knownMembers.map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setFormMember(m)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                        formMember === m
+                          ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white'
+                          : isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button
