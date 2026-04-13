@@ -1644,6 +1644,7 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "date": ISO date string YYYY-MM-DD. When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year. When "tomorrow" is mentioned, use tomorrow's date. When a weekday name is mentioned, pick the NEAREST UPCOMING match from the calendar above.
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format (if duration mentioned, calculate it; if not, assume 1 hour after start)
+- "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
 - "notes": any extra details like location, special instructions
 Only extract if a session/booking/appointment appears to be confirmed or scheduled. If nothing is confirmed, return {"title":null}.`;
             })()
@@ -1681,7 +1682,7 @@ app.get('/calendar/events', async (req, res) => {
 // Create event (supports repeat_count for weekly recurring)
 app.post('/calendar/events', async (req, res) => {
   try {
-    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count } = req.body;
+    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count, is_trial } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'title and date required' });
     const count = Math.min(Math.max(parseInt(repeat_count) || 1, 1), 52); // cap at 52 weeks
     const rows = [];
@@ -1697,6 +1698,7 @@ app.post('/calendar/events', async (req, res) => {
         end_time: end_time || null,
         notes: notes || null,
         created_by: created_by || null,
+        is_trial: is_trial === true || is_trial === 'true' ? true : false,
       });
     }
     const { data, error } = await supabase.from('calendar_events').insert(rows).select();
@@ -1712,7 +1714,7 @@ app.put('/calendar/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates = {};
-    for (const key of ['phone', 'title', 'date', 'start_time', 'end_time', 'notes']) {
+    for (const key of ['phone', 'title', 'date', 'start_time', 'end_time', 'notes', 'is_trial']) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     const { data, error } = await supabase.from('calendar_events').update(updates).eq('id', id).select().single();

@@ -329,12 +329,13 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [calEnd, setCalEnd] = useState('');
   const [calNotes, setCalNotes] = useState('');
   const [calRepeat, setCalRepeat] = useState(1);
+  const [calTrial, setCalTrial] = useState(false);
   const [calSaving, setCalSaving] = useState(false);
   const [calSuccess, setCalSuccess] = useState(false);
 
   const extractAndShowCalendar = async () => {
     setCalExtracting(true);
-    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1);
+    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1); setCalTrial(false);
     setCalSuccess(false);
     try {
       const res = await fetch(`${SERVER}/calendar/extract`, {
@@ -350,6 +351,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         setCalStart(ex.startTime || ex.start_time || '');
         setCalEnd(ex.endTime || ex.end_time || '');
         setCalNotes(ex.notes || '');
+        setCalTrial(ex.isTrial === true);
       } else {
         setCalTitle('KidDost Session');
         const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -370,7 +372,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       await fetch(`${SERVER}/calendar/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, repeat_count: calRepeat > 1 ? calRepeat : undefined }),
+        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, repeat_count: calRepeat > 1 ? calRepeat : undefined, is_trial: calTrial }),
       });
       setCalSuccess(true);
       setTimeout(() => { setShowCalModal(false); setCalSuccess(false); }, 1200);
@@ -748,6 +750,21 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                   <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>
                   <textarea value={calNotes} onChange={e => setCalNotes(e.target.value)} placeholder="Location, special instructions..." rows={2} className={`${calInputCls} resize-none`} />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setCalTrial(!calTrial)}
+                  className={`flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm font-medium transition-all border ${
+                    calTrial
+                      ? 'bg-orange-50 border-orange-400 text-orange-600'
+                      : isDarkMode ? 'bg-gray-800 border-blue-500/30 text-gray-400' : 'bg-gray-100 border-gray-200 text-gray-500'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${calTrial ? 'bg-orange-400 text-white' : isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
+                    {calTrial ? '✓' : ''}
+                  </div>
+                  Trial Session
+                  {calTrial && <span className="ml-auto text-xs font-bold bg-orange-400 text-white px-2 py-0.5 rounded">TRIAL</span>}
+                </button>
                 <div>
                   <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>REPEAT WEEKLY</label>
                   <div className="flex items-center gap-3">

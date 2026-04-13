@@ -15,6 +15,7 @@ interface CalendarEvent {
   notes: string | null;
   created_by: string | null;
   created_at: string;
+  is_trial?: boolean;
 }
 
 interface CalendarProps {
@@ -53,6 +54,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [formNotes, setFormNotes] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formRepeat, setFormRepeat] = useState(1);
+  const [formTrial, setFormTrial] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // AI command bar state
@@ -101,6 +103,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setFormNotes("");
     setFormPhone("");
     setFormRepeat(1);
+    setFormTrial(false);
     setShowModal(true);
   };
 
@@ -112,6 +115,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setFormEnd(ev.end_time || "");
     setFormNotes(ev.notes || "");
     setFormPhone(ev.phone || "");
+    setFormTrial(ev.is_trial || false);
     setShowModal(true);
   };
 
@@ -123,13 +127,13 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         await fetch(`${SERVER}/calendar/events/${editEvent.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null }),
+          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, is_trial: formTrial }),
         });
       } else {
         await fetch(`${SERVER}/calendar/events`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, created_by: agentName || null, repeat_count: formRepeat > 1 ? formRepeat : undefined }),
+          body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, created_by: agentName || null, repeat_count: formRepeat > 1 ? formRepeat : undefined, is_trial: formTrial }),
         });
       }
       setShowModal(false);
@@ -228,9 +232,11 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
               }`}
             >
               <span className="text-sm">{day}</span>
-              {hasEvents && (
-                <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-white" : isDarkMode ? "bg-blue-400" : "bg-[#008069]"}`} />
-              )}
+              {hasEvents && (() => {
+                const dayEvents = eventsForDate(dateStr);
+                const hasTrial = dayEvents.some(e => e.is_trial);
+                return <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-white" : hasTrial ? "bg-orange-400" : isDarkMode ? "bg-blue-400" : "bg-[#008069]"}`} />;
+              })()}
             </button>
           );
         })}
@@ -253,10 +259,13 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             ) : (
               <div className="flex flex-col gap-2">
                 {selectedEvents.map(ev => (
-                  <div key={ev.id} className={`rounded-xl p-3 ${cardBg} border ${border}`}>
+                  <div key={ev.id} className={`rounded-xl p-3 ${cardBg} border ${ev.is_trial ? 'border-orange-400' : border}`} style={ev.is_trial ? { borderLeftWidth: 3, borderLeftColor: '#f97316' } : {}}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold ${text}`}>{ev.title}</p>
+                        <p className={`text-sm font-semibold ${text}`}>
+                          {ev.is_trial && <span className="inline-block text-[10px] font-bold bg-orange-400 text-white px-1.5 py-0.5 rounded mr-1.5 align-middle">TRIAL</span>}
+                          {ev.title}
+                        </p>
                         {(ev.start_time || ev.end_time) && (
                           <p className={`text-xs mt-0.5 ${subtext}`}>
                             {formatTime(ev.start_time)}{ev.end_time ? ` – ${formatTime(ev.end_time)}` : ""}
@@ -352,6 +361,22 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
               <label className={`text-xs font-medium mb-1 block ${subtext}`}>PHONE (optional)</label>
               <input type="tel" value={formPhone} onChange={e => setFormPhone(e.target.value)} placeholder="+919606746900" className={inputCls} />
             </div>
+
+            <button
+              type="button"
+              onClick={() => setFormTrial(!formTrial)}
+              className={`flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm font-medium transition-all border ${
+                formTrial
+                  ? "bg-orange-50 border-orange-400 text-orange-600 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-400"
+                  : isDarkMode ? "bg-gray-800 border-blue-500/30 text-gray-400" : "bg-gray-100 border-gray-200 text-gray-500"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${formTrial ? "bg-orange-400 text-white" : isDarkMode ? "bg-gray-700" : "bg-gray-300"}`}>
+                {formTrial ? "✓" : ""}
+              </div>
+              Trial Session
+              {formTrial && <span className="ml-auto text-xs font-bold bg-orange-400 text-white px-2 py-0.5 rounded">TRIAL</span>}
+            </button>
 
             <div>
               <label className={`text-xs font-medium mb-1 block ${subtext}`}>NOTES</label>
