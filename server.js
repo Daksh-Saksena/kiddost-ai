@@ -378,6 +378,25 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}`
       : '';
 
+    // ── Check if this customer has had any previous sessions ─────────────
+    let sessionStatusBlock = '';
+    try {
+      const { data: pastEvents, error: evErr } = await supabase
+        .from('calendar_events')
+        .select('id, title, date, is_trial')
+        .eq('phone', fullPhone)
+        .order('date', { ascending: true });
+      if (!evErr && pastEvents && pastEvents.length > 0) {
+        const totalSessions = pastEvents.length;
+        const trialDone = pastEvents.some(e => e.is_trial);
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Trial session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer a trial again. Focus on scheduling regular sessions.`;
+      } else {
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer — their first session will be a TRIAL session.\nWhen discussing booking/scheduling, proactively mention that as it is their first session, it will be a trial session. Share these trial details naturally:\n  • Duration: 1 hour\n  • Cost: Rs 500\n  • Purpose: for the child and the KidDost member to get comfortable with each other\n  • No commitment — they can decide after the trial if they want to continue\n  • They can pick a convenient date and time`;
+      }
+    } catch (e) {
+      console.log('[session-check] failed:', e.message);
+    }
+
     // The system prompt now has all exact age-based activity scripts.
     // Do NOT inject example activities — they conflict with the system prompt scripts.
     const userMessageForAI = combinedMessage;
@@ -458,6 +477,7 @@ NEW SESSION / LOCATION:
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
           (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           varsBlock +
+          sessionStatusBlock +
           exampleBlock
       },
       ...history,
