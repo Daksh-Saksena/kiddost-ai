@@ -154,11 +154,12 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setSaving(true);
     try {
       if (editEvent) {
-        await fetch(`${SERVER}/calendar/events/${editEvent.id}`, {
+        const res = await fetch(`${SERVER}/calendar/events/${editEvent.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: formTitle.trim(), date: formDate, start_time: formStart || null, end_time: formEnd || null, notes: formNotes.trim() || null, phone: formPhone.trim() || null, is_trial: formTrial, assigned_member: formMember.trim() || null }),
         });
+        if (!res.ok) console.error('Update failed:', await res.text());
       } else {
         await fetch(`${SERVER}/calendar/events`, {
           method: "POST",
@@ -468,13 +469,16 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}>
           <div
-            className={`w-full max-w-md rounded-t-2xl p-6 pb-10 shadow-2xl flex flex-col gap-4 ${isDarkMode ? "bg-gray-900 border-t border-blue-900/40" : "bg-white border-t border-gray-200"}`}
+            className={`w-full max-w-md rounded-t-2xl shadow-2xl flex flex-col ${isDarkMode ? "bg-gray-900 border-t border-blue-900/40" : "bg-white border-t border-gray-200"}`}
+            style={{ maxHeight: '85vh' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-1">
+            <div className="p-6 pb-0 flex items-center justify-between mb-3">
               <h2 className={`font-semibold text-base ${text}`}>{editEvent ? "Edit Event" : "New Event"}</h2>
               <button onClick={() => setShowModal(false)} className="hover:opacity-70"><X className={`w-5 h-5 ${subtext}`} /></button>
             </div>
+
+            <div className="flex-1 overflow-y-auto px-6 pb-8 flex flex-col gap-4">
 
             <div>
               <label className={`text-xs font-medium mb-1 block ${subtext}`}>TITLE *</label>
@@ -605,6 +609,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             >
               {saving ? "Saving..." : editEvent ? "Update Event" : formRepeat > 1 ? `Create ${formRepeat} Sessions` : "Create Event"}
             </button>
+            </div>
           </div>
         </div>
       )}
