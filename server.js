@@ -492,7 +492,9 @@ BEFORE BOOKING:
 
 GROUP / SIBLING SESSIONS:
 - If the customer mentions they have more than one child (e.g. "I have 2 kids", "my children are 3 and 5"), ask: "Would you like both children in the same session, or would you prefer separate sessions for each child?"
-- Once they answer, say EXACTLY: "Great, please allow me a moment to check the best options for you and get back to you."
+- IMPORTANT: You must wait for a CLEAR answer to same-or-separate (e.g. "same session", "separate", "together", "individual"). If they respond with something else (like ages, names, or other info), acknowledge it and ask again: "Got it! And would you prefer them in the same session together, or separate sessions?"
+- The group/sibling question is PART of the BEFORE BOOKING flow. You still need to gather all the standard BEFORE BOOKING info (children's names, parent name, preferred date/time) before checking availability.
+- Once you have the same-or-separate answer AND all the standard booking info (names, parent name, date/time), say EXACTLY: "Great, allow me to check the slot availability and the best options for your children and come back to you."
 - After saying this, you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
 - A human agent will follow up with group/sibling session details.
 
@@ -633,7 +635,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       /share.*location/i,
       /your location.*confirm/i,
       /check.*(?:area|location).*serviceable/i,
-      /check the best options for you/i,
+      /best options for your children/i,
     ];
     const needsHuman = NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
 
@@ -1618,7 +1620,9 @@ BEFORE BOOKING:
 
 GROUP / SIBLING SESSIONS:
 - If the customer mentions they have more than one child (e.g. "I have 2 kids", "my children are 3 and 5"), ask: "Would you like both children in the same session, or would you prefer separate sessions for each child?"
-- Once they answer, say EXACTLY: "Great, please allow me a moment to check the best options for you and get back to you."
+- IMPORTANT: You must wait for a CLEAR answer to same-or-separate (e.g. "same session", "separate", "together", "individual"). If they respond with something else (like ages, names, or other info), acknowledge it and ask again: "Got it! And would you prefer them in the same session together, or separate sessions?"
+- The group/sibling question is PART of the BEFORE BOOKING flow. You still need to gather all the standard BEFORE BOOKING info (children's names, parent name, preferred date/time) before checking availability.
+- Once you have the same-or-separate answer AND all the standard booking info (names, parent name, date/time), say EXACTLY: "Great, allow me to check the slot availability and the best options for your children and come back to you."
 - After saying this, you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
 - A human agent will follow up with group/sibling session details.
 

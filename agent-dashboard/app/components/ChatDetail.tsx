@@ -346,9 +346,22 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       });
       const json = await res.json();
       const ex = json.extracted;
-      if (ex && ex.title) {
-        setCalTitle(ex.title);
-        setCalDate(ex.date || '');
+      if (ex && (ex.title || ex.startTime || ex.start_time || ex.date || (Array.isArray(ex.repeatDays) && ex.repeatDays.length > 0))) {
+        setCalTitle(ex.title || 'KidDost Session');
+        // If date is null but repeatDays exists, compute the next occurrence of the first repeat day
+        if (ex.date) {
+          setCalDate(ex.date);
+        } else if (Array.isArray(ex.repeatDays) && ex.repeatDays.length > 0) {
+          const today = new Date();
+          const todayDay = today.getDay();
+          const targetDay = ex.repeatDays[0];
+          const diff = (targetDay - todayDay + 7) % 7 || 7;
+          const next = new Date(today);
+          next.setDate(today.getDate() + diff);
+          setCalDate(next.toISOString().split('T')[0]);
+        } else {
+          setCalDate(new Date().toISOString().split('T')[0]);
+        }
         setCalStart(ex.startTime || ex.start_time || '');
         setCalEnd(ex.endTime || ex.end_time || '');
         setCalNotes(ex.notes || '');
