@@ -406,7 +406,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       {
         role: "system",
         content:
-          `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore.
+          `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 6 months).
 
 Your tone:
 - Friendly, warm, and human-like (like a real WhatsApp agent)
@@ -444,7 +444,7 @@ PRICING / SERVICES / QUOTATION:
   • Age 2: Verbal interaction, puzzles, rhymes, simple art & craft, storybook reading, shapes/colours/numbers, park outings.
   • Age 3: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, phonics, writing practice, park outings.
   • Age 4 to 8: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, worksheets, study help if needed, park outings.
-  • Age above 8: Apologise — services are for children up to 8 years, you are not the right fit.
+  • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
   • If they asked about full pricing/services: mention the trial session at ₹500/hour.
@@ -1497,7 +1497,7 @@ app.get('/debug-prompt', async (req, res) => {
       ? `\n\n---\n${programDescription ? `KIDDOST PROGRAM DESCRIPTION (extracted from a real conversation — when the user asks about activities or programs, use this description word for word, do not swap these activities for others):\n"${programDescription}"\n\n` : ""}Full example conversation (use for tone and style only):\n\`\`\`\n${formatExampleChat(exampleChat)}\n\`\`\`\n\nDO NOT copy from the example: specific names, dates, prices, locations, or availability.\n---`
       : "";
 
-    const systemPrompt = `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore.
+    const systemPrompt = `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 6 months).
 
 Your tone:
 - Friendly, warm, and human-like (like a real WhatsApp agent)
@@ -1536,7 +1536,7 @@ PRICING / SERVICES / QUOTATION:
   • Age 2: Verbal interaction, puzzles, rhymes, simple art & craft, storybook reading, shapes/colours/numbers, park outings.
   • Age 3: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, phonics, writing practice, park outings.
   • Age 4 to 8: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, worksheets, study help if needed, park outings.
-  • Age above 8: Apologise — services are for children up to 8 years, you are not the right fit.
+  • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
   • If they asked about full pricing/services: mention the trial session at ₹500/hour.
