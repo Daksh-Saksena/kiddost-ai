@@ -191,6 +191,49 @@ const PORT = process.env.PORT || 10000;
 const BOTSPACE_API_KEY = process.env.BOTSPACE_API_KEY;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+
+// ── Location serviceability (Haversine + Google Geocoding) ──────────────
+const SERVICE_HUBS = [
+  { name: 'Marathahalli (East Bangalore)', lat: 12.95594, lng: 77.72582, radiusKm: 6 },
+  { name: 'Jayanagar (Central/South Bangalore)', lat: 12.93257, lng: 77.58352, radiusKm: 10 },
+  { name: 'Electronic City', lat: 12.84977, lng: 77.66629, radiusKm: 3 },
+];
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function checkLocationServiceability(locationText) {
+  if (!GOOGLE_MAPS_API_KEY) return null; // no API key, skip
+  try {
+    const query = encodeURIComponent(locationText + ', Bangalore, India');
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${GOOGLE_MAPS_API_KEY}`;
+    const res = await axios.get(url);
+    if (!res.data.results || res.data.results.length === 0) return null;
+    const { lat, lng } = res.data.results[0].geometry.location;
+    const formattedAddress = res.data.results[0].formatted_address;
+
+    // Check against each hub
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const hub of SERVICE_HUBS) {
+      const dist = haversineKm(lat, lng, hub.lat, hub.lng);
+      if (dist < nearestDist) { nearestDist = dist; nearest = hub; }
+      if (dist <= hub.radiusKm) {
+        return { serviceable: true, hub: hub.name, distance: Math.round(dist * 10) / 10, address: formattedAddress, lat, lng };
+      }
+    }
+    return { serviceable: false, nearestHub: nearest?.name, distance: Math.round(nearestDist * 10) / 10, address: formattedAddress, lat, lng };
+  } catch (e) {
+    console.error('Geocoding error:', e.message);
+    return null;
+  }
+}
 
 // VAPID setup for Web Push
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -507,23 +550,14 @@ TIME SLOT REQUEST:
 - If the conversation history shows you already said "allow me to check the slot availability" and no human agent has confirmed yet, reply UNSURE.
 
 LOCATION / SERVICEABILITY:
-We operate in Bangalore only with 3 service hubs. If the user asks "do you service in X?" or shares their location during booking, check against these hubs:
-
-HUB 1 — East Bangalore (Marathahalli hub, 6 km radius):
-  Serviceable areas: Marathahalli, Whitefield, ITPL, Brookefield, Kundalahalli, Varthur, Bellandur, Kadubeesanahalli, Doddanekundi, Hagadur, Hoodi, Kadugodi, Mahadevapura, HAL, Old Airport Road, Yemalur, Cessna Business Park area, Outer Ring Road (ORR) east stretch.
-
-HUB 2 — Central/South Bangalore (Jayanagar hub, 10 km radius):
-  Serviceable areas: Jayanagar, Basavanagudi, JP Nagar, BTM Layout, HSR Layout, Koramangala, Banashankari, Rajajinagar, Malleshwaram, Sadashivanagar, Vijayanagar, Basaveshwaranagar, Majestic, Yeshwanthpur, RT Nagar, Wilson Garden, Richmond Town, Indiranagar, Domlur, Ulsoor, MG Road, Brigade Road, Shivajinagar, Frazer Town, Cox Town, Chamrajpet, Hanumanthanagar, Kumaraswamy Layout, Padmanabhanagar.
-
-HUB 3 — Electronic City (3 km radius):
-  Serviceable areas: Electronic City Phase 1, Electronic City Phase 2, Neeladri Nagar, Doddathogur, Konappana Agrahara, Huskur.
-
-RULES:
-- If the user's area clearly matches one of the serviceable areas above → confirm immediately: "Yes, we do service in [area]! 😊" and continue the conversation normally.
-- If the user says a Bangalore area NOT in the list, or you are unsure → say EXACTLY: "Let me check if we can service your area and get back to you." Then STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE.
+We operate in Bangalore only with 3 service hubs (Marathahalli ~6km, Jayanagar ~10km, Electronic City ~3km).
+The system automatically geocodes the user's location and injects a LOCATION VERIFIED message above. Follow it:
+- If you see "LOCATION VERIFIED ✅" → confirm to the user: "Yes, we do service in [area]! 😊" and continue normally.
+- If you see "LOCATION VERIFIED ❌" → say EXACTLY: "Let me check if we can service your area and get back to you." Then STOP. If the user replies anything after that, respond UNSURE.
+- If NO location check was injected (user didn't mention a place) and they ask "do you service in X?", ask them to share their area name and you will check.
 - If the user says a city other than Bangalore → politely say: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
 - During the BEFORE BOOKING flow, after collecting child name / parent name / preferred time, also ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
-- Do NOT fabricate serviceability for areas you are unsure about. When in doubt, defer to the human agent.
+- Do NOT fabricate serviceability. Only confirm when you see a LOCATION VERIFIED ✅ system message.
 ---
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
@@ -535,6 +569,37 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       ...history,
       { role: "user", content: userMessageForAI }
     ];
+
+    // ── Location serviceability check (geocoding) ────────────────────────
+    // Detect if user is asking about location/area and inject verified result
+    const locationPatterns = [
+      /(?:do you|can you|are you).*(?:service|serve|cover|come to|operate|available)\s+(?:in|at|near|around)\s+(.+)/i,
+      /(?:service|serve|cover|available).*(?:in|at|near)\s+(.+)/i,
+      /(?:we are|we're|i am|i'm|i live|we live|located|staying|stay)\s+(?:in|at|near|around)\s+(.+)/i,
+      /(?:my (?:area|location|place|locality|address) is|i'm from|we're from)\s+(.+)/i,
+      /(?:our (?:area|location|place|locality|address) is)\s+(.+)/i,
+      /(?:what about|how about)\s+(.+?)(?:\s*\?|$)/i,
+    ];
+    let locationCheckResult = null;
+    for (const pat of locationPatterns) {
+      const m = combinedMessage.match(pat);
+      if (m && m[1]) {
+        const locationText = m[1].replace(/[?.!]+$/, '').trim();
+        if (locationText.length >= 3 && locationText.length <= 100) {
+          locationCheckResult = await checkLocationServiceability(locationText);
+          if (locationCheckResult) {
+            console.log(`[Location Check] "${locationText}" → ${JSON.stringify(locationCheckResult)}`);
+          }
+          break;
+        }
+      }
+    }
+    if (locationCheckResult) {
+      const locMsg = locationCheckResult.serviceable
+        ? `LOCATION VERIFIED ✅: "${locationCheckResult.address}" is SERVICEABLE — ${locationCheckResult.distance} km from ${locationCheckResult.hub} hub (within radius). You can confidently confirm this area.`
+        : `LOCATION VERIFIED ❌: "${locationCheckResult.address}" is NOT SERVICEABLE — nearest hub is ${locationCheckResult.nearestHub} (${locationCheckResult.distance} km away, outside radius). Defer to human agent: "Let me check if we can service your area and get back to you."`;
+      messagesForAI.splice(-1, 0, { role: "system", content: locMsg });
+    }
 
     const aiResponse = await axios.post(
       "https://api.openai.com/v1/chat/completions",
@@ -1645,23 +1710,14 @@ TIME SLOT REQUEST:
 - If the conversation history shows you already said "allow me to check the slot availability" and no human agent has confirmed yet, reply UNSURE.
 
 LOCATION / SERVICEABILITY:
-We operate in Bangalore only with 3 service hubs. If the user asks "do you service in X?" or shares their location during booking, check against these hubs:
-
-HUB 1 — East Bangalore (Marathahalli hub, 6 km radius):
-  Serviceable areas: Marathahalli, Whitefield, ITPL, Brookefield, Kundalahalli, Varthur, Bellandur, Kadubeesanahalli, Doddanekundi, Hagadur, Hoodi, Kadugodi, Mahadevapura, HAL, Old Airport Road, Yemalur, Cessna Business Park area, Outer Ring Road (ORR) east stretch.
-
-HUB 2 — Central/South Bangalore (Jayanagar hub, 10 km radius):
-  Serviceable areas: Jayanagar, Basavanagudi, JP Nagar, BTM Layout, HSR Layout, Koramangala, Banashankari, Rajajinagar, Malleshwaram, Sadashivanagar, Vijayanagar, Basaveshwaranagar, Majestic, Yeshwanthpur, RT Nagar, Wilson Garden, Richmond Town, Indiranagar, Domlur, Ulsoor, MG Road, Brigade Road, Shivajinagar, Frazer Town, Cox Town, Chamrajpet, Hanumanthanagar, Kumaraswamy Layout, Padmanabhanagar.
-
-HUB 3 — Electronic City (3 km radius):
-  Serviceable areas: Electronic City Phase 1, Electronic City Phase 2, Neeladri Nagar, Doddathogur, Konappana Agrahara, Huskur.
-
-RULES:
-- If the user's area clearly matches one of the serviceable areas above → confirm immediately: "Yes, we do service in [area]! 😊" and continue the conversation normally.
-- If the user says a Bangalore area NOT in the list, or you are unsure → say EXACTLY: "Let me check if we can service your area and get back to you." Then STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE.
+We operate in Bangalore only with 3 service hubs (Marathahalli ~6km, Jayanagar ~10km, Electronic City ~3km).
+The system automatically geocodes the user's location and injects a LOCATION VERIFIED message above. Follow it:
+- If you see "LOCATION VERIFIED ✅" → confirm to the user: "Yes, we do service in [area]! 😊" and continue normally.
+- If you see "LOCATION VERIFIED ❌" → say EXACTLY: "Let me check if we can service your area and get back to you." Then STOP. If the user replies anything after that, respond UNSURE.
+- If NO location check was injected (user didn't mention a place) and they ask "do you service in X?", ask them to share their area name and you will check.
 - If the user says a city other than Bangalore → politely say: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
 - During the BEFORE BOOKING flow, after collecting child name / parent name / preferred time, also ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
-- Do NOT fabricate serviceability for areas you are unsure about. When in doubt, defer to the human agent.
+- Do NOT fabricate serviceability. Only confirm when you see a LOCATION VERIFIED ✅ system message.
 ---
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
