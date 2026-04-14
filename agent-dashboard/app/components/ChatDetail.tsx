@@ -784,12 +784,12 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                   {calTrial && <span className="ml-auto text-xs font-bold bg-orange-400 text-white px-2 py-0.5 rounded">TRIAL</span>}
                 </button>
                 <div>
-                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>REPEAT WEEKLY</label>
+                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TOTAL SESSIONS</label>
                   <div className="flex items-center gap-3">
-                    <input type="range" min={1} max={20} value={calRepeat} onChange={e => setCalRepeat(parseInt(e.target.value))} className="flex-1 accent-blue-500" />
+                    <input type="range" min={1} max={30} value={calRepeat} onChange={e => setCalRepeat(parseInt(e.target.value))} className="flex-1 accent-blue-500" />
                     <span className={`text-sm font-semibold min-w-[3rem] text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{calRepeat === 1 ? 'Once' : `${calRepeat}x`}</span>
                   </div>
-                  {calRepeat > 1 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Creates {calRepeat}{calDays.length > 1 ? ` weeks × ${calDays.length} days = ${calRepeat * calDays.length} sessions` : ' weekly sessions'} starting {calDate || 'selected date'}</p>}
+                  {calRepeat > 1 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Creates {calRepeat} sessions{calDays.length > 1 ? ` across ${calDays.length} days/week (~${Math.ceil(calRepeat / calDays.length)} weeks)` : ` (${calRepeat} weeks)`} starting {calDate || 'selected date'}</p>}
                   <div className="flex gap-2 mt-2">
                     {[1, 4, 8, 11].map(n => (
                       <button key={n} type="button" onClick={() => setCalRepeat(n)} className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${calRepeat === n ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white') : (isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600')}`}>{n === 1 ? 'Once' : `${n}x`}</button>
@@ -814,7 +814,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                   disabled={calSaving || !calTitle.trim() || !calDate}
                   className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white hover:bg-[#006d5b]'}`}
                 >
-                  {calSaving ? 'Saving...' : calRepeat > 1 ? `Save ${calDays.length > 1 ? calRepeat * calDays.length : calRepeat} Sessions` : 'Save to Calendar'}
+                  {calSaving ? 'Saving...' : calRepeat > 1 ? `Save ${calRepeat} Sessions` : 'Save to Calendar'}
                 </button>
               </>
             )}

@@ -1769,7 +1769,7 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-8 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
-- "repeatCount": number of weeks to repeat. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1.
+- "repeatCount": TOTAL number of sessions. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions total). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1. NOTE: this is total sessions, NOT weeks — e.g. if sessions are Thursday and Sunday, 11 means roughly 5–6 weeks with 11 sessions total across both days.
 - "repeatDays": array of JS day numbers (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday) for which days the session repeats. E.g. "every Tuesday and Thursday" → [2, 4]. "Friday Saturday" → [5, 6]. "Monday, Wednesday, Friday" → [1, 3, 5]. If only one day is mentioned or no specific days, return null.
 - "notes": any extra details like location, special instructions
 Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
@@ -1821,23 +1821,24 @@ app.post('/calendar/events', async (req, res) => {
 
     const rows = [];
     if (days && days.length > 0 && weeks > 1) {
-      // Multi-day recurring: for each week, create events on each selected day
+      // Multi-day recurring: repeat_count is TOTAL sessions, distribute across selected days
       const baseDate = new Date(date + 'T00:00:00');
       const baseDay = baseDate.getDay();
-      const totalEvents = weeks * days.length;
+      const totalSessions = weeks; // weeks var is actually total sessions
       let eventNum = 0;
-      for (let w = 0; w < weeks; w++) {
+      let w = 0;
+      while (eventNum < totalSessions) {
         for (const dayNum of days) {
-          // Calculate offset from the base date's week start
+          if (eventNum >= totalSessions) break;
           let offset = dayNum - baseDay;
-          if (w === 0 && offset < 0) offset += 7; // don't go before start date in first week
+          if (w === 0 && offset < 0) offset += 7;
           const d = new Date(baseDate);
           d.setDate(baseDate.getDate() + w * 7 + offset);
-          if (d < baseDate && w === 0) continue; // skip days before the start date
+          if (d < baseDate && w === 0) continue;
           eventNum++;
           rows.push({
             phone: phone || null,
-            title: `${title} (${eventNum}/${totalEvents})`,
+            title: `${title} (${eventNum}/${totalSessions})`,
             date: d.toISOString().split('T')[0],
             start_time: start_time || null,
             end_time: end_time || null,
@@ -1847,6 +1848,8 @@ app.post('/calendar/events', async (req, res) => {
             assigned_member: assigned_member || null,
           });
         }
+        w++;
+        if (w > 52) break; // safety cap
       }
     } else {
       // Single-day recurring (original logic)
