@@ -365,8 +365,8 @@ export default function AppClient() {
   };
 
   const loadChats = async () => {
-    const { data, error } = await supabase.from("messages").select("phone, content, role, sender, agent, created_at").order("created_at", { ascending: false });
-    console.log('loadChats result', { data, error });
+    // Only fetch the latest message per phone — limit to recent messages to avoid downloading entire DB
+    const { data, error } = await supabase.from("messages").select("phone, content, role, sender, agent, created_at").order("created_at", { ascending: false }).limit(500);
     if (error) return;
     if (!data || data.length === 0) return setChats([]);
 
@@ -405,7 +405,6 @@ export default function AppClient() {
 
   const loadMessages = async (phone: string) => {
     const { data, error } = await supabase.from("messages").select("*").eq("phone", phone).order("created_at", { ascending: true });
-    console.log('loadMessages result', { phone, data, error });
     if (error) return;
     if (!data) return setMessages([]);
     const msgs: Message[] = data.map((m: any) => {
@@ -459,7 +458,12 @@ export default function AppClient() {
   useEffect(() => {
     if (!authed) return;
     loadChats();
-  }, [authed, pinnedChatIds, needsHumanPhones]);
+  }, [authed, pinnedChatIds]);
+
+  // When needsHumanPhones changes, patch chats in-place (no refetch)
+  useEffect(() => {
+    setChats(prev => prev.map(c => ({ ...c, needsHuman: needsHumanPhones.has(c.id) })));
+  }, [needsHumanPhones]);
 
   useEffect(() => {
     if (selectedChat) {
@@ -478,7 +482,7 @@ export default function AppClient() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
-          console.log('realtime payload:', payload);
+          console.log('realtime:', msg.phone, msg.content?.slice(0, 30));
           const msg = payload.new;
           if (msg.phone === selectedChat) {
             const mapped = {
@@ -507,11 +511,19 @@ export default function AppClient() {
           } else if (msg.role === 'user' || msg.sender === 'user') {
             // Message for a background chat — bump its unread count
             setChats(prev => prev.map(c =>
-              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1 } : c
+              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1, lastMessage: msg.content || '', time: msg.created_at ? new Date(msg.created_at).toLocaleString() : c.time, lastMsgAt: msg.created_at || c.lastMsgAt } : c
             ));
           }
-          loadChats();
-          loadNeedsHuman();
+          // Update the chat's lastMessage without re-fetching everything
+          setChats(prev => {
+            const exists = prev.some(c => c.id === msg.phone);
+            if (exists) {
+              return prev.map(c => c.id === msg.phone ? { ...c, lastMessage: msg.content || c.lastMessage, time: msg.created_at ? new Date(msg.created_at).toLocaleString() : c.time, lastMsgAt: msg.created_at || c.lastMsgAt, agent: msg.agent ?? c.agent } : c);
+            }
+            // New phone not in list — add it
+            const contacts = getContacts();
+            return [{ id: msg.phone, name: contacts[msg.phone]?.name || msg.phone, avatar: avatarDataUrl(msg.phone), lastMessage: msg.content || '', time: msg.created_at ? new Date(msg.created_at).toLocaleString() : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
+          });
         }
       )
       .on(
