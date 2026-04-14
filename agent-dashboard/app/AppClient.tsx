@@ -315,7 +315,13 @@ export default function AppClient() {
     try {
       const r = await fetch(`${SERVER}/needs-human`);
       const j = await r.json();
-      if (j.phones) setNeedsHumanPhones(new Set(j.phones));
+      if (j.phones) {
+        const sorted = [...j.phones].sort().join(',');
+        setNeedsHumanPhones(prev => {
+          const prevSorted = [...prev].sort().join(',');
+          return prevSorted === sorted ? prev : new Set(j.phones);
+        });
+      }
     } catch {}
   };
 
@@ -422,14 +428,32 @@ export default function AppClient() {
     setTimeout(scrollToBottom, 100);
   };
 
+  const sendingRef = useRef(false);
   const sendMessage = async (text: string) => {
-    if (!text || !selectedChat) return;
-
-    await fetch("https://kiddost-ai.onrender.com/agent-send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: selectedChat, message: text, agent: agentName }),
-    });
+    if (!text || !selectedChat || sendingRef.current) return;
+    sendingRef.current = true;
+    // Optimistic: show message immediately
+    const optimistic: Message = {
+      id: 'optimistic-' + Date.now(),
+      text,
+      sender: 'me',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      agent: agentName,
+      status: 'sending',
+      media_url: null,
+      whatsapp_id: null,
+    };
+    setMessages(prev => [...prev, optimistic]);
+    setTimeout(scrollToBottom, 50);
+    try {
+      await fetch(`${SERVER}/agent-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: selectedChat, message: text, agent: agentName }),
+      });
+    } finally {
+      sendingRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -470,7 +494,13 @@ export default function AppClient() {
               media_url: msg.media_url ?? null,
               whatsapp_id: msg.whatsapp_id ?? null,
             };
-            setMessages((prev) => [...prev, mapped]);
+            setMessages((prev) => {
+              // Dedup: skip if message with same id already exists (or optimistic match)
+              if (prev.some(m => m.id === mapped.id || (m.id.startsWith('optimistic-') && m.text === mapped.text && m.sender === mapped.sender))) {
+                return prev.map(m => (m.id.startsWith('optimistic-') && m.text === mapped.text && m.sender === mapped.sender) ? mapped : m);
+              }
+              return [...prev, mapped];
+            });
             setTimeout(scrollToBottom, 100);
             // Mark as read since we're looking at it
             markRead(msg.phone);
@@ -505,18 +535,17 @@ export default function AppClient() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedChat, authed, pinnedChatIds]);
+  }, [selectedChat, authed]);
 
-  // Polling fallback: refresh chats/messages every 5s
+  // Polling fallback: refresh chats every 15s (realtime handles most updates)
   useEffect(() => {
     if (!authed) return;
     const iv = setInterval(() => {
       loadChats();
-      if (selectedChat) loadMessages(selectedChat);
-    }, 5000);
+    }, 15000);
 
     return () => clearInterval(iv);
-  }, [selectedChat, authed, pinnedChatIds]);
+  }, [authed]);
 
   // Register service worker and subscribe to push notifications on login
   useEffect(() => {
