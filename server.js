@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import cors from "cors";
 import crypto from "crypto";
 import webpush from "web-push";
+import cron from "node-cron";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -1977,6 +1978,88 @@ app.post('/calendar/assign-member', async (req, res) => {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
+});
+
+// ── Daily session reminder ──────────────────────────────────────────────
+const REMINDER_PHONE = process.env.REMINDER_PHONE || '919901029836';
+
+async function sendDailyReminder() {
+  try {
+    // Get tomorrow's date in IST (UTC+5:30)
+    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const tomorrow = new Date(nowIST);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    console.log(`[reminder] Checking sessions for ${tomorrowStr}`);
+
+    const { data: events, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('date', tomorrowStr)
+      .order('start_time', { ascending: true });
+
+    if (error) { console.error('[reminder] DB error', error.message); return; }
+    if (!events || events.length === 0) {
+      console.log('[reminder] No sessions tomorrow, skipping');
+      return;
+    }
+
+    // Build message
+    const dayLabel = tomorrow.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    let msg = `📅 *Sessions for tomorrow (${dayLabel}):*\n\n`;
+
+    events.forEach((ev, i) => {
+      const time = ev.start_time && ev.end_time
+        ? `${ev.start_time} – ${ev.end_time}`
+        : ev.start_time || 'Time TBD';
+      const trial = ev.is_trial ? ' 🟠 TRIAL' : '';
+      const member = ev.assigned_member ? ` → ${ev.assigned_member}` : '';
+      const phone = ev.phone ? ` (${ev.phone})` : '';
+      msg += `${i + 1}. *${ev.title}*${trial}\n   🕐 ${time}${member}${phone}\n`;
+      if (ev.notes) msg += `   📝 ${ev.notes}\n`;
+      msg += '\n';
+    });
+
+    msg += `Total: ${events.length} session${events.length > 1 ? 's' : ''}`;
+
+    console.log('[reminder] Sending to', REMINDER_PHONE, ':', msg.slice(0, 200));
+
+    // Try template first, fall back to session message
+    const useTemplate = process.env.REMINDER_TEMPLATE_ID;
+    if (useTemplate) {
+      // Template message — works outside 24h window
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+        { name: '', phone: REMINDER_PHONE, templateId: useTemplate, variables: [msg] },
+        { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+      );
+      console.log('[reminder] Sent via template', useTemplate);
+    } else {
+      // Session message — only works within 24h window (for testing)
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+        { phone: REMINDER_PHONE, text: msg },
+        { params: { apiKey: BOTSPACE_API_KEY } }
+      );
+      console.log('[reminder] Sent via session message');
+    }
+  } catch (e) {
+    console.error('[reminder] Error:', e?.response?.data || e.message || e);
+  }
+}
+
+// Cron: every day at 9 PM IST (= 3:30 PM UTC)
+cron.schedule('30 15 * * *', () => {
+  console.log('[cron] Triggering daily reminder (9 PM IST)');
+  sendDailyReminder();
+});
+
+// Manual test endpoint
+app.get('/test-reminder', async (req, res) => {
+  console.log('[test-reminder] Triggered manually');
+  await sendDailyReminder();
+  res.json({ ok: true, message: 'Reminder sent (check WhatsApp)' });
 });
 
 app.listen(PORT, () => {
