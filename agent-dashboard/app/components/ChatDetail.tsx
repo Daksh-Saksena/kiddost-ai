@@ -329,13 +329,14 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [calEnd, setCalEnd] = useState('');
   const [calNotes, setCalNotes] = useState('');
   const [calRepeat, setCalRepeat] = useState(1);
+  const [calDays, setCalDays] = useState<number[]>([]);  // JS day numbers: 0=Sun,1=Mon,...6=Sat
   const [calTrial, setCalTrial] = useState(false);
   const [calSaving, setCalSaving] = useState(false);
   const [calSuccess, setCalSuccess] = useState(false);
 
   const extractAndShowCalendar = async () => {
     setCalExtracting(true);
-    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1); setCalTrial(false);
+    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1); setCalDays([]); setCalTrial(false);
     setCalSuccess(false);
     try {
       const res = await fetch(`${SERVER}/calendar/extract`, {
@@ -353,6 +354,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         setCalNotes(ex.notes || '');
         setCalTrial(ex.isTrial === true);
         if (ex.repeatCount && ex.repeatCount > 1) setCalRepeat(ex.repeatCount);
+        if (Array.isArray(ex.repeatDays) && ex.repeatDays.length > 0) setCalDays(ex.repeatDays);
       } else {
         setCalTitle('KidDost Session');
         setCalDate(new Date().toISOString().split('T')[0]);
@@ -372,7 +374,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       await fetch(`${SERVER}/calendar/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, repeat_count: calRepeat > 1 ? calRepeat : undefined, is_trial: calTrial }),
+        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, repeat_count: calRepeat > 1 ? calRepeat : undefined, repeat_days: calDays.length > 0 ? calDays : undefined, is_trial: calTrial }),
       });
       setCalSuccess(true);
       setTimeout(() => { setShowCalModal(false); setCalSuccess(false); }, 1200);
@@ -771,19 +773,32 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                     <input type="range" min={1} max={20} value={calRepeat} onChange={e => setCalRepeat(parseInt(e.target.value))} className="flex-1 accent-blue-500" />
                     <span className={`text-sm font-semibold min-w-[3rem] text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{calRepeat === 1 ? 'Once' : `${calRepeat}x`}</span>
                   </div>
-                  {calRepeat > 1 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Creates {calRepeat} weekly sessions starting {calDate || 'selected date'}</p>}
+                  {calRepeat > 1 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Creates {calRepeat}{calDays.length > 1 ? ` weeks × ${calDays.length} days = ${calRepeat * calDays.length} sessions` : ' weekly sessions'} starting {calDate || 'selected date'}</p>}
                   <div className="flex gap-2 mt-2">
                     {[1, 4, 8, 11].map(n => (
                       <button key={n} type="button" onClick={() => setCalRepeat(n)} className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${calRepeat === n ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white') : (isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600')}`}>{n === 1 ? 'Once' : `${n}x`}</button>
                     ))}
                   </div>
+                  {calRepeat > 1 && (
+                    <div className="mt-3">
+                      <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>DAYS OF WEEK</label>
+                      <div className="flex gap-1.5">
+                        {(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as const).map((day, idx) => (
+                          <button key={day} type="button" onClick={() => setCalDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort())}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${calDays.includes(idx) ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white') : (isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600')}`}
+                          >{day}</button>
+                        ))}
+                      </div>
+                      {calDays.length === 0 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>No days selected — will repeat on same weekday as start date</p>}
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={saveCalEvent}
                   disabled={calSaving || !calTitle.trim() || !calDate}
                   className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white hover:bg-[#006d5b]'}`}
                 >
-                  {calSaving ? 'Saving...' : calRepeat > 1 ? `Save ${calRepeat} Sessions` : 'Save to Calendar'}
+                  {calSaving ? 'Saving...' : calRepeat > 1 ? `Save ${calDays.length > 1 ? calRepeat * calDays.length : calRepeat} Sessions` : 'Save to Calendar'}
                 </button>
               </>
             )}

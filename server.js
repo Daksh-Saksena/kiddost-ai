@@ -1720,7 +1720,8 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-6 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
-- "repeatCount": number of weekly sessions. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1.
+- "repeatCount": number of weeks to repeat. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1.
+- "repeatDays": array of JS day numbers (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday) for which days the session repeats. E.g. "every Tuesday and Thursday" → [2, 4]. "Monday, Wednesday, Friday" → [1, 3, 5]. If only one day is mentioned or no specific days, return null.
 - "notes": any extra details like location, special instructions
 Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
             })()
@@ -1756,28 +1757,65 @@ app.get('/calendar/events', async (req, res) => {
   }
 });
 
-// Create event (supports repeat_count for weekly recurring)
+// Create event (supports repeat_count for weekly recurring, repeat_days for multi-day)
 app.post('/calendar/events', async (req, res) => {
   try {
-    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count, is_trial, assigned_member } = req.body;
+    const { phone, title, date, start_time, end_time, notes, created_by, repeat_count, repeat_days, is_trial, assigned_member } = req.body;
     if (!title || !date) return res.status(400).json({ error: 'title and date required' });
-    const count = Math.min(Math.max(parseInt(repeat_count) || 1, 1), 52); // cap at 52 weeks
+    const weeks = Math.min(Math.max(parseInt(repeat_count) || 1, 1), 52);
+
+    // repeat_days: array of JS day numbers [0=Sun,1=Mon,...6=Sat]
+    // If provided, generate events for each specified day across the given weeks
+    const days = Array.isArray(repeat_days) && repeat_days.length > 0
+      ? repeat_days.map(Number).filter(d => d >= 0 && d <= 6)
+      : null;
+
     const rows = [];
-    for (let i = 0; i < count; i++) {
-      const d = new Date(date + 'T00:00:00');
-      d.setDate(d.getDate() + i * 7);
-      const dateStr = d.toISOString().split('T')[0];
-      rows.push({
-        phone: phone || null,
-        title: count > 1 ? `${title} (${i + 1}/${count})` : title,
-        date: dateStr,
-        start_time: start_time || null,
-        end_time: end_time || null,
-        notes: notes || null,
-        created_by: created_by || null,
-        is_trial: is_trial === true || is_trial === 'true' ? true : false,
-        assigned_member: assigned_member || null,
-      });
+    if (days && days.length > 0 && weeks > 1) {
+      // Multi-day recurring: for each week, create events on each selected day
+      const baseDate = new Date(date + 'T00:00:00');
+      const baseDay = baseDate.getDay();
+      const totalEvents = weeks * days.length;
+      let eventNum = 0;
+      for (let w = 0; w < weeks; w++) {
+        for (const dayNum of days) {
+          // Calculate offset from the base date's week start
+          let offset = dayNum - baseDay;
+          if (w === 0 && offset < 0) offset += 7; // don't go before start date in first week
+          const d = new Date(baseDate);
+          d.setDate(baseDate.getDate() + w * 7 + offset);
+          if (d < baseDate && w === 0) continue; // skip days before the start date
+          eventNum++;
+          rows.push({
+            phone: phone || null,
+            title: `${title} (${eventNum}/${totalEvents})`,
+            date: d.toISOString().split('T')[0],
+            start_time: start_time || null,
+            end_time: end_time || null,
+            notes: notes || null,
+            created_by: created_by || null,
+            is_trial: is_trial === true || is_trial === 'true' ? true : false,
+            assigned_member: assigned_member || null,
+          });
+        }
+      }
+    } else {
+      // Single-day recurring (original logic)
+      for (let i = 0; i < weeks; i++) {
+        const d = new Date(date + 'T00:00:00');
+        d.setDate(d.getDate() + i * 7);
+        rows.push({
+          phone: phone || null,
+          title: weeks > 1 ? `${title} (${i + 1}/${weeks})` : title,
+          date: d.toISOString().split('T')[0],
+          start_time: start_time || null,
+          end_time: end_time || null,
+          notes: notes || null,
+          created_by: created_by || null,
+          is_trial: is_trial === true || is_trial === 'true' ? true : false,
+          assigned_member: assigned_member || null,
+        });
+      }
     }
     const { data, error } = await supabase.from('calendar_events').insert(rows).select();
     if (error) return res.status(500).json({ error: error.message });
