@@ -415,6 +415,8 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
+CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'UTC' })} IST
+
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
 - DO NOT copy specific names, dates, prices, or availability from the example conversation
@@ -471,6 +473,11 @@ OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 
 TOO EXPENSIVE / OUT OF BUDGET:
 - Thank them for considering, invite them to reach out for ad-hoc support.
+
+BUSINESS HOURS:
+- Our human agents are available between 9 AM and 8 PM IST.
+- If the CURRENT TIME is before 9 AM or after 8 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9 AM and 8 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If the CURRENT TIME is within business hours, follow the normal flow below.
 
 TIME SLOT REQUEST:
 - "Sure, allow me to check the slot availability and come back to you."
@@ -1502,6 +1509,8 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
+CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'UTC' })} IST
+
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
 - Use ONLY the activities mentioned in the example conversation below — NEVER invent activities not found there
@@ -1559,6 +1568,11 @@ OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 
 TOO EXPENSIVE / OUT OF BUDGET:
 - Thank them for considering, invite them to reach out for ad-hoc support.
+
+BUSINESS HOURS:
+- Our human agents are available between 9 AM and 8 PM IST.
+- If the CURRENT TIME is before 9 AM or after 8 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9 AM and 8 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If the CURRENT TIME is within business hours, follow the normal flow below.
 
 TIME SLOT REQUEST:
 - "Sure, allow me to check the slot availability and come back to you."
