@@ -1691,7 +1691,7 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "title": short session title, e.g. "KidDost Session" or include child name if mentioned
 - "date": ISO date string YYYY-MM-DD. When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year. When "tomorrow" is mentioned, use tomorrow's date. When a weekday name is mentioned, pick the NEAREST UPCOMING match from the calendar above.
 - "startTime": HH:MM in 24h format
-- "endTime": HH:MM in 24h format (if duration mentioned, calculate it; if not, assume 1 hour after start)
+- "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-6 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
 - "notes": any extra details like location, special instructions
 Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
