@@ -491,7 +491,16 @@ TIME SLOT REQUEST:
 - Do NOT fabricate availability confirmations. You cannot actually check calendars. A human agent will respond once they have checked.
 - If the conversation history shows you already said you will check slot availability and no human agent has confirmed yet, reply UNSURE.
 
-NEW SESSION / LOCATION: ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+NEW SESSION / LOCATION:
+- When it is time to check if their area is serviceable, ask them to share their location.
+- Once the user shares their location (text address, pin, or map link), reply: "Sure, let me check if your area is serviceable and get back to you."
+- CRITICAL: After you have said you will check their location, you must STOP responding. If the user replies with anything while you are supposed to be "checking", respond with ONLY the word: UNSURE
+- Do NOT fabricate serviceability confirmations. You cannot actually check locations. A human agent will respond once they have verified.
+- If the conversation history shows you already said you will check their location and no human agent has confirmed yet, reply UNSURE.
+---
+
+Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
+          (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           varsBlock +
           sessionStatusBlock +
           exampleBlock
@@ -1583,7 +1592,16 @@ TIME SLOT REQUEST:
 - Do NOT fabricate availability confirmations. You cannot actually check calendars. A human agent will respond once they have checked.
 - If the conversation history shows you already said you will check slot availability and no human agent has confirmed yet, reply UNSURE.
 
-NEW SESSION / LOCATION: ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+NEW SESSION / LOCATION:
+- When it is time to check if their area is serviceable, ask them to share their location.
+- Once the user shares their location (text address, pin, or map link), reply: "Sure, let me check if your area is serviceable and get back to you."
+- CRITICAL: After you have said you will check their location, you must STOP responding. If the user replies with anything while you are supposed to be "checking", respond with ONLY the word: UNSURE
+- Do NOT fabricate serviceability confirmations. You cannot actually check locations. A human agent will respond once they have verified.
+- If the conversation history shows you already said you will check their location and no human agent has confirmed yet, reply UNSURE.
+---
+
+Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
+      (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
       exampleBlock;
 
     res.json({
