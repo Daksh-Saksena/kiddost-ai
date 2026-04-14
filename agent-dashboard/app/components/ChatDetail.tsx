@@ -137,11 +137,14 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     prevLengthRef.current = messages.length;
   }, [messages]);
 
+  const [sendCooldown, setSendCooldown] = useState(false);
   const handleSend = async () => {
-    if (inputValue.trim()) {
-      await onSend(inputValue.trim());
-      setInputValue("");
-    }
+    if (sendCooldown || !inputValue.trim()) return;
+    const text = inputValue.trim();
+    setInputValue("");
+    setSendCooldown(true);
+    await onSend(text);
+    setTimeout(() => setSendCooldown(false), 1000);
   };
 
   const uploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -720,7 +723,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
           <FileText className="w-5 h-5" />
         </button>
         <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyPress={handleKeyPress} placeholder={isDarkMode ? "Transmit message..." : "Type a message"} className={`flex-1 rounded-full px-5 py-3 outline-none text-sm ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white text-gray-900"} transition-all`} />
-        <button onClick={handleSend} className={`p-3 rounded-full active:scale-95 transition-all ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
+        <button onClick={handleSend} disabled={sendCooldown} className={`p-3 rounded-full active:scale-95 transition-all ${sendCooldown ? 'opacity-40 cursor-not-allowed' : ''} ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
           <Send className="w-5 h-5" />
         </button>
       </div>
