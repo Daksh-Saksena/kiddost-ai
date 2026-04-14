@@ -2027,16 +2027,22 @@ async function sendDailyReminder() {
 
     // Try template first, fall back to session message
     const useTemplate = process.env.REMINDER_TEMPLATE_ID;
+    let sent = false;
     if (useTemplate) {
-      // Template message — works outside 24h window
-      await axios.post(
-        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-        { name: '', phone: REMINDER_PHONE, templateId: useTemplate, variables: [msg] },
-        { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
-      );
-      console.log('[reminder] Sent via template', useTemplate);
-    } else {
-      // Session message — only works within 24h window (for testing)
+      try {
+        await axios.post(
+          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+          { name: '', phone: REMINDER_PHONE, templateId: useTemplate, variables: [msg] },
+          { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+        );
+        console.log('[reminder] Sent via template', useTemplate);
+        sent = true;
+      } catch (tplErr) {
+        console.warn('[reminder] Template failed, falling back to session message:', tplErr?.response?.data?.message || tplErr.message);
+      }
+    }
+    if (!sent) {
+      // Session message — only works within 24h window
       await axios.post(
         `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
         { phone: REMINDER_PHONE, text: msg },
