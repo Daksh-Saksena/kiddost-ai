@@ -354,8 +354,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         setCalTrial(ex.isTrial === true);
       } else {
         setCalTitle('KidDost Session');
-        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-        setCalDate(tomorrow.toISOString().split('T')[0]);
+        setCalDate(new Date().toISOString().split('T')[0]);
       }
     } catch {
       setCalTitle('KidDost Session');

@@ -1661,7 +1661,10 @@ app.post('/calendar/extract', async (req, res) => {
 
     if (!msgs || msgs.length === 0) return res.json({ extracted: null });
 
-    const chatText = msgs.reverse().map(m => `${m.sender || m.role}: ${m.content}`).join('\n');
+    const chatText = msgs.reverse().map(m => {
+      const label = m.sender === 'agent' ? 'Agent' : m.sender === 'ai' ? 'Agent' : 'Customer';
+      return `${label}: ${m.content}`;
+    }).join('\n');
 
     const aiRes = await axios.post(
       'https://api.openai.com/v1/chat/completions',
@@ -1689,7 +1692,7 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "endTime": HH:MM in 24h format (if duration mentioned, calculate it; if not, assume 1 hour after start)
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
 - "notes": any extra details like location, special instructions
-Only extract if a session/booking/appointment appears to be confirmed or scheduled. If nothing is confirmed, return {"title":null}.`;
+Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
             })()
           },
           { role: 'user', content: chatText }
