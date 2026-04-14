@@ -11,7 +11,7 @@ import { supabase } from "../lib/supabase";
 const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 
-type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[]; pinned?: boolean };
+type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[]; pinned?: boolean; needsHuman?: boolean };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
@@ -300,6 +300,7 @@ export default function AppClient() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
+  const [needsHumanPhones, setNeedsHumanPhones] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement | null>(null);
   // Track last-seen message timestamp per phone to calculate unread counts
   const lastSeenRef = useRef<Record<string, string>>({});
@@ -308,6 +309,22 @@ export default function AppClient() {
   useEffect(() => {
     try { lastSeenRef.current = JSON.parse(localStorage.getItem('kiddost_lastSeen') || '{}'); } catch {}
   }, []);
+
+  // Fetch phones needing human attention
+  const loadNeedsHuman = async () => {
+    try {
+      const r = await fetch(`${SERVER}/needs-human`);
+      const j = await r.json();
+      if (j.phones) setNeedsHumanPhones(new Set(j.phones));
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!authed) return;
+    loadNeedsHuman();
+    const iv = setInterval(loadNeedsHuman, 10000);
+    return () => clearInterval(iv);
+  }, [authed]);
 
   const agentScopedKey = `${agentId || 'no-id'}::${agentName || 'Agent'}`;
 
@@ -374,6 +391,7 @@ export default function AppClient() {
       lastMsgAt: r.created_at,
       labels: contacts[r.phone]?.labels || [],
       pinned: pinnedChatIds.includes(r.phone),
+      needsHuman: needsHumanPhones.has(r.phone),
     }));
 
     setChats(result);
@@ -417,7 +435,7 @@ export default function AppClient() {
   useEffect(() => {
     if (!authed) return;
     loadChats();
-  }, [authed, pinnedChatIds]);
+  }, [authed, pinnedChatIds, needsHumanPhones]);
 
   useEffect(() => {
     if (selectedChat) {
@@ -463,6 +481,7 @@ export default function AppClient() {
             ));
           }
           loadChats();
+          loadNeedsHuman();
         }
       )
       .on(

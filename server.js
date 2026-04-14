@@ -490,6 +490,12 @@ BEFORE BOOKING:
 - You can combine multiple questions in one message. Only proceed to check availability once you have all three.
 - IMPORTANT: While gathering names/date/time, you are still in normal conversation mode. Reply normally to their answers. Do NOT reply UNSURE during this phase.
 
+GROUP / SIBLING SESSIONS:
+- If the customer mentions they have more than one child (e.g. "I have 2 kids", "my children are 3 and 5"), ask: "Would you like both children in the same session, or would you prefer separate sessions for each child?"
+- Once they answer, say EXACTLY: "Great, please allow me a moment to check the best options for you and get back to you."
+- After saying this, you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
+- A human agent will follow up with group/sibling session details.
+
 TIME SLOT REQUEST:
 - Once you have the child's name, parent's name, AND preferred date/time, say EXACTLY: "Sure, allow me to check the slot availability and come back to you."
 - CRITICAL: The UNSURE rule ONLY activates after you have sent this EXACT check-availability message. NOT before.
@@ -537,6 +543,8 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     // If AI is unsure, notify agents instead of replying to user
     if (aiReply.trim().toUpperCase() === "UNSURE") {
       console.log("[AI] UNSURE — sending agent notification, not replying to user");
+      // Flag conversation as needing human attention
+      await supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone);
       await sendPushToAll({
         title: "Agent needed",
         body: `AI couldn't answer for ${fullPhone} — message: "${combinedMessage.slice(0, 80)}"`,
@@ -625,10 +633,13 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       /share.*location/i,
       /your location.*confirm/i,
       /check.*(?:area|location).*serviceable/i,
+      /check the best options for you/i,
     ];
     const needsHuman = NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
 
     if (needsHuman) {
+      // Flag conversation as needing human attention
+      supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone).then(() => {});
       // Strong alert — agent action required
       sendPushToAll({
         title: "Assistance needed",
@@ -888,6 +899,13 @@ app.get('/contacts', async (req, res) => {
   const map = {};
   for (const row of (data || [])) map[row.phone] = { name: row.name || '', notes: row.notes || '', labels: row.labels || [] };
   res.json({ contacts: map });
+});
+
+// Return phones that need human attention (red dot on dashboard)
+app.get('/needs-human', async (req, res) => {
+  const { data, error } = await supabase.from('conversations').select('phone').eq('needs_human', true);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ phones: (data || []).map(r => r.phone) });
 });
 
 app.post('/contacts', async (req, res) => {
@@ -1322,7 +1340,7 @@ app.post("/agent-send", async (req, res) => {
       // Also update conversations table flag for compatibility
       await supabase
         .from("conversations")
-        .update({ ai_paused: true })
+        .update({ ai_paused: true, needs_human: false })
         .eq("phone", phone);
     } catch (dbErr) {
       console.error("Failed to insert agent message into supabase", dbErr?.message || dbErr);
@@ -1597,6 +1615,12 @@ BEFORE BOOKING:
   3. Preferred date and time — ask: "What date and time would work best for you?"
 - You can combine multiple questions in one message. Only proceed to check availability once you have all three.
 - IMPORTANT: While gathering names/date/time, you are still in normal conversation mode. Reply normally to their answers. Do NOT reply UNSURE during this phase.
+
+GROUP / SIBLING SESSIONS:
+- If the customer mentions they have more than one child (e.g. "I have 2 kids", "my children are 3 and 5"), ask: "Would you like both children in the same session, or would you prefer separate sessions for each child?"
+- Once they answer, say EXACTLY: "Great, please allow me a moment to check the best options for you and get back to you."
+- After saying this, you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
+- A human agent will follow up with group/sibling session details.
 
 TIME SLOT REQUEST:
 - Once you have the child's name, parent's name, AND preferred date/time, say EXACTLY: "Sure, allow me to check the slot availability and come back to you."

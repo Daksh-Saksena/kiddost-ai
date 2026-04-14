@@ -19,6 +19,7 @@ interface Chat {
   agent?: string | null;
   labels?: string[];
   pinned?: boolean;
+  needsHuman?: boolean;
 }
 
 interface ChatListProps {
@@ -84,7 +85,12 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
     ? [...filtered].sort((a, b) => (a.agent || 'AI').localeCompare(b.agent || 'AI'))
     : filtered;
 
-  const sorted = [...baseSorted].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
+  const sorted = [...baseSorted].sort((a, b) => {
+    // Pinned first, then needs_human, then rest
+    if (a.pinned !== b.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
+    if (a.needsHuman !== b.needsHuman) return Number(!!b.needsHuman) - Number(!!a.needsHuman);
+    return 0;
+  });
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
@@ -207,6 +213,10 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
           >
             <div className="relative">
               <img src={chat.avatar} alt={chat.name} className="w-14 h-14 rounded-full object-cover" />
+              {chat.needsHuman && (
+                <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-current"
+                  style={{ borderColor: isDarkMode ? '#000' : '#fff', boxShadow: '0 0 8px rgba(239,68,68,0.7)' }} />
+              )}
             </div>
             <div className="flex-1 ml-4 min-w-0">
               <div className="flex justify-between items-baseline">
