@@ -1878,7 +1878,7 @@ app.post('/calendar/events', async (req, res) => {
     }
     const { data, error } = await supabase.from('calendar_events').insert(rows).select();
     if (error) return res.status(500).json({ error: error.message });
-    return res.json({ events: data, count });
+    return res.json({ events: data, count: rows.length });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
