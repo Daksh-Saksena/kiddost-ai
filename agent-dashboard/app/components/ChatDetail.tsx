@@ -331,12 +331,13 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [calRepeat, setCalRepeat] = useState(1);
   const [calDays, setCalDays] = useState<number[]>([]);  // JS day numbers: 0=Sun,1=Mon,...6=Sat
   const [calTrial, setCalTrial] = useState(false);
+  const [calMember, setCalMember] = useState('');
   const [calSaving, setCalSaving] = useState(false);
   const [calSuccess, setCalSuccess] = useState(false);
 
   const extractAndShowCalendar = async () => {
     setCalExtracting(true);
-    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1); setCalDays([]); setCalTrial(false);
+    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1); setCalDays([]); setCalTrial(false); setCalMember('');
     setCalSuccess(false);
     try {
       const res = await fetch(`${SERVER}/calendar/extract`, {
@@ -390,7 +391,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       await fetch(`${SERVER}/calendar/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, repeat_count: calRepeat > 1 ? calRepeat : undefined, repeat_days: calDays.length > 0 ? calDays : undefined, is_trial: calTrial }),
+        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, assigned_member: calMember.trim() || null, repeat_count: calRepeat > 1 ? calRepeat : undefined, repeat_days: calDays.length > 0 ? calDays : undefined, is_trial: calTrial }),
       });
       setCalSuccess(true);
       setTimeout(() => { setShowCalModal(false); setCalSuccess(false); }, 1200);
@@ -763,6 +764,10 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                     <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>END</label>
                     <input type="time" value={calEnd} onChange={e => setCalEnd(e.target.value)} className={calInputCls} />
                   </div>
+                </div>
+                <div>
+                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>ASSIGNED MEMBER</label>
+                  <input type="text" value={calMember} onChange={e => setCalMember(e.target.value)} placeholder="e.g. Priya, Rahul..." className={calInputCls} />
                 </div>
                 <div>
                   <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>

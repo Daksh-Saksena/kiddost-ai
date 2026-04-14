@@ -1920,14 +1920,14 @@ app.post('/calendar/ai-command', async (req, res) => {
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
-    const cal14 = [];
-    for (let i = 0; i < 14; i++) {
+    const cal60 = [];
+    for (let i = 0; i < 60; i++) {
       const d = new Date(now); d.setDate(now.getDate() + i);
-      cal14.push(`${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toISOString().split('T')[0]}`);
+      cal60.push(`${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toISOString().split('T')[0]}`);
     }
 
     const eventList = (allEvents || []).map(e =>
-      `ID:${e.id} | "${e.title}" | ${e.date} ${e.start_time || ''}-${e.end_time || ''} | phone:${e.phone || 'N/A'} | notes:${e.notes || ''}`
+      `ID:${e.id} | "${e.title}" | ${e.date} ${e.start_time || ''}-${e.end_time || ''} | phone:${e.phone || 'N/A'} | member:${e.assigned_member || 'unassigned'} | trial:${e.is_trial ? 'yes' : 'no'} | notes:${e.notes || ''}`
     ).join('\n');
 
     const aiRes = await axios.post('https://api.openai.com/v1/chat/completions', {
@@ -1936,7 +1936,7 @@ app.post('/calendar/ai-command', async (req, res) => {
         {
           role: 'system',
           content: `You are a calendar assistant. TODAY is ${todayStr} (${now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).
-UPCOMING 14 DAYS:\n${cal14.join('\n')}
+UPCOMING 60 DAYS:\n${cal60.join('\n')}
 
 CURRENT CALENDAR EVENTS:\n${eventList || '(no events)'}
 
@@ -1944,15 +1944,19 @@ The user will give you a natural language command about the calendar. You must r
 {
   "actions": [
     { "type": "delete", "id": "<event UUID>" },
-    { "type": "create", "title": "...", "date": "YYYY-MM-DD", "start_time": "HH:MM" or null, "end_time": "HH:MM" or null, "phone": "..." or null, "notes": "..." or null, "is_trial": true/false }
+    { "type": "create", "title": "...", "date": "YYYY-MM-DD", "start_time": "HH:MM" or null, "end_time": "HH:MM" or null, "phone": "..." or null, "assigned_member": "..." or null, "notes": "..." or null, "is_trial": true/false },
+    { "type": "update", "id": "<event UUID>", "fields": { "title": "...", "date": "YYYY-MM-DD", "start_time": "HH:MM", "end_time": "HH:MM", "assigned_member": "...", "notes": "...", "is_trial": true/false } }
   ],
-  "summary": "Short human-readable summary of what you did, e.g. 'Created 4 weekly sessions for Aarav every Sunday in April'"
+  "summary": "Short human-readable summary of what you did or the answer to the user's question"
 }
 Rules:
 - Match event titles/names loosely (case-insensitive, partial match is fine).
 - For "remove all sessions of X" → delete all events whose title contains X.
 - For "move X to Y" → delete old + create new.
 - For "add session for X on Sunday at 3pm" → create with the correct date from the calendar above.
+- UPDATE: For "change X's time to 4pm", "assign Priya to session X", "update notes for X" → use type "update" with only the fields that changed in "fields".
+  You can bulk-update: "assign Rahul to all sessions of X" → multiple update actions.
+- QUERIES: For questions like "show all sessions on Thursday", "who handles X", "how many sessions does Priya have", "list all trials" → return actions: [] and put the answer in "summary". Be detailed and list relevant events with dates, times, members.
 - RECURRING / REPEATING: When the user says "weekly", "every Sunday", "for a month", "for 3 months", etc., create MULTIPLE individual create actions — one for each week:
   • "for a month" or "monthly" = 4 weekly sessions
   • "for 2 months" = 8 weekly sessions
@@ -1971,7 +1975,7 @@ Rules:
 
     const parsed = JSON.parse(aiRes.data.choices[0].message.content);
     const actions = parsed.actions || [];
-    let deleted = 0, created = 0;
+    let deleted = 0, created = 0, updated = 0;
 
     for (const action of actions) {
       if (action.type === 'delete' && action.id) {
@@ -1986,16 +1990,28 @@ Rules:
           phone: action.phone || null,
           notes: action.notes || null,
           is_trial: action.is_trial === true,
+          assigned_member: action.assigned_member || null,
           created_by: 'AI Command',
         });
         if (!error) created++;
+      } else if (action.type === 'update' && action.id && action.fields) {
+        const allowedFields = ['title', 'date', 'start_time', 'end_time', 'phone', 'notes', 'is_trial', 'assigned_member'];
+        const updateData = {};
+        for (const key of allowedFields) {
+          if (action.fields[key] !== undefined) updateData[key] = action.fields[key];
+        }
+        if (Object.keys(updateData).length > 0) {
+          const { error } = await supabase.from('calendar_events').update(updateData).eq('id', action.id);
+          if (!error) updated++;
+        }
       }
     }
 
     return res.json({
-      summary: parsed.summary || `Done: ${deleted} deleted, ${created} created`,
+      summary: parsed.summary || `Done: ${deleted} deleted, ${created} created, ${updated} updated`,
       deleted,
       created,
+      updated,
       totalActions: actions.length,
     });
   } catch (e) {

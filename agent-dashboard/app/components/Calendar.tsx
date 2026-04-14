@@ -196,7 +196,9 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
       setAiResult(json.summary || json.error || "Done");
       setAiCmd("");
       fetchEvents();
-      setTimeout(() => setAiResult(null), 4000);
+      // Query-only responses (no actions) stay visible longer
+      const isQuery = !json.deleted && !json.created && !json.updated;
+      setTimeout(() => setAiResult(null), isQuery ? 12000 : 4000);
     } catch {
       setAiResult("Something went wrong");
       setTimeout(() => setAiResult(null), 3000);
@@ -353,8 +355,12 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
       {/* AI Command Bar */}
       <div className={`px-3 py-2 border-t ${border} ${isDarkMode ? "bg-gray-950" : "bg-white"}`}>
         {aiResult && (
-          <div className={`mb-2 px-3 py-2 rounded-xl text-xs font-medium ${isDarkMode ? "bg-blue-900/30 text-blue-300" : "bg-green-50 text-green-700"}`}>
-            <Sparkles className="w-3 h-3 inline mr-1.5" />{aiResult}
+          <div className={`mb-2 px-3 py-2 rounded-xl text-xs font-medium whitespace-pre-wrap max-h-40 overflow-y-auto ${isDarkMode ? "bg-blue-900/30 text-blue-300" : "bg-green-50 text-green-700"}`}>
+            <div className="flex items-start gap-1.5">
+              <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              <span className="flex-1">{aiResult}</span>
+              <button onClick={() => setAiResult(null)} className="opacity-50 hover:opacity-100 flex-shrink-0 ml-1">&times;</button>
+            </div>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -364,7 +370,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             value={aiCmd}
             onChange={e => setAiCmd(e.target.value)}
             onKeyDown={e => e.key === "Enter" && runAiCommand()}
-            placeholder={aiRunning ? "Thinking..." : "AI: \"remove all sessions of Aarav\"..."}
+            placeholder={aiRunning ? "Thinking..." : "AI: create, edit, query sessions..."}
             disabled={aiRunning}
             className={`flex-1 rounded-full px-4 py-2.5 text-sm outline-none transition-all ${isDarkMode ? "bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500" : "bg-gray-100 border border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-[#008069]"}`}
           />
