@@ -506,13 +506,24 @@ TIME SLOT REQUEST:
 - Do NOT fabricate availability confirmations. You cannot actually check calendars. A human agent will respond once they have checked.
 - If the conversation history shows you already said "allow me to check the slot availability" and no human agent has confirmed yet, reply UNSURE.
 
-NEW SESSION / LOCATION:
-- When it is time to check if their area is serviceable, ask them to share their location.
-- Once the user shares their location (text address, pin, or map link), say EXACTLY: "Sure, let me check if your area is serviceable and get back to you."
-- CRITICAL: The UNSURE rule ONLY activates after you have sent this EXACT serviceability message. NOT before.
-- After you have said "let me check if your area is serviceable", you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
-- Do NOT fabricate serviceability confirmations. You cannot actually check locations. A human agent will respond once they have verified.
-- If the conversation history shows you already said "let me check if your area is serviceable" and no human agent has confirmed yet, reply UNSURE.
+LOCATION / SERVICEABILITY:
+We operate in Bangalore only with 3 service hubs. If the user asks "do you service in X?" or shares their location during booking, check against these hubs:
+
+HUB 1 — East Bangalore (Marathahalli hub, 6 km radius):
+  Serviceable areas: Marathahalli, Whitefield, ITPL, Brookefield, Kundalahalli, Varthur, Bellandur, Kadubeesanahalli, Doddanekundi, Hagadur, Hoodi, Kadugodi, Mahadevapura, HAL, Old Airport Road, Yemalur, Cessna Business Park area, Outer Ring Road (ORR) east stretch.
+
+HUB 2 — Central/South Bangalore (Jayanagar hub, 10 km radius):
+  Serviceable areas: Jayanagar, Basavanagudi, JP Nagar, BTM Layout, HSR Layout, Koramangala, Banashankari, Rajajinagar, Malleshwaram, Sadashivanagar, Vijayanagar, Basaveshwaranagar, Majestic, Yeshwanthpur, RT Nagar, Wilson Garden, Richmond Town, Indiranagar, Domlur, Ulsoor, MG Road, Brigade Road, Shivajinagar, Frazer Town, Cox Town, Chamrajpet, Hanumanthanagar, Kumaraswamy Layout, Padmanabhanagar.
+
+HUB 3 — Electronic City (3 km radius):
+  Serviceable areas: Electronic City Phase 1, Electronic City Phase 2, Neeladri Nagar, Doddathogur, Konappana Agrahara, Huskur.
+
+RULES:
+- If the user's area clearly matches one of the serviceable areas above → confirm immediately: "Yes, we do service in [area]! 😊" and continue the conversation normally.
+- If the user says a Bangalore area NOT in the list, or you are unsure → say EXACTLY: "Let me check if we can service your area and get back to you." Then STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE.
+- If the user says a city other than Bangalore → politely say: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
+- During the BEFORE BOOKING flow, after collecting child name / parent name / preferred time, also ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
+- Do NOT fabricate serviceability for areas you are unsure about. When in doubt, defer to the human agent.
 ---
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
@@ -633,9 +644,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       /check.*availability.*come back/i,
       /get back to you/i,
       /come back to you/i,
-      /share.*location/i,
-      /your location.*confirm/i,
-      /check.*(?:area|location).*serviceable/i,
+      /check.*(?:area|location).*service/i,
       /best options for your children/i,
     ];
     const needsHuman = NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
@@ -1635,13 +1644,24 @@ TIME SLOT REQUEST:
 - Do NOT fabricate availability confirmations. You cannot actually check calendars. A human agent will respond once they have checked.
 - If the conversation history shows you already said "allow me to check the slot availability" and no human agent has confirmed yet, reply UNSURE.
 
-NEW SESSION / LOCATION:
-- When it is time to check if their area is serviceable, ask them to share their location.
-- Once the user shares their location (text address, pin, or map link), say EXACTLY: "Sure, let me check if your area is serviceable and get back to you."
-- CRITICAL: The UNSURE rule ONLY activates after you have sent this EXACT serviceability message. NOT before.
-- After you have said "let me check if your area is serviceable", you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
-- Do NOT fabricate serviceability confirmations. You cannot actually check locations. A human agent will respond once they have verified.
-- If the conversation history shows you already said "let me check if your area is serviceable" and no human agent has confirmed yet, reply UNSURE.
+LOCATION / SERVICEABILITY:
+We operate in Bangalore only with 3 service hubs. If the user asks "do you service in X?" or shares their location during booking, check against these hubs:
+
+HUB 1 — East Bangalore (Marathahalli hub, 6 km radius):
+  Serviceable areas: Marathahalli, Whitefield, ITPL, Brookefield, Kundalahalli, Varthur, Bellandur, Kadubeesanahalli, Doddanekundi, Hagadur, Hoodi, Kadugodi, Mahadevapura, HAL, Old Airport Road, Yemalur, Cessna Business Park area, Outer Ring Road (ORR) east stretch.
+
+HUB 2 — Central/South Bangalore (Jayanagar hub, 10 km radius):
+  Serviceable areas: Jayanagar, Basavanagudi, JP Nagar, BTM Layout, HSR Layout, Koramangala, Banashankari, Rajajinagar, Malleshwaram, Sadashivanagar, Vijayanagar, Basaveshwaranagar, Majestic, Yeshwanthpur, RT Nagar, Wilson Garden, Richmond Town, Indiranagar, Domlur, Ulsoor, MG Road, Brigade Road, Shivajinagar, Frazer Town, Cox Town, Chamrajpet, Hanumanthanagar, Kumaraswamy Layout, Padmanabhanagar.
+
+HUB 3 — Electronic City (3 km radius):
+  Serviceable areas: Electronic City Phase 1, Electronic City Phase 2, Neeladri Nagar, Doddathogur, Konappana Agrahara, Huskur.
+
+RULES:
+- If the user's area clearly matches one of the serviceable areas above → confirm immediately: "Yes, we do service in [area]! 😊" and continue the conversation normally.
+- If the user says a Bangalore area NOT in the list, or you are unsure → say EXACTLY: "Let me check if we can service your area and get back to you." Then STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE.
+- If the user says a city other than Bangalore → politely say: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
+- During the BEFORE BOOKING flow, after collecting child name / parent name / preferred time, also ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
+- Do NOT fabricate serviceability for areas you are unsure about. When in doubt, defer to the human agent.
 ---
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
