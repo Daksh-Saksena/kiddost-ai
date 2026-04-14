@@ -352,6 +352,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         setCalEnd(ex.endTime || ex.end_time || '');
         setCalNotes(ex.notes || '');
         setCalTrial(ex.isTrial === true);
+        if (ex.repeatCount && ex.repeatCount > 1) setCalRepeat(ex.repeatCount);
       } else {
         setCalTitle('KidDost Session');
         setCalDate(new Date().toISOString().split('T')[0]);

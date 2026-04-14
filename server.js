@@ -1693,6 +1693,7 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-6 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
+- "repeatCount": number of weekly sessions. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1.
 - "notes": any extra details like location, special instructions
 Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
             })()
