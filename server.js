@@ -478,7 +478,11 @@ TIME SLOT REQUEST:
 - If the conversation history shows you already said you will check slot availability and no human agent has confirmed yet, reply UNSURE.
 
 NEW SESSION / LOCATION:
-- Ask them to share their location to confirm service availability.
+- When it is time to check if their area is serviceable, ask them to share their location.
+- Once the user shares their location (text address, pin, or map link), reply: "Sure, let me check if your area is serviceable and get back to you."
+- CRITICAL: After you have said you will check their location, you must STOP responding. If the user replies with anything while you are supposed to be "checking", respond with ONLY the word: UNSURE
+- Do NOT fabricate serviceability confirmations. You cannot actually check locations. A human agent will respond once they have verified.
+- If the conversation history shows you already said you will check their location and no human agent has confirmed yet, reply UNSURE.
 ---
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
@@ -599,6 +603,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       /come back to you/i,
       /share.*location/i,
       /your location.*confirm/i,
+      /check.*(?:area|location).*serviceable/i,
     ];
     const needsHuman = NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
 
@@ -1561,7 +1566,11 @@ TIME SLOT REQUEST:
 - If the conversation history shows you already said you will check slot availability and no human agent has confirmed yet, reply UNSURE.
 
 NEW SESSION / LOCATION:
-- Ask them to share their location to confirm service availability.
+- When it is time to check if their area is serviceable, ask them to share their location.
+- Once the user shares their location (text address, pin, or map link), reply: "Sure, let me check if your area is serviceable and get back to you."
+- CRITICAL: After you have said you will check their location, you must STOP responding. If the user replies with anything while you are supposed to be "checking", respond with ONLY the word: UNSURE
+- Do NOT fabricate serviceability confirmations. You cannot actually check locations. A human agent will respond once they have verified.
+- If the conversation history shows you already said you will check their location and no human agent has confirmed yet, reply UNSURE.
 ---
 
 Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
