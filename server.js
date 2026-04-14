@@ -1825,16 +1825,23 @@ app.post('/calendar/events', async (req, res) => {
       const baseDate = new Date(date + 'T00:00:00');
       const baseDay = baseDate.getDay();
       const totalSessions = weeks; // weeks var is actually total sessions
+
+      // Sort days by offset from baseDay so events are created chronologically
+      const sortedDays = [...days].sort((a, b) => {
+        const offA = ((a - baseDay) % 7 + 7) % 7;
+        const offB = ((b - baseDay) % 7 + 7) % 7;
+        return offA - offB;
+      });
+
       let eventNum = 0;
       let w = 0;
       while (eventNum < totalSessions) {
-        for (const dayNum of days) {
+        for (const dayNum of sortedDays) {
           if (eventNum >= totalSessions) break;
-          let offset = dayNum - baseDay;
-          if (w === 0 && offset < 0) offset += 7;
+          // Always-positive offset: days after baseDay in the same week cycle
+          const offset = ((dayNum - baseDay) % 7 + 7) % 7;
           const d = new Date(baseDate);
           d.setDate(baseDate.getDate() + w * 7 + offset);
-          if (d < baseDate && w === 0) continue;
           eventNum++;
           rows.push({
             phone: phone || null,
