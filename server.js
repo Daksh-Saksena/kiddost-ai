@@ -1666,6 +1666,8 @@ app.post('/calendar/extract', async (req, res) => {
       return `${label}: ${m.content}`;
     }).join('\n');
 
+    console.log('[extract] phone:', phone, 'msgs:', msgs.length, 'chatText:', chatText.slice(0, 500));
+
     const aiRes = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
@@ -1704,6 +1706,7 @@ Extract if a session/booking/appointment is being discussed, requested, or confi
     );
 
     const extracted = JSON.parse(aiRes.data.choices[0].message.content);
+    console.log('[extract] GPT raw:', aiRes.data.choices[0].message.content);
     return res.json({ extracted, chatSnippet: chatText.slice(0, 300) });
   } catch (e) {
     console.error('/calendar/extract error', e?.message || e);
