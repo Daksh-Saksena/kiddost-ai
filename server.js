@@ -1749,23 +1749,28 @@ app.post('/calendar/extract', async (req, res) => {
             content: (() => {
               const now = new Date();
               const cal = [];
-              for (let i = 0; i < 14; i++) {
+              for (let i = 0; i < 60; i++) {
                 const d = new Date(now); d.setDate(now.getDate() + i);
                 cal.push(`${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toISOString().split('T')[0]}`);
               }
               return `You extract confirmed session booking details from a WhatsApp conversation.
 TODAY is ${now.toISOString().split('T')[0]} (${now.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}).
-UPCOMING CALENDAR (next 14 days):
+UPCOMING CALENDAR (next 60 days):
 ${cal.join('\n')}
-Use this calendar to resolve day names like "Sunday", "this Friday", "next Wednesday" to the correct YYYY-MM-DD date.
+Use this calendar to resolve day names like "Sunday", "this Friday", "next Wednesday", "from next month", "starting May" to the correct YYYY-MM-DD date.
 Return ONLY valid JSON with these fields (use null if not found):
 - "title": short session title, e.g. "KidDost Session" or include child name if mentioned
-- "date": ISO date string YYYY-MM-DD. When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year. When "tomorrow" is mentioned, use tomorrow's date. When a weekday name is mentioned, pick the NEAREST UPCOMING match from the calendar above.
+- "date": ISO date string YYYY-MM-DD — the START date for the recurring series. This is the date of the FIRST session occurrence.
+  * When "from next month" or "starting [month]" is mentioned, set date to the 1st of that month (or the first matching weekday in that month if repeatDays are given).
+  * When a weekday name is mentioned (e.g. "every Thursday"), pick the NEAREST UPCOMING match from the calendar above.
+  * When only a day number is mentioned (e.g. "10th"), assume the CURRENT month and year.
+  * When "tomorrow" is mentioned, use tomorrow's date.
+  * IMPORTANT: If repeatDays is set, date MUST be set to the first occurrence of the earliest repeat day. NEVER return null for date when repeatDays has values.
 - "startTime": HH:MM in 24h format
-- "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-6 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
+- "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-8 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
 - "repeatCount": number of weeks to repeat. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1.
-- "repeatDays": array of JS day numbers (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday) for which days the session repeats. E.g. "every Tuesday and Thursday" → [2, 4]. "Monday, Wednesday, Friday" → [1, 3, 5]. If only one day is mentioned or no specific days, return null.
+- "repeatDays": array of JS day numbers (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday) for which days the session repeats. E.g. "every Tuesday and Thursday" → [2, 4]. "Friday Saturday" → [5, 6]. "Monday, Wednesday, Friday" → [1, 3, 5]. If only one day is mentioned or no specific days, return null.
 - "notes": any extra details like location, special instructions
 Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
             })()
