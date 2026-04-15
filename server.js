@@ -208,15 +208,72 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Resolve Google Maps short-URLs (maps.app.goo.gl, goo.gl/maps) → lat,lng
+async function resolveGoogleMapsUrl(shortUrl) {
+  try {
+    // Follow redirects to get the expanded URL
+    const resp = await axios.get(shortUrl, { maxRedirects: 5, timeout: 8000 });
+    const finalUrl = resp.request?.res?.responseUrl || resp.request?._redirectable?._currentUrl || shortUrl;
+    console.log('[Maps URL] expanded:', finalUrl);
+    // Try to extract @lat,lng from the expanded URL
+    const atMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    // Try !3d...!4d... format
+    const dMatch = finalUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+    if (dMatch) return { lat: parseFloat(dMatch[1]), lng: parseFloat(dMatch[2]) };
+    // Try query param q=lat,lng
+    const qMatch = finalUrl.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    // Try place/ path
+    const placeMatch = finalUrl.match(/\/place\/([^/@]+)/);
+    if (placeMatch) return { placeName: decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ') };
+    return null;
+  } catch (e) {
+    console.error('[Maps URL] resolve error:', e.message);
+    return null;
+  }
+}
+
 async function checkLocationServiceability(locationText) {
   if (!GOOGLE_MAPS_API_KEY) return null; // no API key, skip
   try {
-    const query = encodeURIComponent(locationText + ', Bangalore, India');
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${GOOGLE_MAPS_API_KEY}`;
-    const res = await axios.get(url);
-    if (!res.data.results || res.data.results.length === 0) return null;
-    const { lat, lng } = res.data.results[0].geometry.location;
-    const formattedAddress = res.data.results[0].formatted_address;
+    let lat, lng, formattedAddress;
+
+    // Check if locationText is a Google Maps URL
+    const mapsUrlMatch = locationText.match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)\S+/i);
+    if (mapsUrlMatch) {
+      const resolved = await resolveGoogleMapsUrl(mapsUrlMatch[0]);
+      if (resolved?.lat && resolved?.lng) {
+        lat = resolved.lat;
+        lng = resolved.lng;
+        // Reverse-geocode to get a readable address
+        const revUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
+        const revRes = await axios.get(revUrl);
+        formattedAddress = revRes.data.results?.[0]?.formatted_address || `${lat}, ${lng}`;
+        console.log(`[Location Check] Maps URL resolved → ${lat},${lng} (${formattedAddress})`);
+      } else if (resolved?.placeName) {
+        // Fell back to place name extraction — forward-geocode it
+        const query = encodeURIComponent(resolved.placeName + ', Bangalore, India');
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${GOOGLE_MAPS_API_KEY}`;
+        const res = await axios.get(url);
+        if (!res.data.results?.length) return null;
+        lat = res.data.results[0].geometry.location.lat;
+        lng = res.data.results[0].geometry.location.lng;
+        formattedAddress = res.data.results[0].formatted_address;
+      } else {
+        console.log('[Location Check] Could not resolve Google Maps URL');
+        return null;
+      }
+    } else {
+      // Standard text-based geocoding
+      const query = encodeURIComponent(locationText + ', Bangalore, India');
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${GOOGLE_MAPS_API_KEY}`;
+      const res = await axios.get(url);
+      if (!res.data.results || res.data.results.length === 0) return null;
+      lat = res.data.results[0].geometry.location.lat;
+      lng = res.data.results[0].geometry.location.lng;
+      formattedAddress = res.data.results[0].formatted_address;
+    }
 
     // Check against each hub
     let nearest = null;
@@ -341,7 +398,7 @@ Return ONLY valid JSON with these fields:
 - "notes": an object of important facts/details about the customer mentioned ANYWHERE in the conversation. Extract things like:
   • "parentName": mother's/father's name if mentioned
   • "spouseName": husband/wife name if mentioned
-  • "location": area, locality, address if mentioned
+  • "location": area, locality, address if mentioned (extract the PLACE NAME, not a URL — if user only shares a link, skip this field)
   • "school": child's school if mentioned
   • "preferences": any specific preferences for sessions (e.g. "only weekends", "no art")
   • "allergies": any allergies or health concerns
@@ -466,9 +523,9 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       if (!evErr && pastEvents && pastEvents.length > 0) {
         const totalSessions = pastEvents.length;
         const trialDone = pastEvents.some(e => e.is_trial);
-        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Trial session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer a trial again. Focus on scheduling regular sessions.`;
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Introductory session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer an introductory session again. Focus on scheduling regular sessions.`;
       } else {
-        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer — their first session will be a TRIAL session.\nWhen discussing booking/scheduling, proactively mention that as it is their first session, it will be a trial session. Share these trial details naturally:\n  • Duration: 1 hour\n  • Cost: Rs 500\n  • Purpose: for the child and the KidDost member to get comfortable with each other\n  • No commitment — they can decide after the trial if they want to continue\n  • They can pick a convenient date and time`;
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer — their first session will be an INTRODUCTORY session.\nWhen discussing booking/scheduling, proactively mention that as it is their first session, it will be an introductory session. Share these details naturally:\n  • Duration: 1 hour\n  • Cost: Rs 500\n  • Purpose: for the child and the KidDost member to get comfortable with each other\n  • No commitment — they can decide after the introductory session if they want to continue\n  • They can pick a convenient date and time`;
       }
     } catch (e) {
       console.log('[session-check] failed:', e.message);
@@ -499,7 +556,7 @@ CRITICAL RULES:
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
 - NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the full history before responding.
-- NEVER repeat information you have already given. If you already shared activities, pricing, or trial details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
+- NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - Only include "Feel free to let us know if you have any questions." when you are finishing a substantial info block (pricing/activities). Do NOT add it to every single message.
 
 IMPORTANT — if you are unsure or do not have enough information to answer confidently:
@@ -523,7 +580,7 @@ PRICING / SERVICES / QUOTATION:
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: mention the trial session at ₹500/hour.
+  • If they asked about full pricing/services: mention the introductory session at ₹500/hour.
   • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
@@ -533,7 +590,8 @@ PRICING / SERVICES / QUOTATION:
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 - Ask child's age, give age-appropriate activities, then write [PRICING_IMAGE], then clarify: we don't provide nanny services — team members are female graduates/students, English interaction.
 
-MONTHLY PACKAGES (only when user asks about packages/monthly plans):
+VALUE PACKAGES (only when user asks about packages/plans/bundles):
+- IMPORTANT: We call them "value packages", NOT "monthly packages".
 - Write [MONTH_IMAGE] on its own line, then explain the package flexibility (bundle of sessions, discounted rate, can be used over 1–3 months).
 - End with "Feel free to let us know if you have any questions."
 
@@ -544,7 +602,7 @@ SAME MEMBER EVERY TIME:
 - We keep 2–3 members per account for continuity, accounting for short and long leaves.
 
 SAFETY / BACKGROUND CHECKS:
-- Safety is our top priority. All team members undergo thorough background checks, including police verification, to ensure a safe and trustworthy environment for your child.
+- Reply UNSURE. Do not answer safety or background check questions yourself — let a human agent handle this.
 
 OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 - This is NOT about activities or pricing. Do NOT re-share activities or ask for age.
@@ -554,9 +612,10 @@ TOO EXPENSIVE / OUT OF BUDGET:
 - Thank them for considering, invite them to reach out for ad-hoc support.
 
 BUSINESS HOURS:
-- Our human agents are available between 9 AM and 8 PM IST.
-- If the CURRENT TIME is before 9 AM or after 8 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9 AM and 8 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- We are operational from 9:30 AM to 7:45 PM IST.
+- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
 - If the CURRENT TIME is within business hours, follow the normal flow below.
+- IMPORTANT: When the customer requests a time slot for a session, NEVER suggest or accept times outside our operational hours (9:30 AM – 7:45 PM). If they ask for a slot outside this range (e.g. 7 AM, 8 PM), politely let them know: "Our sessions are available between 9:30 AM and 7:45 PM. Could we find a slot within that window?"
 
 BEFORE BOOKING:
 - Before proceeding to check slot availability, you MUST gather ALL of the following:
@@ -593,7 +652,7 @@ The system automatically geocodes the user's location and injects a LOCATION VER
 - Do NOT fabricate serviceability. Only confirm when you see a LOCATION VERIFIED ✅ system message.
 ---
 
-Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
+Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session.` +
           (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           varsBlock +
           sessionStatusBlock +
@@ -605,25 +664,34 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     // ── Location serviceability check (geocoding) ────────────────────────
     // Detect if user is asking about location/area and inject verified result
-    const locationPatterns = [
-      /(?:do you|can you|are you).*(?:service|serve|cover|come to|operate|available)\s+(?:in|at|near|around)\s+(.+)/i,
-      /(?:service|serve|cover|available).*(?:in|at|near)\s+(.+)/i,
-      /(?:we are|we're|i am|i'm|i live|we live|located|staying|stay)\s+(?:in|at|near|around)\s+(.+)/i,
-      /(?:my (?:area|location|place|locality|address) is|i'm from|we're from)\s+(.+)/i,
-      /(?:our (?:area|location|place|locality|address) is)\s+(.+)/i,
-      /(?:what about|how about)\s+(.+?)(?:\s*\?|$)/i,
-    ];
+    // First check if the message contains a Google Maps URL
+    const mapsUrlInMsg = combinedMessage.match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)\S+/i);
     let locationCheckResult = null;
-    for (const pat of locationPatterns) {
-      const m = combinedMessage.match(pat);
-      if (m && m[1]) {
-        const locationText = m[1].replace(/[?.!]+$/, '').trim();
-        if (locationText.length >= 3 && locationText.length <= 100) {
-          locationCheckResult = await checkLocationServiceability(locationText);
-          if (locationCheckResult) {
-            console.log(`[Location Check] "${locationText}" → ${JSON.stringify(locationCheckResult)}`);
+    if (mapsUrlInMsg) {
+      locationCheckResult = await checkLocationServiceability(mapsUrlInMsg[0]);
+      if (locationCheckResult) {
+        console.log(`[Location Check] Maps URL → ${JSON.stringify(locationCheckResult)}`);
+      }
+    } else {
+      const locationPatterns = [
+        /(?:do you|can you|are you).*(?:service|serve|cover|come to|operate|available)\s+(?:in|at|near|around)\s+(.+)/i,
+        /(?:service|serve|cover|available).*(?:in|at|near)\s+(.+)/i,
+        /(?:we are|we're|i am|i'm|i live|we live|located|staying|stay)\s+(?:in|at|near|around)\s+(.+)/i,
+        /(?:my (?:area|location|place|locality|address) is|i'm from|we're from)\s+(.+)/i,
+        /(?:our (?:area|location|place|locality|address) is)\s+(.+)/i,
+        /(?:what about|how about)\s+(.+?)(?:\s*\?|$)/i,
+      ];
+      for (const pat of locationPatterns) {
+        const m = combinedMessage.match(pat);
+        if (m && m[1]) {
+          const locationText = m[1].replace(/[?.!]+$/, '').trim();
+          if (locationText.length >= 3 && locationText.length <= 100) {
+            locationCheckResult = await checkLocationServiceability(locationText);
+            if (locationCheckResult) {
+              console.log(`[Location Check] "${locationText}" → ${JSON.stringify(locationCheckResult)}`);
+            }
+            break;
           }
-          break;
         }
       }
     }
@@ -1659,7 +1727,7 @@ CRITICAL RULES:
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
 - NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the full history before responding.
-- NEVER repeat information you have already given. If you already shared activities, pricing, or trial details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
+- NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - Only include "Feel free to let us know if you have any questions." when you are finishing a substantial info block (pricing/activities). Do NOT add it to every single message.
 
 IMPORTANT — if you are unsure or do not have enough information to answer confidently:
@@ -1683,7 +1751,7 @@ PRICING / SERVICES / QUOTATION:
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: mention the trial session at ₹500/hour.
+  • If they asked about full pricing/services: mention the introductory session at ₹500/hour.
   • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
@@ -1693,7 +1761,8 @@ PRICING / SERVICES / QUOTATION:
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 - Ask child's age, give age-appropriate activities, then write [PRICING_IMAGE], then clarify: we don't provide nanny services — team members are female graduates/students, English interaction.
 
-MONTHLY PACKAGES (only when user asks about packages/monthly plans):
+VALUE PACKAGES (only when user asks about packages/plans/bundles):
+- IMPORTANT: We call them "value packages", NOT "monthly packages".
 - Write [MONTH_IMAGE] on its own line, then explain the package flexibility (bundle of sessions, discounted rate, can be used over 1–3 months).
 - End with "Feel free to let us know if you have any questions."
 
@@ -1704,7 +1773,7 @@ SAME MEMBER EVERY TIME:
 - We keep 2–3 members per account for continuity, accounting for short and long leaves.
 
 SAFETY / BACKGROUND CHECKS:
-- Safety is our top priority. All team members undergo thorough background checks, including police verification, to ensure a safe and trustworthy environment for your child.
+- Reply UNSURE. Do not answer safety or background check questions yourself — let a human agent handle this.
 
 OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 - This is NOT about activities or pricing. Do NOT re-share activities or ask for age.
@@ -1714,9 +1783,10 @@ TOO EXPENSIVE / OUT OF BUDGET:
 - Thank them for considering, invite them to reach out for ad-hoc support.
 
 BUSINESS HOURS:
-- Our human agents are available between 9 AM and 8 PM IST.
-- If the CURRENT TIME is before 9 AM or after 8 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9 AM and 8 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- We are operational from 9:30 AM to 7:45 PM IST.
+- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
 - If the CURRENT TIME is within business hours, follow the normal flow below.
+- IMPORTANT: When the customer requests a time slot for a session, NEVER suggest or accept times outside our operational hours (9:30 AM – 7:45 PM). If they ask for a slot outside this range (e.g. 7 AM, 8 PM), politely let them know: "Our sessions are available between 9:30 AM and 7:45 PM. Could we find a slot within that window?"
 
 BEFORE BOOKING:
 - Before proceeding to check slot availability, you MUST gather ALL of the following:
@@ -1753,7 +1823,7 @@ The system automatically geocodes the user's location and injects a LOCATION VER
 - Do NOT fabricate serviceability. Only confirm when you see a LOCATION VERIFIED ✅ system message.
 ---
 
-Goal: Make the user feel like they are chatting with a real human agent and move them towards booking a trial session.` +
+Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session.` +
       (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
       exampleBlock;
 
@@ -1878,7 +1948,7 @@ Return ONLY valid JSON with these fields (use null if not found):
 - "startTime": HH:MM in 24h format
 - "endTime": HH:MM in 24h format. IMPORTANT: If TWO times are mentioned (e.g. "3 PM to 6 PM", "between 3 and 6 PM", "5-8 PM"), the first is startTime and the second is endTime — do NOT default to 1 hour. Only assume 1 hour after start if NO end time is mentioned at all.
 - "isTrial": true if this appears to be a TRIAL/demo/first/introductory session, false otherwise. Look for words like "trial", "demo", "free session", "intro", "first session", "try", etc.
-- "repeatCount": TOTAL number of sessions. If the conversation mentions a monthly package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard monthly package is 11 sessions total). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1. NOTE: this is total sessions, NOT weeks — e.g. if sessions are Thursday and Sunday, 11 means roughly 5–6 weeks with 11 sessions total across both days.
+- "repeatCount": TOTAL number of sessions. If the conversation mentions a value package, recurring sessions, group package, or regular weekly sessions, set this to 11 (our standard value package is 11 sessions total). If they say "for a month" or "monthly", use 11. If a specific number of sessions is mentioned, use that number. If it's just a single one-off session, use 1. NOTE: this is total sessions, NOT weeks — e.g. if sessions are Thursday and Sunday, 11 means roughly 5–6 weeks with 11 sessions total across both days.
 - "repeatDays": array of JS day numbers (0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday) for which days the session repeats. E.g. "every Tuesday and Thursday" → [2, 4]. "Friday Saturday" → [5, 6]. "Monday, Wednesday, Friday" → [1, 3, 5]. If only one day is mentioned or no specific days, return null.
 - "notes": any extra details like location, special instructions
 Extract if a session/booking/appointment is being discussed, requested, or confirmed — even if still tentative. Look for any mention of dates, times, or booking intent. Only return {"title":null} if there is absolutely no mention of any session or booking.`;
