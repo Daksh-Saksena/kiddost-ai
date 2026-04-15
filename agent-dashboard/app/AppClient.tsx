@@ -482,8 +482,8 @@ export default function AppClient() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
-          console.log('realtime:', msg.phone, msg.content?.slice(0, 30));
           const msg = payload.new;
+          console.log('realtime:', msg.phone, msg.content?.slice(0, 30));
           if (msg.phone === selectedChat) {
             const mapped = {
               id: String(msg.id || msg.created_at),
