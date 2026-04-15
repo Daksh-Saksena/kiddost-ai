@@ -38,6 +38,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [templateVars, setTemplateVars] = useState<string[]>([]);
   const [templateSending, setTemplateSending] = useState(false);
   const [manualTemplateId, setManualTemplateId] = useState('');
+  const [customerVars, setCustomerVars] = useState<{ children?: any[]; notes?: Record<string, string> } | null>(null);
 
   const SERVER = 'https://kiddost-ai.onrender.com';
 
@@ -106,7 +107,19 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     setShowInfo(false);
     setLabels(initialLabels || []);
     setLabelInput('');
+    setCustomerVars(null);
   }, [chatId]);
+
+  // Fetch conversation vars when info panel opens
+  useEffect(() => {
+    if (!showInfo) return;
+    const cleanPhone = chatId.startsWith('+') ? chatId : `+${chatId}`;
+    supabase.from('conversations').select('vars').eq('phone', cleanPhone).single()
+      .then(({ data }) => {
+        setCustomerVars(data?.vars || {});
+      });
+  }, [showInfo, chatId]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const prevLengthRef = useRef(0);
@@ -523,6 +536,40 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                 >Add</button>
               </div>
             </div>
+            {/* AI-extracted customer facts */}
+            {customerVars && (
+              <div>
+                <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>AI-EXTRACTED FACTS</label>
+                {(!customerVars.children?.length && !Object.keys(customerVars.notes || {}).length) ? (
+                  <p className={`text-xs italic ${ isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>No facts extracted yet</p>
+                ) : (
+                  <div className={`rounded-xl px-4 py-3 text-sm space-y-2 ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30' : 'bg-gray-50 border border-gray-200'}`}>
+                    {customerVars.children && customerVars.children.length > 0 && (
+                      <div>
+                        <span className={`text-xs font-medium ${ isDarkMode ? 'text-blue-300' : 'text-green-700'}`}>Children</span>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          {customerVars.children.map((c: any, i: number) => (
+                            <span key={i} className={`px-2 py-0.5 rounded-full text-xs ${ isDarkMode ? 'bg-blue-900/60 text-blue-200' : 'bg-green-100 text-green-800'}`}>
+                              {c.name || 'Unnamed'}{c.age ? ` (${c.age})` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {customerVars.notes && Object.keys(customerVars.notes).length > 0 && (
+                      <div className="space-y-1">
+                        {Object.entries(customerVars.notes).map(([key, val]) => (
+                          <div key={key} className="flex gap-2 text-xs">
+                            <span className={`font-medium whitespace-nowrap ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}:</span>
+                            <span className={isDarkMode ? 'text-gray-200' : 'text-gray-800'}>{String(val)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

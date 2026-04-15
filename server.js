@@ -325,7 +325,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
     // - what the user is actually asking about (handles follow-ups like "For 4?")
     // - whether they're asking about activities/programs
     // - a good search query to find the right example chat
-    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, children: [] };
+    let intent = { isAskingAboutActivities: false, searchQuery: combinedMessage, children: [], notes: {} };
     try {
       const intentRes = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -338,6 +338,16 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
 Return ONLY valid JSON with these fields:
 - "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
 - "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": number or null }. If the same child is mentioned with both name and age, combine them into one entry. If a new age is mentioned for a different (second) child, add a separate entry. Example: [{"name":"Ram","age":4},{"name":null,"age":2}]
+- "notes": an object of important facts/details about the customer mentioned ANYWHERE in the conversation. Extract things like:
+  • "parentName": mother's/father's name if mentioned
+  • "spouseName": husband/wife name if mentioned
+  • "location": area, locality, address if mentioned
+  • "school": child's school if mentioned
+  • "preferences": any specific preferences for sessions (e.g. "only weekends", "no art")
+  • "allergies": any allergies or health concerns
+  • "referral": how they heard about us
+  • Any other notable facts — use descriptive keys in camelCase
+  Only include fields that are actually mentioned. Do NOT guess or infer.
 - "searchQuery": a short keyword phrase (3-6 words) to search for relevant past conversations. If asking about activities, include the child's age.
 Consider the FULL conversation history carefully — do not confuse one child's age with another's.`
             },
@@ -351,6 +361,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       );
       intent = JSON.parse(intentRes.data.choices[0].message.content);
       if (!Array.isArray(intent.children)) intent.children = [];
+      if (!intent.notes || typeof intent.notes !== 'object') intent.notes = {};
       console.log("[Intent]", intent);
     } catch (e) {
       console.log("[Intent] extraction failed, falling back:", e.message);
@@ -386,6 +397,24 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         .catch(e => console.log('[vars] save failed:', e.message));
     }
 
+    // Merge extracted notes into convVars.notes 
+    if (intent.notes && typeof intent.notes === 'object' && Object.keys(intent.notes).length > 0) {
+      const storedNotes = (convVars.notes && typeof convVars.notes === 'object') ? convVars.notes : {};
+      let notesUpdated = false;
+      for (const [key, val] of Object.entries(intent.notes)) {
+        if (val != null && val !== '' && storedNotes[key] !== val) {
+          storedNotes[key] = val;
+          notesUpdated = true;
+        }
+      }
+      if (notesUpdated) {
+        convVars.notes = storedNotes;
+        supabase.from('conversations').update({ vars: convVars }).eq('phone', fullPhone)
+          .then(() => console.log('[vars/notes] saved:', JSON.stringify(convVars.notes)))
+          .catch(e => console.log('[vars/notes] save failed:', e.message));
+      }
+    }
+
     // ── STEP 2: Retrieve relevant example using the extracted search query ───
     const exampleChat = findBestExampleChat(intent.searchQuery || combinedMessage);
     // For activities, find the best age-matched description.
@@ -418,8 +447,12 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         if (c.name) return `- Child named ${c.name} (age unknown)`;
         return `- Unnamed child: ${c.age} years old`;
       });
-    const varsBlock = childFacts.length > 0
-      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}`
+    const varsBlock = childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
+      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${
+        convVars.notes && Object.keys(convVars.notes).length > 0
+          ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
+          : ''
+      }`
       : '';
 
     // ── Check if this customer has had any previous sessions ─────────────
