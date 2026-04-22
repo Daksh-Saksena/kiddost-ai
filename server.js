@@ -768,6 +768,33 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       }
     }
 
+    // Never move to slot-check unless key booking details are known.
+    // If the model jumps early, force a details-collection question instead.
+    const CHECK_SLOT_REPLY_RE = /allow me to check the slot availability/i;
+    if (!mentionsNanny && CHECK_SLOT_REPLY_RE.test(aiReply)) {
+      const notes = (convVars && convVars.notes && typeof convVars.notes === 'object') ? convVars.notes : {};
+      const children = Array.isArray(allChildren) ? allChildren : [];
+
+      const hasChildName = children.some(c => !!(c && c.name));
+      const hasChildAge = children.some(c => c && c.age != null);
+      const hasParentName = Boolean(notes.parentName || notes.parent || notes.customerName || notes.name);
+      const hasLocation = Boolean(notes.location || notes.area || notes.locality || notes.address);
+
+      const missing = [];
+      if (!hasChildName) missing.push("child's name");
+      if (!hasChildAge) missing.push("child's age");
+      if (!hasParentName) missing.push('your name');
+      if (!hasLocation) missing.push('your area/locality');
+
+      if (missing.length > 0) {
+        const missingText =
+          missing.length === 1
+            ? missing[0]
+            : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
+        aiReply = `Sure, before I check slot availability, could you share ${missingText}?`;
+      }
+    }
+
     if (mentionsNanny) {
       aiReply = "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English.";
     }
