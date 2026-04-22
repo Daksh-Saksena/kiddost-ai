@@ -723,7 +723,55 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       }
     );
 
-    const aiReply = aiResponse.data.choices[0].message.content;
+    let aiReply = aiResponse.data.choices[0].message.content;
+
+    // Safety net: patch known model misfires before sending to user.
+    // 1) Prevent false out-of-hours replies during working hours.
+    // 2) Enforce approved nanny-services wording.
+    const nowIst = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).format(new Date());
+    const [hStr, mStr] = nowIst.split(':');
+    const nowMins = (parseInt(hStr, 10) * 60) + parseInt(mStr, 10);
+    const isWithinBusinessHours = nowMins >= (9 * 60 + 30) && nowMins <= (19 * 60 + 45);
+
+    const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9:?30\s*am\s*(?:and|-)\s*7:?45\s*pm|first thing in the morning|could we find a slot within that window)/i;
+    const mentionsNanny = /\b(nanny|babysitter|caretaker|caregiver)\b/i.test(combinedMessage || '');
+
+    const extractTimesToMinutes = (text) => {
+      const times = [];
+      const re = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi;
+      let m;
+      while ((m = re.exec(text || '')) !== null) {
+        let hour = parseInt(m[1], 10);
+        const minute = m[2] ? parseInt(m[2], 10) : 0;
+        const mer = m[3].toLowerCase();
+        if (hour === 12) hour = 0;
+        if (mer === 'pm') hour += 12;
+        times.push(hour * 60 + minute);
+      }
+      return times;
+    };
+
+    const timesInMessage = extractTimesToMinutes(combinedMessage);
+    const hasTimes = timesInMessage.length > 0;
+    const allTimesWithinHours = hasTimes && timesInMessage.every(t => t >= (9 * 60 + 30) && t <= (19 * 60 + 45));
+
+    if (OUT_OF_HOURS_REPLY_RE.test(aiReply)) {
+      // If current time is within business hours, this out-of-hours response is invalid.
+      // Also block false rejects when all requested times are within hours (e.g. 5-6 PM).
+      if (isWithinBusinessHours || allTimesWithinHours) {
+        aiReply = 'Sure, allow me to check the slot availability and come back to you.';
+      }
+    }
+
+    if (mentionsNanny) {
+      aiReply = "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English.";
+    }
+
     console.log("AI Reply (buffered):", aiReply);
 
     // If AI is unsure, notify agents instead of replying to user
