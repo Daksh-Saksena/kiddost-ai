@@ -967,7 +967,7 @@ async function sendWelcome(fullPhone) {
       { name: 'KidDost', phone: fullPhone, mediaUrl: imageUrl, mediaType: 'image', label: '' },
       { headers: { 'Content-Type': 'application/json' } }
     );
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 3000));
     // 3. Follow-up
     await sendText('Feel free to let us know if you have any questions.');
     console.log('[welcome] sent to', fullPhone);
