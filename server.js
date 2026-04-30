@@ -592,10 +592,10 @@ PRICING / SERVICES / QUOTATION:
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
-- first immediately ask for age of the child if not already known, then say:
--"We don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
--some people call what we do "nanny service" for younger kids, so clarify according to that.
-- After clarifying, if they are still interested in our engagement/activity sessions, ask for the child's age and give the appropriate activities response, then write [PRICING_IMAGE].
+- Step 1: If child's age is not already known, send ONLY "How old is the child?" and nothing else in that message. Stop there.
+- Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
+- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify — we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- If age is already known, skip Step 1 and go straight to Step 2.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
@@ -1844,10 +1844,10 @@ PRICING / SERVICES / QUOTATION:
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
-- first immediately ask for age of the child if not already known, then say:
--"We don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
--some people call what we do "nanny service" for younger kids, so clarify according to that.
-- After clarifying, if they are still interested in our engagement/activity sessions, ask for the child's age and give the appropriate activities response, then write [PRICING_IMAGE].
+- Step 1: If child's age is not already known, send ONLY "How old is the child?" and nothing else in that message. Stop there.
+- Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
+- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify — we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- If age is already known, skip Step 1 and go straight to Step 2.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
