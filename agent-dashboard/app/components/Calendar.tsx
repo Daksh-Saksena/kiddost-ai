@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send, BarChart3, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send, BarChart3, User, Phone } from "lucide-react";
 
 const SERVER = "https://kiddost-ai.onrender.com";
 
@@ -86,6 +86,13 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsTab, setStatsTab] = useState<'members' | 'customers'>('members');
   const [loadingStats, setLoadingStats] = useState(false);
+
+  // Member phone management state
+  const [showMembers, setShowMembers] = useState(false);
+  const [membersList, setMembersList] = useState<{name: string; phone: string}[]>([]);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberPhone, setNewMemberPhone] = useState("");
+  const [savingMember, setSavingMember] = useState(false);
 
   // Known members (fetched from all events)
   const knownMembers = Array.from(new Set(events.map(e => e.assigned_member).filter(Boolean) as string[]));
@@ -222,6 +229,42 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setShowStats(!showStats);
   };
 
+  const fetchMembers = async () => {
+    try {
+      const res = await fetch(`${SERVER}/members`);
+      const json = await res.json();
+      setMembersList(json.members || []);
+    } catch { setMembersList([]); }
+  };
+
+  const saveMember = async () => {
+    if (!newMemberName.trim() || !newMemberPhone.trim()) return;
+    setSavingMember(true);
+    try {
+      await fetch(`${SERVER}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newMemberName.trim(), phone: newMemberPhone.trim() }),
+      });
+      setNewMemberName("");
+      setNewMemberPhone("");
+      fetchMembers();
+    } catch { /* silent */ }
+    finally { setSavingMember(false); }
+  };
+
+  const deleteMember = async (name: string) => {
+    try {
+      await fetch(`${SERVER}/members/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      fetchMembers();
+    } catch { /* silent */ }
+  };
+
+  const openMembers = () => {
+    fetchMembers();
+    setShowMembers(true);
+  };
+
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   const bg = isDarkMode ? "bg-black" : "bg-white";
@@ -242,6 +285,9 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         <h1 className="text-lg font-semibold text-white flex-1">Calendar</h1>
         <button onClick={toggleStats} className={`text-white hover:opacity-70 transition-opacity mr-2 ${showStats ? 'opacity-100' : 'opacity-70'}`} title="Stats">
           <BarChart3 className="w-5 h-5" />
+        </button>
+        <button onClick={openMembers} className="text-white hover:opacity-70 transition-opacity mr-2 opacity-70" title="Member phones">
+          <Phone className="w-5 h-5" />
         </button>
         <button onClick={() => openCreateModal()} className="text-white hover:opacity-70 transition-opacity" title="New event">
           <Plus className="w-6 h-6" />
@@ -467,6 +513,69 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             ) : (
               <div className={`p-8 text-center ${subtext}`}>Failed to load stats</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Members Phone Management Modal */}
+      {showMembers && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowMembers(false)}>
+          <div
+            className={`w-full max-w-md rounded-t-2xl shadow-2xl flex flex-col ${isDarkMode ? "bg-gray-900 border-t border-blue-900/40" : "bg-white border-t border-gray-200"}`}
+            style={{ maxHeight: '80vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-5 pb-3 flex items-center justify-between">
+              <h2 className={`font-semibold text-base flex items-center gap-2 ${text}`}>
+                <Phone className="w-4 h-4" /> Member Phones
+              </h2>
+              <button onClick={() => setShowMembers(false)} className="hover:opacity-70"><X className={`w-5 h-5 ${subtext}`} /></button>
+            </div>
+            <p className={`px-5 pb-3 text-xs ${subtext}`}>Set WhatsApp numbers so members get a reminder 15 mins before their session.</p>
+
+            <div className="flex-1 overflow-y-auto px-5 pb-6 flex flex-col gap-3">
+              {/* Existing members */}
+              {membersList.map(m => (
+                <div key={m.name} className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${cardBg} border ${border}`}>
+                  <div>
+                    <p className={`text-sm font-semibold ${text}`}>{m.name}</p>
+                    <p className={`text-xs ${subtext}`}>{m.phone}</p>
+                  </div>
+                  <button onClick={() => deleteMember(m.name)} className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-red-900/30 text-red-400" : "hover:bg-red-50 text-red-500"}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {membersList.length === 0 && (
+                <p className={`text-sm text-center py-3 ${subtext}`}>No members added yet</p>
+              )}
+
+              {/* Add new member */}
+              <div className={`rounded-xl p-3 border ${border} ${cardBg} flex flex-col gap-2 mt-1`}>
+                <p className={`text-xs font-semibold uppercase ${subtext}`}>Add / Update Member</p>
+                <input
+                  type="text"
+                  value={newMemberName}
+                  onChange={e => setNewMemberName(e.target.value)}
+                  placeholder="Member name (e.g. Priya)"
+                  className={inputCls}
+                />
+                <input
+                  type="tel"
+                  value={newMemberPhone}
+                  onChange={e => setNewMemberPhone(e.target.value)}
+                  placeholder="WhatsApp number (e.g. 919876543210)"
+                  className={inputCls}
+                />
+                <button
+                  onClick={saveMember}
+                  disabled={savingMember || !newMemberName.trim() || !newMemberPhone.trim()}
+                  className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-[#008069] text-white hover:bg-[#006d5b]"}`}
+                >
+                  {savingMember ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

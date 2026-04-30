@@ -525,7 +525,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         const trialDone = pastEvents.some(e => e.is_trial);
         sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Introductory session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer an introductory session again. Focus on scheduling regular sessions.`;
       } else {
-        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer — their first session will be an INTRODUCTORY session.\nWhen discussing booking/scheduling, proactively mention that as it is their first session, it will be an introductory session. Share these details naturally:\n  • Duration: 1 hour\n  • Cost: Rs 500\n  • Purpose: for the child and the KidDost member to get comfortable with each other\n  • No commitment — they can decide after the introductory session if they want to continue\n  • They can pick a convenient date and time`;
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer. Their first session will be an introductory session (1 hour, ₹500). Treat the booking flow the same as a regular session — just note it is introductory when confirming.`;
       }
     } catch (e) {
       console.log('[session-check] failed:', e.message);
@@ -797,9 +797,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       }
     }
 
-    if (mentionsNanny) {
-      aiReply = "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English.";
-    }
+    // Nanny: handled by AI prompt (ask age first, then clarify) — no override needed
 
     console.log("AI Reply (buffered):", aiReply);
 
@@ -2387,6 +2385,116 @@ app.post('/calendar/assign-member', async (req, res) => {
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
+});
+
+// ── Member phone management ─────────────────────────────────────────────
+// Requires Supabase table: members (name TEXT PRIMARY KEY, phone TEXT NOT NULL)
+app.get('/members', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('members').select('*').order('name');
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ members: data || [] });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/members', async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    if (!name || !phone) return res.status(400).json({ error: 'name and phone required' });
+    const { data, error } = await supabase
+      .from('members')
+      .upsert({ name: name.trim(), phone: phone.trim() }, { onConflict: 'name' })
+      .select();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ member: data?.[0] });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/members/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { error } = await supabase.from('members').delete().eq('name', decodeURIComponent(name));
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ── 15-minute session reminder to assigned member ───────────────────────
+function formatTimeIST(timeStr) {
+  const [h, m] = timeStr.split(':');
+  const hr = parseInt(h);
+  const ampm = hr >= 12 ? 'PM' : 'AM';
+  return `${hr % 12 || 12}:${m} ${ampm}`;
+}
+
+async function sendMemberSessionReminders() {
+  try {
+    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const todayStr = nowIST.toISOString().split('T')[0];
+    const target = new Date(nowIST.getTime() + 15 * 60 * 1000);
+    const targetTime = `${String(target.getUTCHours()).padStart(2, '0')}:${String(target.getUTCMinutes()).padStart(2, '0')}`;
+
+    const { data: events, error } = await supabase
+      .from('calendar_events')
+      .select('*')
+      .eq('date', todayStr)
+      .eq('start_time', targetTime);
+
+    if (error) { console.error('[member-reminder] DB error', error.message); return; }
+    if (!events || events.length === 0) return;
+
+    const { data: memberRows } = await supabase.from('members').select('name, phone');
+    const memberMap = Object.fromEntries((memberRows || []).map(m => [m.name.toLowerCase(), m.phone]));
+
+    for (const ev of events) {
+      if (!ev.assigned_member) continue;
+      const memberPhone = memberMap[ev.assigned_member.toLowerCase()];
+      if (!memberPhone) {
+        console.log(`[member-reminder] No phone for member: ${ev.assigned_member}`);
+        continue;
+      }
+      const time = ev.start_time ? formatTimeIST(ev.start_time) : 'soon';
+      const customer = ev.phone ? ` (${ev.phone})` : '';
+      const msg = `⏰ Reminder: You have a session starting in 15 minutes!\n\n📅 *${ev.title}*${customer}\n🕐 ${time}`;
+
+      console.log(`[member-reminder] Sending to ${ev.assigned_member} (${memberPhone}): ${ev.title} at ${time}`);
+
+      const useTemplate = process.env.REMINDER_TEMPLATE_ID;
+      let sent = false;
+      if (useTemplate) {
+        try {
+          await axios.post(
+            `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+            { name: ev.assigned_member, phone: memberPhone, templateId: useTemplate, variables: [msg] },
+            { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+          );
+          sent = true;
+        } catch (tplErr) {
+          console.warn('[member-reminder] Template failed:', tplErr?.response?.data?.message || tplErr.message);
+        }
+      }
+      if (!sent) {
+        await axios.post(
+          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+          { name: ev.assigned_member, phone: memberPhone, text: msg },
+          { params: { apiKey: BOTSPACE_API_KEY } }
+        );
+      }
+    }
+  } catch (e) {
+    console.error('[member-reminder] Error:', e?.response?.data || e.message || e);
+  }
+}
+
+// Cron: every minute — send WhatsApp reminder to member if their session starts in 15 mins
+cron.schedule('* * * * *', () => {
+  sendMemberSessionReminders();
 });
 
 // ── Daily session reminder ──────────────────────────────────────────────
