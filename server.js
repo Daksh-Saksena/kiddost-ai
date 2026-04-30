@@ -310,6 +310,59 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
+async function loadPushSubscriptionsFromDb() {
+  try {
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, subscription, agent');
+    if (error) {
+      console.error('[push] failed loading subscriptions from DB:', error.message);
+      return;
+    }
+    for (const row of (data || [])) {
+      if (row?.endpoint && row?.subscription) {
+        pushSubscriptions.set(row.endpoint, {
+          subscription: row.subscription,
+          agent: row.agent || null,
+        });
+      }
+    }
+    console.log(`[push] loaded ${pushSubscriptions.size} subscriptions from DB`);
+  } catch (e) {
+    console.error('[push] DB load error:', e.message);
+  }
+}
+
+async function upsertPushSubscription(subscription, agent) {
+  try {
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(
+        {
+          endpoint: subscription.endpoint,
+          subscription,
+          agent: agent || null,
+        },
+        { onConflict: 'endpoint' }
+      );
+    if (error) console.error('[push] failed to persist subscription:', error.message);
+  } catch (e) {
+    console.error('[push] DB upsert error:', e.message);
+  }
+}
+
+async function deletePushSubscription(endpoint) {
+  try {
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint);
+    if (error) console.error('[push] failed to delete subscription:', error.message);
+  } catch (e) {
+    console.error('[push] DB delete error:', e.message);
+  }
+}
+
 // Service-role client for server-side uploads (requires SUPABASE_SERVICE_ROLE_KEY env)
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 let supabaseService = null;
@@ -1114,22 +1167,30 @@ app.get('/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
 });
 
-app.post('/push-subscribe', (req, res) => {
+app.post('/push-subscribe', async (req, res) => {
   const { subscription, agent } = req.body;
   if (!subscription?.endpoint) return res.status(400).json({ error: 'invalid_subscription' });
   pushSubscriptions.set(subscription.endpoint, { subscription, agent });
+  await upsertPushSubscription(subscription, agent);
   console.log(`[push] subscribed: ${agent} (${pushSubscriptions.size} total)`);
   res.json({ ok: true });
 });
 
-app.post('/push-unsubscribe', (req, res) => {
+app.post('/push-unsubscribe', async (req, res) => {
   const { endpoint } = req.body;
-  if (endpoint) pushSubscriptions.delete(endpoint);
+  if (endpoint) {
+    pushSubscriptions.delete(endpoint);
+    await deletePushSubscription(endpoint);
+  }
   res.json({ ok: true });
 });
 
 async function sendPushToAll(payload) {
   if (!process.env.VAPID_PUBLIC_KEY) return;
+  if (pushSubscriptions.size === 0) {
+    console.log('[push] no active subscriptions; skipping notification');
+    return;
+  }
   const dead = [];
   for (const [endpoint, { subscription }] of pushSubscriptions) {
     try {
@@ -1139,7 +1200,10 @@ async function sendPushToAll(payload) {
       else console.error('[push] send error:', e.message);
     }
   }
-  dead.forEach(ep => pushSubscriptions.delete(ep));
+  for (const ep of dead) {
+    pushSubscriptions.delete(ep);
+    await deletePushSubscription(ep);
+  }
 }
 
 // Shared contacts (stored in Supabase so all agents see the same names)
@@ -2622,6 +2686,7 @@ app.get('/test-member-reminder', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
+  await loadPushSubscriptionsFromDb();
 });
