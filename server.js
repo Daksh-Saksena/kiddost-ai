@@ -1459,15 +1459,8 @@ app.post("/webhook", async (req, res) => {
     });
     if (userInsertError) console.error('/webhook user insert error', userInsertError.message, { storedMediaUrl });
 
-    // Send push notification to all subscribed agent dashboards
-    const senderName = body?.customer?.name?.trim() || fullPhone;
-    const pushText = message || (mediaUrl ? '📎 Media message' : 'New message');
-    sendPushToAll({
-      title: `${senderName}`,
-      body: pushText,
-      phone: fullPhone,
-      icon: '/icon-192.png'
-    }).catch(() => {});
+    // Do not push on every inbound message.
+    // Push alerts are sent only from agent-needed paths (UNSURE / human-handoff patterns).
  
     // If AI is disabled for this conversation, skip buffering/respon
     const { data: last, error: lastErr } = await supabase
