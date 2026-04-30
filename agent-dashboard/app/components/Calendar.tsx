@@ -133,6 +133,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const selectedEvents = selectedDate ? eventsForDate(selectedDate) : [];
 
   const openCreateModal = (date?: string) => {
+    fetchMembers();
     setEditEvent(null);
     setFormTitle("");
     setFormDate(date || selectedDate || toDateStr(year, month, today.getDate()));
@@ -147,6 +148,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   };
 
   const openEditModal = (ev: CalendarEvent) => {
+    fetchMembers();
     setEditEvent(ev);
     setFormTitle(ev.title);
     setFormDate(ev.date);
