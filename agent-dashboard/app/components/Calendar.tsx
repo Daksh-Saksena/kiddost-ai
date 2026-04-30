@@ -94,8 +94,10 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [savingMember, setSavingMember] = useState(false);
 
-  // Known members (fetched from all events)
-  const knownMembers = Array.from(new Set(events.map(e => e.assigned_member).filter(Boolean) as string[]));
+  // Known members: DB list is primary (has phones), fall back to names from events for any not yet in DB
+  const dbMemberNames = membersList.map(m => m.name);
+  const eventMemberNames = Array.from(new Set(events.map(e => e.assigned_member).filter(Boolean) as string[]));
+  const knownMembers = Array.from(new Set([...dbMemberNames, ...eventMemberNames]));
 
   const fetchEvents = async () => {
     const from = `${year}-${pad(month + 1)}-01`;
@@ -109,6 +111,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   };
 
   useEffect(() => { fetchEvents(); }, [year, month]);
+  useEffect(() => { fetchMembers(); }, []); // load member phones on mount so bubbles are in sync
 
   const prevMonth = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1); }
@@ -534,23 +537,38 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
             <p className={`px-5 pb-3 text-xs ${subtext}`}>Set WhatsApp numbers so members get a reminder 15 mins before their session.</p>
 
             <div className="flex-1 overflow-y-auto px-5 pb-6 flex flex-col gap-3">
-              {/* Existing members */}
+              {/* Members with phones */}
               {membersList.map(m => (
                 <div key={m.name} className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${cardBg} border ${border}`}>
                   <div>
                     <p className={`text-sm font-semibold ${text}`}>{m.name}</p>
-                    <p className={`text-xs ${subtext}`}>{m.phone}</p>
+                    <p className={`text-xs flex items-center gap-1 ${subtext}`}><Phone className="w-3 h-3" />{m.phone}</p>
                   </div>
-                  <button onClick={() => deleteMember(m.name)} className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-red-900/30 text-red-400" : "hover:bg-red-50 text-red-500"}`}>
+                  <button onClick={() => { setNewMemberName(m.name); setNewMemberPhone(m.phone); }} className={`p-1.5 rounded-lg mr-1 ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`} title="Edit">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => deleteMember(m.name)} className={`p-1.5 rounded-lg ${isDarkMode ? "hover:bg-red-900/30 text-red-400" : "hover:bg-red-50 text-red-500"}`} title="Delete">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
-              {membersList.length === 0 && (
-                <p className={`text-sm text-center py-3 ${subtext}`}>No members added yet</p>
+              {/* Members from events that don't have a phone yet */}
+              {eventMemberNames.filter(n => !dbMemberNames.map(d => d.toLowerCase()).includes(n.toLowerCase())).map(n => (
+                <div key={n} className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${cardBg} border border-dashed ${border}`}>
+                  <div>
+                    <p className={`text-sm font-semibold ${text}`}>{n}</p>
+                    <p className={`text-xs ${isDarkMode ? 'text-yellow-500' : 'text-yellow-600'}`}>No phone — tap to add</p>
+                  </div>
+                  <button onClick={() => setNewMemberName(n)} className={`text-xs px-3 py-1.5 rounded-full font-medium ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"}`}>
+                    + Add phone
+                  </button>
+                </div>
+              ))}
+              {membersList.length === 0 && eventMemberNames.length === 0 && (
+                <p className={`text-sm text-center py-3 ${subtext}`}>No members yet</p>
               )}
 
-              {/* Add new member */}
+              {/* Add / update member */}
               <div className={`rounded-xl p-3 border ${border} ${cardBg} flex flex-col gap-2 mt-1`}>
                 <p className={`text-xs font-semibold uppercase ${subtext}`}>Add / Update Member</p>
                 <input
@@ -558,8 +576,14 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
                   value={newMemberName}
                   onChange={e => setNewMemberName(e.target.value)}
                   placeholder="Member name (e.g. Priya)"
+                  list="member-phones-suggestions"
                   className={inputCls}
                 />
+                {knownMembers.length > 0 && (
+                  <datalist id="member-phones-suggestions">
+                    {knownMembers.map(m => <option key={m} value={m} />)}
+                  </datalist>
+                )}
                 <input
                   type="tel"
                   value={newMemberPhone}

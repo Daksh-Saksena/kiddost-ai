@@ -2465,26 +2465,41 @@ async function sendMemberSessionReminders() {
 
       console.log(`[member-reminder] Sending to ${ev.assigned_member} (${memberPhone}): ${ev.title} at ${time}`);
 
-      const useTemplate = process.env.REMINDER_TEMPLATE_ID;
+      // Always try template first (required for members outside 24h window)
+      const templateId = process.env.MEMBER_REMINDER_TEMPLATE_ID || process.env.REMINDER_TEMPLATE_ID;
       let sent = false;
-      if (useTemplate) {
+      if (templateId) {
         try {
           await axios.post(
             `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-            { name: ev.assigned_member, phone: memberPhone, templateId: useTemplate, variables: [msg] },
+            {
+              name: ev.assigned_member,
+              phone: memberPhone,
+              templateId,
+              // Pass as separate variables so template placeholders {{1}} {{2}} {{3}} map correctly
+              variables: [ev.title, time, ev.notes || 'Location TBD'],
+            },
             { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
           );
           sent = true;
+          console.log(`[member-reminder] Sent via template ${templateId}`);
         } catch (tplErr) {
           console.warn('[member-reminder] Template failed:', tplErr?.response?.data?.message || tplErr.message);
         }
       }
+      // Fallback: session message (only works if member messaged in last 24h)
       if (!sent) {
-        await axios.post(
-          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-          { name: ev.assigned_member, phone: memberPhone, text: msg },
-          { params: { apiKey: BOTSPACE_API_KEY } }
-        );
+        try {
+          await axios.post(
+            `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+            { name: ev.assigned_member, phone: memberPhone, text: msg },
+            { params: { apiKey: BOTSPACE_API_KEY } }
+          );
+          sent = true;
+          console.log(`[member-reminder] Sent via session message (fallback)`);
+        } catch (sessErr) {
+          console.warn('[member-reminder] Session message also failed (member outside 24h window):', sessErr?.response?.data?.message || sessErr.message);
+        }
       }
     }
   } catch (e) {
