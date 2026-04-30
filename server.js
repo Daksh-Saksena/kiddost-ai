@@ -2600,6 +2600,37 @@ app.get('/test-reminder', async (req, res) => {
   res.json({ ok: true, message: 'Reminder sent (check WhatsApp)' });
 });
 
+// Test endpoint: send a member reminder right now for a specific member/event
+// Usage: GET /test-member-reminder?member=Priya&title=KidDost+Session&time=15:30&location=Domlur
+app.get('/test-member-reminder', async (req, res) => {
+  const { member, title, time, location } = req.query;
+  if (!member) return res.status(400).json({ error: 'member query param required' });
+
+  const { data: memberRows } = await supabase.from('members').select('name, phone');
+  const memberMap = Object.fromEntries((memberRows || []).map(m => [m.name.toLowerCase(), m.phone]));
+  const memberPhone = memberMap[String(member).toLowerCase()];
+
+  if (!memberPhone) return res.status(404).json({ error: `No phone found for member: ${member}. Add them via POST /members first.` });
+
+  const timeStr = String(time || '??:??');
+  const [h, m] = timeStr.split(':');
+  const hr = parseInt(h);
+  const formattedTime = !isNaN(hr) ? `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}` : timeStr;
+  const msg = `⏰ Reminder: You have a session starting in 15 minutes!\n\n📅 *${title || 'KidDost Session'}*\n🕐 ${formattedTime}\n📍 ${location || 'N/A'}`;
+
+  console.log(`[test-member-reminder] Sending to ${member} (${memberPhone})`);
+  try {
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+      { name: String(member), phone: memberPhone, text: msg },
+      { params: { apiKey: BOTSPACE_API_KEY } }
+    );
+    res.json({ ok: true, sentTo: memberPhone, message: msg });
+  } catch (e) {
+    res.status(500).json({ error: e?.response?.data || e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
