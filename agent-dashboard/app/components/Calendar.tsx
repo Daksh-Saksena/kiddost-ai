@@ -286,7 +286,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
         <button onClick={toggleStats} className={`text-white hover:opacity-70 transition-opacity mr-2 ${showStats ? 'opacity-100' : 'opacity-70'}`} title="Stats">
           <BarChart3 className="w-5 h-5" />
         </button>
-        <button onClick={openMembers} className="text-white hover:opacity-70 transition-opacity mr-2 opacity-70" title="Member phones">
+        <button onClick={openMembers} className="text-white hover:opacity-70 transition-opacity mr-2" title="Member phones">
           <Phone className="w-5 h-5" />
         </button>
         <button onClick={() => openCreateModal()} className="text-white hover:opacity-70 transition-opacity" title="New event">
