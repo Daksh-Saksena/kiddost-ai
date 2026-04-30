@@ -2466,7 +2466,7 @@ async function sendMemberSessionReminders() {
       console.log(`[member-reminder] Sending to ${ev.assigned_member} (${memberPhone}): ${ev.title} at ${time}`);
 
       // Always try template first (required for members outside 24h window)
-      const templateId = process.env.MEMBER_REMINDER_TEMPLATE_ID || process.env.REMINDER_TEMPLATE_ID;
+      const templateId = process.env.MEMBER_REMINDER_TEMPLATE_ID; // set this once template is approved
       let sent = false;
       if (templateId) {
         try {
