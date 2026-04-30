@@ -883,7 +883,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     }
 
     // ── Push notifications ──────────────────────────────────────────────────
-    // Patterns where the AI is deferring and a human needs to follow up
+    // Only notify agents when the AI is deferring and a human needs to follow up
     const NEEDS_HUMAN_PATTERNS = [
       /let me check.*(?:get back|come back)/i,
       /allow me to check/i,
@@ -899,18 +899,9 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     if (needsHuman) {
       // Flag conversation as needing human attention
       supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone).then(() => {});
-      // Strong alert — agent action required
       sendPushToAll({
         title: "Assistance needed",
         body: `Follow-up required for ${fullPhone}: "${aiReply.slice(0, 100)}"`,
-        phone: fullPhone,
-        icon: "/icon-192.png"
-      }).catch(() => {});
-    } else {
-      // Quiet activity ping — just so agents stay aware
-      sendPushToAll({
-        title: "New message",
-        body: `AI replied to ${fullPhone}: "${aiReply.slice(0, 100)}"`,
         phone: fullPhone,
         icon: "/icon-192.png"
       }).catch(() => {});
