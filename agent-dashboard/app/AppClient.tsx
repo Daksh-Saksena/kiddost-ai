@@ -389,7 +389,7 @@ export default function AppClient() {
     const result: Chat[] = Array.from(map.values()).map((r: any) => ({
       id: r.phone,
       name: contacts[r.phone]?.name || r.phone,
-      avatar: avatarDataUrl(r.phone),
+      avatar: avatarDataUrl(contacts[r.phone]?.name || r.phone, r.phone),
       lastMessage: r.content || '',
       time: r.created_at ? new Date(r.created_at).toLocaleString() : "",
       agent: r.agent ?? null,
@@ -522,7 +522,7 @@ export default function AppClient() {
             }
             // New phone not in list — add it
             const contacts = getContacts();
-            return [{ id: msg.phone, name: contacts[msg.phone]?.name || msg.phone, avatar: avatarDataUrl(msg.phone), lastMessage: msg.content || '', time: msg.created_at ? new Date(msg.created_at).toLocaleString() : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
+            return [{ id: msg.phone, name: contacts[msg.phone]?.name || msg.phone, avatar: avatarDataUrl(contacts[msg.phone]?.name || msg.phone, msg.phone), lastMessage: msg.content || '', time: msg.created_at ? new Date(msg.created_at).toLocaleString() : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
           });
         }
       )
