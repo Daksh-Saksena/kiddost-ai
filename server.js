@@ -525,7 +525,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         const trialDone = pastEvents.some(e => e.is_trial);
         sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Introductory session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer an introductory session again. Focus on scheduling regular sessions.`;
       } else {
-        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer. Their first session will be an introductory session (1 hour, ₹500). Treat the booking flow the same as a regular session — just note it is introductory when confirming.`;
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer. Their first session will be an introductory session. When mentioning the first session price, use this exact line: "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." Treat the booking flow the same as a regular session after that.`;
       }
     } catch (e) {
       console.log('[session-check] failed:', e.message);
@@ -584,7 +584,7 @@ PRICING / SERVICES / QUOTATION:
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: mention the introductory session at ₹500/hour.
+  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
   • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
@@ -1836,7 +1836,7 @@ PRICING / SERVICES / QUOTATION:
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: mention the introductory session at ₹500/hour.
+  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour session at your convenience to see if we meet your expectations. For the first time experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
   • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
