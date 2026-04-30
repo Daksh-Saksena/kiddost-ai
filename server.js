@@ -386,7 +386,8 @@ function hashPin(pin) {
 // Helper: generate AI response for a combined user message
 async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
   try {
-    const { prependWelcomeBack = false } = options;
+    const { prependWelcomeBack = false, contactName = '' } = options;
+    const displayContact = String(contactName || '').trim() || fullPhone;
     // Fetch last 10 messages for conversation memory
     const { data, error } = await supabase
       .from("messages")
@@ -860,8 +861,8 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       // Flag conversation as needing human attention
       await supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone);
       await sendPushToAll({
-        title: "Agent needed",
-        body: `AI couldn't answer for ${fullPhone} — message: "${combinedMessage.slice(0, 80)}"`,
+        title: `${displayContact}`,
+        body: `AI couldn't respond to a message from ${displayContact} (${fullPhone}) — "${combinedMessage.slice(0, 80)}"`,
         phone: fullPhone,
         icon: "/icon-192.png"
       });
@@ -953,8 +954,8 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       // Flag conversation as needing human attention
       supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone).then(() => {});
       sendPushToAll({
-        title: "Assistance needed",
-        body: `Follow-up required for ${fullPhone}: "${aiReply.slice(0, 100)}"`,
+        title: `${displayContact}`,
+        body: `Follow-up required for ${displayContact} (${fullPhone}): "${aiReply.slice(0, 100)}"`,
         phone: fullPhone,
         icon: "/icon-192.png"
       }).catch(() => {});
@@ -1344,6 +1345,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     const fullPhone = `+${countryCode}${phone}`;
+    const contactName = body?.customer?.name?.trim() || '';
 
     // Safely extract message or media
     let message = null;
@@ -1500,7 +1502,7 @@ app.post("/webhook", async (req, res) => {
         welcomeBackFlags[fullPhone] = false;
         try {
           if (combined) {
-            await handleAIResponse(fullPhone, combined, { prependWelcomeBack });
+            await handleAIResponse(fullPhone, combined, { prependWelcomeBack, contactName });
           }
         } catch (e) {
           console.error('buffered AI handler error', e?.message || e);
