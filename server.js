@@ -1544,7 +1544,7 @@ app.post("/webhook", async (req, res) => {
 
     // Do not push on every inbound message.
     // Push alerts are sent only from agent-needed paths (UNSURE / human-handoff patterns), 
-    // EXCEPT for engagement tracking: notify when user sends their 2nd or 5th message.
+    // EXCEPT for engagement tracking: notify on EVERY message after the first one (>= 2).
     try {
       const { count: userMsgCount } = await supabase
         .from("messages")
@@ -1552,11 +1552,11 @@ app.post("/webhook", async (req, res) => {
         .eq("phone", fullPhone)
         .eq("sender", "user");
 
-      if (userMsgCount === 2 || userMsgCount === 5) {
+      if (userMsgCount >= 2) {
         const contactName = body?.contacts?.[0]?.profile?.name || fullPhone;
         sendPushToAll({
           title: `Active Conversation: ${contactName}`,
-          body: `User has sent their ${userMsgCount === 2 ? '2nd' : '5th'} message and is actively engaging with the AI.`,
+          body: `User replied (Message #${userMsgCount}): "${message ? message.slice(0, 50) + (message.length > 50 ? '...' : '') : 'Media/Attachment'}"`,
           phone: fullPhone,
           icon: "/icon-192.png"
         }).catch(() => {});
