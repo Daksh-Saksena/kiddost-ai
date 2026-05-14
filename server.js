@@ -768,6 +768,10 @@ TIME SLOT REQUEST:
 LOCATION / SERVICEABILITY:
 We operate in Bangalore (Bengaluru) ONLY. No other city.
 
+RULE 0 — USER ASKING WHERE WE ARE BASED:
+- If the user asks "where are you based?", "where is this from?", "ye kha ka h", "kahan se ho", "which city?", "where do you operate?", or any similar question about OUR location (in any language including Hindi), answer: "We are based in Bangalore and currently operate only in Bangalore."
+- This is NOT the user telling you THEIR location. Do NOT reject them. Just answer the question.
+
 RULE 1 — NON-BANGALORE CITY DETECTED:
 - If the system injects a "NON-BANGALORE CITY DETECTED" message above, or if you yourself can tell the user mentioned a city/area/state that is NOT Bangalore/Bengaluru (e.g. Mumbai, Delhi, Kolkata, Chennai, Hyderabad, Pune, Nagpur, Mysore, Jaipur, Lucknow, Ahmedabad, Kochi, Goa, Noida, Gurgaon, Chandigarh, Indore, Bhopal, Patna, Coimbatore, Vizag, Mangalore, or ANY other non-Bangalore location), say EXACTLY:
   "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
@@ -2082,6 +2086,10 @@ TIME SLOT REQUEST:
 
 LOCATION / SERVICEABILITY:
 We operate in Bangalore (Bengaluru) ONLY. No other city.
+
+RULE 0 — USER ASKING WHERE WE ARE BASED:
+- If the user asks "where are you based?", "where is this from?", "ye kha ka h", "kahan se ho", "which city?", "where do you operate?", or any similar question about OUR location (in any language including Hindi), answer: "We are based in Bangalore and currently operate only in Bangalore."
+- This is NOT the user telling you THEIR location. Do NOT reject them. Just answer the question.
 
 RULE 1 — NON-BANGALORE CITY DETECTED:
 - If the system injects a "NON-BANGALORE CITY DETECTED" message above, or if you yourself can tell the user mentioned a city/area/state that is NOT Bangalore/Bengaluru (e.g. Mumbai, Delhi, Kolkata, Chennai, Hyderabad, Pune, Nagpur, Mysore, Jaipur, Lucknow, Ahmedabad, Kochi, Goa, Noida, Gurgaon, Chandigarh, Indore, Bhopal, Patna, Coimbatore, Vizag, Mangalore, or ANY other non-Bangalore location), say EXACTLY:
