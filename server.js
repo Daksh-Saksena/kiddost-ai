@@ -2263,6 +2263,10 @@ app.get('/debug-prompt', async (req, res) => {
       exampleChatFile: exampleChat?.file || null,
       websiteContentLength: KIDDOST_WEBSITE_CONTENT.length
     });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
     /*
     const systemPrompt_old = `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 4 months).
