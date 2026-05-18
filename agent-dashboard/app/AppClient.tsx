@@ -637,75 +637,85 @@ export default function AppClient() {
     >
       {showCalendar ? (
         <Calendar isDarkMode={isDarkMode} onBack={() => setShowCalendar(false)} agentName={agentName} />
-      ) : selectedChat ? (
-        <ChatDetail
-          chatId={selectedChat}
-          onBack={() => setSelectedChat(null)}
-          isDarkMode={isDarkMode}
-          messages={messages}
-          chatName={currentChat?.name}
-          chatAvatar={currentChat?.avatar}
-          onSend={sendMessage}
-          agentName={agentName}
-          onSaveContact={(name, notes) => {
-            // Save to server (shared across all agents) + local state
-            fetch(`${SERVER}/contacts`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: selectedChat, name, notes })
-            }).catch(() => {});
-            saveContact(selectedChat, { name, notes });
-            setContacts(prev => ({ ...prev, [selectedChat]: { name, notes } }));
-            setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: name || c.id } : c));
-          }}
-          initialContact={contacts[selectedChat] || { name: '', notes: '' }}
-          initialLabels={contacts[selectedChat]?.labels || []}
-          onAddLabel={(label) => {
-            fetch(`${SERVER}/label`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: selectedChat, label })
-            }).catch(() => {});
-            setContacts(prev => {
-              const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
-              const newLabels = cur.labels?.includes(label) ? cur.labels : [...(cur.labels || []), label];
-              const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
-              try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
-              setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
-              return updated;
-            });
-          }}
-          onRemoveLabel={(label) => {
-            fetch(`${SERVER}/label?phone=${encodeURIComponent(selectedChat)}&label=${encodeURIComponent(label)}`, {
-              method: 'DELETE',
-            }).catch(() => {});
-            setContacts(prev => {
-              const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
-              const newLabels = (cur.labels || []).filter(l => l !== label);
-              const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
-              try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
-              setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
-              return updated;
-            });
-          }}
-        />
       ) : (
-        chats.length === 0 ? (
-          <div style={{ padding: 40, color: isDarkMode ? '#fff' : '#000', textAlign: 'center' }}>
-            No chats yet — check DevTools console for errors.
+        <div className="h-full flex flex-col overflow-hidden">
+          {/* Chat List: preserved in DOM to maintain scroll position perfectly */}
+          <div className={selectedChat ? "hidden" : "h-full flex flex-col"}>
+            {chats.length === 0 ? (
+              <div style={{ padding: 40, color: isDarkMode ? '#fff' : '#000', textAlign: 'center' }}>
+                No chats yet — check DevTools console for errors.
+              </div>
+            ) : (
+              <ChatList
+                onSelectChat={(chatId) => setSelectedChat(chatId)}
+                onTogglePin={togglePinChat}
+                onOpenCalendar={() => setShowCalendar(true)}
+                isDarkMode={isDarkMode}
+                onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+                onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}
+                onDeleteAccount={agentId && agentId !== 'admin' ? () => { setDeletePin(''); setDeleteError(''); setShowDeleteModal(true); } : undefined}
+                chats={chats}
+              />
+            )}
           </div>
-        ) : (
-          <ChatList
-            onSelectChat={(chatId) => setSelectedChat(chatId)}
-            onTogglePin={togglePinChat}
-            onOpenCalendar={() => setShowCalendar(true)}
-            isDarkMode={isDarkMode}
-            onToggleTheme={() => setIsDarkMode(!isDarkMode)}
-            onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}
-            onDeleteAccount={agentId && agentId !== 'admin' ? () => { setDeletePin(''); setDeleteError(''); setShowDeleteModal(true); } : undefined}
-            chats={chats}
-          />
-        )
+
+          {/* Chat Detail: rendered conditionally on top */}
+          {selectedChat && (
+            <div className="h-full flex flex-col">
+              <ChatDetail
+                chatId={selectedChat}
+                onBack={() => setSelectedChat(null)}
+                isDarkMode={isDarkMode}
+                messages={messages}
+                chatName={currentChat?.name}
+                chatAvatar={currentChat?.avatar}
+                onSend={sendMessage}
+                agentName={agentName}
+                onSaveContact={(name, notes) => {
+                  // Save to server (shared across all agents) + local state
+                  fetch(`${SERVER}/contacts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: selectedChat, name, notes })
+                  }).catch(() => {});
+                  saveContact(selectedChat, { name, notes });
+                  setContacts(prev => ({ ...prev, [selectedChat]: { name, notes } }));
+                  setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: name || c.id } : c));
+                }}
+                initialContact={contacts[selectedChat] || { name: '', notes: '' }}
+                initialLabels={contacts[selectedChat]?.labels || []}
+                onAddLabel={(label) => {
+                  fetch(`${SERVER}/label`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: selectedChat, label })
+                  }).catch(() => {});
+                  setContacts(prev => {
+                    const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
+                    const newLabels = cur.labels?.includes(label) ? cur.labels : [...(cur.labels || []), label];
+                    const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
+                    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+                    setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
+                    return updated;
+                  });
+                }}
+                onRemoveLabel={(label) => {
+                  fetch(`${SERVER}/label?phone=${encodeURIComponent(selectedChat)}&label=${encodeURIComponent(label)}`, {
+                    method: 'DELETE',
+                  }).catch(() => {});
+                  setContacts(prev => {
+                    const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
+                    const newLabels = (cur.labels || []).filter(l => l !== label);
+                    const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
+                    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+                    setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
+                    return updated;
+                  });
+                }}
+              />
+            </div>
+          )}
+        </div>
       )}
       <div ref={bottomRef} />
 
