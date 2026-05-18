@@ -390,18 +390,29 @@ export default function AppClient() {
   };
 
   const loadChats = async () => {
-    // Only fetch the latest message per phone — limit to recent messages to avoid downloading entire DB
-    const { data, error } = await supabase.from("messages").select("phone, content, role, sender, agent, created_at").order("created_at", { ascending: false }).limit(500);
-    if (error) return;
-    if (!data || data.length === 0) {
-      setAllRecentMessages([]);
-      return setChats([]);
-    }
-    setAllRecentMessages(data);
+    // 1. Fetch all conversations from the conversations table to ensure no active chat is ever omitted
+    const { data: convs, error: convsError } = await supabase
+      .from("conversations")
+      .select("phone, needs_human");
+
+    // 2. Fetch recent messages to populate lastMessage, timestamp, etc. (limit 3000 for deep history)
+    const { data: msgs, error: msgsError } = await supabase
+      .from("messages")
+      .select("phone, content, role, sender, agent, created_at")
+      .order("created_at", { ascending: false })
+      .limit(3000);
+
+    if (msgsError && !convs) return;
+
+    const messagesData = msgs || [];
+    const conversationsData = convs || [];
+
+    // Save messages to allRecentMessages for global search
+    setAllRecentMessages(messagesData);
 
     // Count unread (user messages newer than last-seen) per phone
     const unreadCount: Record<string, number> = {};
-    for (const row of data) {
+    for (const row of messagesData) {
       if (row.role !== 'user' && row.sender !== 'user') continue;
       const lastSeen = lastSeenRef.current[row.phone];
       if (!lastSeen || row.created_at > lastSeen) {
@@ -409,25 +420,58 @@ export default function AppClient() {
       }
     }
 
-    const map = new Map();
-    for (const row of data) {
-      if (!map.has(row.phone)) map.set(row.phone, row);
+    // Map each phone number to its latest message row
+    const latestMsgMap = new Map();
+    for (const row of messagesData) {
+      if (!latestMsgMap.has(row.phone)) {
+        latestMsgMap.set(row.phone, row);
+      }
     }
 
     const contacts = getContacts();
-    const result: Chat[] = Array.from(map.values()).map((r: any) => ({
-      id: r.phone,
-      name: contacts[r.phone]?.name || r.phone,
-      avatar: avatarDataUrl(contacts[r.phone]?.name || r.phone, r.phone),
-      lastMessage: r.content || '',
-      time: r.created_at ? new Date(r.created_at).toLocaleString() : "",
-      agent: r.agent ?? null,
-      unread: unreadCount[r.phone] || 0,
-      lastMsgAt: r.created_at,
-      labels: contacts[r.phone]?.labels || [],
-      pinned: pinnedChatIds.includes(r.phone),
-      needsHuman: needsHumanPhones.has(r.phone),
-    }));
+    const addedPhones = new Set<string>();
+    const result: Chat[] = [];
+
+    // First, process all conversations from the database to guarantee they are displayed
+    for (const c of conversationsData) {
+      const phone = c.phone;
+      const latestMsg = latestMsgMap.get(phone);
+      
+      result.push({
+        id: phone,
+        name: contacts[phone]?.name || phone,
+        avatar: avatarDataUrl(contacts[phone]?.name || phone, phone),
+        lastMessage: latestMsg?.content || 'No recent messages',
+        time: latestMsg?.created_at ? new Date(latestMsg.created_at).toLocaleString() : "",
+        agent: latestMsg?.agent ?? null,
+        unread: unreadCount[phone] || 0,
+        lastMsgAt: latestMsg?.created_at || null,
+        labels: contacts[phone]?.labels || [],
+        pinned: pinnedChatIds.includes(phone),
+        needsHuman: c.needs_human || needsHumanPhones.has(phone),
+      });
+      addedPhones.add(phone);
+    }
+
+    // Also include any other phone numbers from recent messages not yet in conversationsData
+    for (const phone of latestMsgMap.keys()) {
+      if (!addedPhones.has(phone)) {
+        const latestMsg = latestMsgMap.get(phone);
+        result.push({
+          id: phone,
+          name: contacts[phone]?.name || phone,
+          avatar: avatarDataUrl(contacts[phone]?.name || phone, phone),
+          lastMessage: latestMsg?.content || '',
+          time: latestMsg?.created_at ? new Date(latestMsg.created_at).toLocaleString() : "",
+          agent: latestMsg?.agent ?? null,
+          unread: unreadCount[phone] || 0,
+          lastMsgAt: latestMsg?.created_at || null,
+          labels: contacts[phone]?.labels || [],
+          pinned: pinnedChatIds.includes(phone),
+          needsHuman: needsHumanPhones.has(phone),
+        });
+      }
+    }
 
     setChats(result);
   };
