@@ -452,7 +452,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
           <img src={avatar} alt={name} className="w-11 h-11 rounded-full object-cover" />
         </div>
         <div className="flex-1 ml-3 relative z-10">
-          <h2 className="font-medium">{name}</h2>
+          <h2 className="font-bold">{name}</h2>
           <p className={`text-xs ${isDarkMode ? "text-white" : "text-gray-200"}`}>Online</p>
           <div className="text-xs mt-1 flex items-center gap-2">
             <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>Handled by:</strong> {handlerLocal}</span>

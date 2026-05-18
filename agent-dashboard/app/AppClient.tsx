@@ -323,6 +323,7 @@ export default function AppClient() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [allRecentMessages, setAllRecentMessages] = useState<any[]>([]);
   const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
   const [needsHumanPhones, setNeedsHumanPhones] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -392,7 +393,11 @@ export default function AppClient() {
     // Only fetch the latest message per phone — limit to recent messages to avoid downloading entire DB
     const { data, error } = await supabase.from("messages").select("phone, content, role, sender, agent, created_at").order("created_at", { ascending: false }).limit(500);
     if (error) return;
-    if (!data || data.length === 0) return setChats([]);
+    if (!data || data.length === 0) {
+      setAllRecentMessages([]);
+      return setChats([]);
+    }
+    setAllRecentMessages(data);
 
     // Count unread (user messages newer than last-seen) per phone
     const unreadCount: Record<string, number> = {};
@@ -507,6 +512,7 @@ export default function AppClient() {
         { event: "INSERT", schema: "public", table: "messages" },
         (payload) => {
           const msg = payload.new;
+          setAllRecentMessages(prev => [msg, ...prev]);
           console.log('realtime:', msg.phone, msg.content?.slice(0, 30));
           if (msg.phone === selectedChat) {
             const mapped = {
@@ -679,6 +685,7 @@ export default function AppClient() {
                 onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}
                 onDeleteAccount={agentId && agentId !== 'admin' ? () => { setDeletePin(''); setDeleteError(''); setShowDeleteModal(true); } : undefined}
                 chats={chats}
+                allRecentMessages={allRecentMessages}
               />
             )}
           </div>

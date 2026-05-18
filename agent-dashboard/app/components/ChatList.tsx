@@ -31,9 +31,10 @@ interface ChatListProps {
   chats: Chat[];
   onTogglePin: (chatId: string) => void;
   onOpenCalendar: () => void;
+  allRecentMessages?: any[];
 }
 
-export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats, onTogglePin, onOpenCalendar }: ChatListProps) {
+export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats, onTogglePin, onOpenCalendar, allRecentMessages = [] }: ChatListProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
   const [showNewConvo, setShowNewConvo] = useState(false);
@@ -72,11 +73,21 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
   };
 
   const filtered = query.trim()
-    ? chats.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query.toLowerCase()) ||
-          c.lastMessage.toLowerCase().includes(query.toLowerCase())
-      )
+    ? chats.filter((c) => {
+        const queryLower = query.toLowerCase();
+        // 1. Search contact name
+        if (c.name.toLowerCase().includes(queryLower)) return true;
+        // 2. Search last message
+        if (c.lastMessage.toLowerCase().includes(queryLower)) return true;
+        // 3. Search past messages in allRecentMessages history
+        const hasPastMatch = allRecentMessages.some(
+          (m) =>
+            m.phone === c.id &&
+            m.content &&
+            m.content.toLowerCase().includes(queryLower)
+        );
+        return hasPastMatch;
+      })
     : chats;
 
   const baseSorted = sort === 'az'
@@ -221,7 +232,7 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
             <div className="flex-1 ml-4 min-w-0">
               <div className="flex justify-between items-baseline">
                 <div className="flex items-center gap-2 min-w-0">
-                  <h3 className={`font-medium truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
+                  <h3 className={`font-bold truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
                   {chat.pinned && <Pin className={`w-3.5 h-3.5 flex-shrink-0 ${isDarkMode ? 'text-yellow-300' : 'text-amber-500'}`} fill="currentColor" />}
                 </div>
                 <span className={`text-xs ml-2 flex-shrink-0 ${isDarkMode ? "text-blue-400" : "text-gray-500"}`}>{chat.time}</span>
