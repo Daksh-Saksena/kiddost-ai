@@ -97,10 +97,14 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
     : filtered;
 
   const sorted = [...baseSorted].sort((a, b) => {
-    // Pinned first, then needs_human, then rest
+    // 1. Pinned chats always go to the top
     if (a.pinned !== b.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
-    if (a.needsHuman !== b.needsHuman) return Number(!!b.needsHuman) - Number(!!a.needsHuman);
-    return 0;
+    
+    // 2. Otherwise sort strictly by latest message time (most recent first)
+    const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
+    const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
+    
+    return timeB - timeA;
   });
 
   return (
