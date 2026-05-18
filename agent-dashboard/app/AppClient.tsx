@@ -269,7 +269,7 @@ export default function AppClient() {
   const [deleteError, setDeleteError] = useState('');
   const [contacts, setContacts] = useState<Record<string, { name: string; notes: string; labels?: string[] }>>({});
 
-  // Read all localStorage state after mount to avoid SSR hydration mismatch
+  // Read all localStorage state after mount to avoid SSR hydration mismatch and block pinch/double-tap zooming programmatically
   useEffect(() => {
     try {
       const session = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
@@ -280,6 +280,30 @@ export default function AppClient() {
       }
     } catch {}
     setContacts(getContacts());
+
+    // Programmatically and bulletproofly prevent all user pinch-to-zoom and double-tap zoom gestures on iOS and Android
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+    
+    let lastTouchEnd = 0;
+    const handleTouchEnd = (e: TouchEvent) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
   }, []);
 
   // Load shared contacts from server on mount

@@ -122,11 +122,26 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const prevLengthRef = useRef(0);
 
-  // Reset scroll tracking when switching chats
+  // Auto-expand textarea height based on content, matching WhatsApp style
+  const adjustTextareaHeight = () => {
+    const tx = textareaRef.current;
+    if (!tx) return;
+    tx.style.height = "auto";
+    tx.style.height = `${Math.min(tx.scrollHeight, 120)}px`; // Cap height at 120px
+  };
+
+  // Adjust height when inputValue changes
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputValue]);
+
+  // Reset scroll tracking and textarea height when switching chats
   useEffect(() => {
     prevLengthRef.current = 0;
+    setTimeout(() => adjustTextareaHeight(), 50);
   }, [chatId]);
 
   useEffect(() => {
@@ -769,7 +784,16 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         >
           <FileText className="w-5 h-5" />
         </button>
-        <textarea rows={3} value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyPress={handleKeyPress} placeholder={isDarkMode ? "Transmit message..." : "Type a message"} className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-base resize-none ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white border border-gray-300 text-gray-900 focus:border-[#008069] focus:ring-2 focus:ring-[#008069]/20"} transition-all`} />
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder={isDarkMode ? "Transmit message..." : "Type a message"}
+          className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-base resize-none overflow-y-auto ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white border border-gray-300 text-gray-900 focus:border-[#008069] focus:ring-2 focus:ring-[#008069]/20"} transition-all`}
+          style={{ height: '40px', minHeight: '40px', maxHeight: '120px' }}
+        />
         <button onClick={handleSend} disabled={sendCooldown} className={`p-3 mb-1 rounded-full active:scale-95 transition-all ${sendCooldown ? 'opacity-40 cursor-not-allowed' : ''} ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
           <Send className="w-5 h-5" />
         </button>
