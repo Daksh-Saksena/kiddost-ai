@@ -454,7 +454,8 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 - If age is already known, skip Step 1 and go straight to Step 2.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
-- Step 1: If child's age is not already known, you MUST ask: "Could I please know the child's age first?" and do NOT explain the packages yet.
+- Step 1: If the child's age is not already known (neither mentioned in the conversation history nor present in KNOWN FACTS), you MUST ask: "Could I please know the child's age first?" and do NOT explain the packages yet.
+- If age is already known, skip Step 1 and go straight to Step 2.
 - Step 2: Once age is known, you must tell them both the regular prices and the monthly package prices. Use this exact response structure:
   "These are our regular prices and these are our monthly value packages:
 Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.
@@ -615,7 +616,17 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       console.log("Supabase fetch error:", error);
     }
 
-    const history = Array.isArray(data) ? data.reverse() : [];
+    let history = Array.isArray(data) ? data.reverse() : [];
+
+    // Filter history to prevent duplicating the current incoming user message(s)
+    const bufferedCount = options.bufferedCount || 1;
+    let removed = 0;
+    while (history.length > 0 && 
+           history[history.length - 1].role === 'user' && 
+           removed < bufferedCount) {
+      history.pop();
+      removed++;
+    }
 
     // Load conversation variables AND ai_paused flag
     let convVars = {};
@@ -713,7 +724,17 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     // convVars.children = [{name, age}, ...] — merge by name or by position
     let varsUpdated = false;
     const storedChildren = Array.isArray(convVars.children) ? convVars.children : [];
-    for (const ic of intent.children) {
+    
+    // Coerce child ages to number if string representations are returned from intent classifier
+    const parsedIntentChildren = (intent.children || []).map(c => {
+      let age = c.age;
+      if (typeof age === 'string' && !isNaN(parseFloat(age))) {
+        age = parseFloat(age);
+      }
+      return { name: c.name || null, age: age != null ? age : null };
+    });
+
+    for (const ic of parsedIntentChildren) {
       if (ic.name == null && ic.age == null) continue;
       // Try to find existing match: same name (if named), or a nameless child slot
       let matched = null;
@@ -761,7 +782,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const exampleChat = findBestExampleChat(intent.searchQuery || combinedMessage);
     // For activities, find the best age-matched description.
     // Use the age of the child being discussed — prefer named child if name appears in message.
-    const allChildren = storedChildren.length > 0 ? storedChildren : intent.children;
+    const allChildren = storedChildren.length > 0 ? storedChildren : parsedIntentChildren;
     let activeChildAge = null;
     let activeChildName = null;
     if (allChildren.length === 1) {
@@ -1866,14 +1887,15 @@ app.post("/webhook", async (req, res) => {
 
       // wait MESSAGE_BUFFER_DELAY_MS before sending combined text to AI
       messageTimers[fullPhone] = setTimeout(async () => {
-        const combined = (messageBuffers[fullPhone] || []).join(" ").trim();
+        const buffered = messageBuffers[fullPhone] || [];
+        const combined = buffered.join(" ").trim();
         const prependWelcomeBack = !!welcomeBackFlags[fullPhone];
         // reset buffer
         messageBuffers[fullPhone] = [];
         welcomeBackFlags[fullPhone] = false;
         try {
           if (combined) {
-            await handleAIResponse(fullPhone, combined, { prependWelcomeBack, contactName });
+            await handleAIResponse(fullPhone, combined, { prependWelcomeBack, contactName, bufferedCount: buffered.length });
           }
         } catch (e) {
           console.error('buffered AI handler error', e?.message || e);
