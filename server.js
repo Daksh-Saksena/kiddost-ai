@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Format per line: [DD/MM/YY, HH:MM:SS AM/PM] Name: message
 const CHATS_DIR = path.join(__dirname, "chats");
 const KIDDOST_LABEL = "KidDost Tech Pvt Ltd";
-const STOP_WORDS = new Set(["i","me","my","we","our","you","your","the","a","an","is","it","in","on","at","to","of","and","or","for","with","be","am","are","was","were","do","did","can","will","have","has","had","not","this","that","so","just","ok","okay","hi","hello","thank","thanks","please","sure","yes","no","get","let","us","know","if","would","could","also","he","she","they","them","what","when","how","why","who","its","any","all","now","up","more","but","by","as","from","been","then","than","there","about","after","before","may","might","use"]);
+const STOP_WORDS = new Set(["i", "me", "my", "we", "our", "you", "your", "the", "a", "an", "is", "it", "in", "on", "at", "to", "of", "and", "or", "for", "with", "be", "am", "are", "was", "were", "do", "did", "can", "will", "have", "has", "had", "not", "this", "that", "so", "just", "ok", "okay", "hi", "hello", "thank", "thanks", "please", "sure", "yes", "no", "get", "let", "us", "know", "if", "would", "could", "also", "he", "she", "they", "them", "what", "when", "how", "why", "who", "its", "any", "all", "now", "up", "more", "but", "by", "as", "from", "been", "then", "than", "there", "about", "after", "before", "may", "might", "use"]);
 
 function parseChatFile(filePath) {
   const raw = fs.readFileSync(filePath, "utf8");
@@ -588,9 +588,8 @@ RULE 6 — ASKING FOR LOCATION:
 - During the BEFORE BOOKING flow, after collecting parent name / preferred time, ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
 - Once they share it, follow Rules 1-5 above.
 ---
-Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session. ${
-  KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : ""
-}${varsBlock}${sessionStatusBlock}${exampleBlock}`;
+Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session. ${KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : ""
+    }${varsBlock}${sessionStatusBlock}${exampleBlock}`;
 }
 
 function hashPin(pin) {
@@ -608,7 +607,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       .select("role, content")
       .eq("phone", fullPhone)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(30);
 
     if (error) {
       console.log("Supabase fetch error:", error);
@@ -619,9 +618,9 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
     // Filter history to prevent duplicating the current incoming user message(s)
     const bufferedCount = options.bufferedCount || 1;
     let removed = 0;
-    while (history.length > 0 && 
-           history[history.length - 1].role === 'user' && 
-           removed < bufferedCount) {
+    while (history.length > 0 &&
+      history[history.length - 1].role === 'user' &&
+      removed < bufferedCount) {
       history.pop();
       removed++;
     }
@@ -722,7 +721,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     // convVars.children = [{name, age}, ...] — merge by name or by position
     let varsUpdated = false;
     const storedChildren = Array.isArray(convVars.children) ? convVars.children : [];
-    
+
     // Coerce child ages to number if string representations are returned from intent classifier
     const parsedIntentChildren = (intent.children || []).map(c => {
       let age = c.age;
@@ -809,10 +808,9 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         return `- Unnamed child: ${c.age} years old`;
       });
     const varsBlock = childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
-      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${
-        convVars.notes && Object.keys(convVars.notes).length > 0
-          ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
-          : ''
+      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${convVars.notes && Object.keys(convVars.notes).length > 0
+        ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
+        : ''
       }`
       : '';
 
@@ -1278,13 +1276,13 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     if (needsHuman) {
       // Flag conversation as needing human attention
-      supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone).then(() => {});
+      supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone).then(() => { });
       sendPushToAll({
         title: `${displayContact}`,
         body: `Follow-up required for ${displayContact} (${fullPhone}): "${aiReply.slice(0, 100)}"`,
         phone: fullPhone,
         icon: "/icon-192.png"
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     console.log("Buffered message sent successfully");
@@ -1833,7 +1831,7 @@ app.post("/webhook", async (req, res) => {
           body: `User replied (Message #${userMsgCount}): "${message ? message.slice(0, 50) + (message.length > 50 ? '...' : '') : 'Media/Attachment'}"`,
           phone: fullPhone,
           icon: "/icon-192.png"
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch (e) {
       console.log('Failed to count messages for push notification', e.message);
@@ -2226,7 +2224,7 @@ app.get('/debug-prompt', async (req, res) => {
         .eq('phone', phone)
         .maybeSingle();
       convVars = convData?.vars || {};
-    } catch (e) {}
+    } catch (e) { }
 
     const allChildren = convVars.children || [];
     const childFacts = allChildren
@@ -2237,10 +2235,9 @@ app.get('/debug-prompt', async (req, res) => {
         return `- Unnamed child: ${c.age} years old`;
       });
     const varsBlock = childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
-      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${
-        convVars.notes && Object.keys(convVars.notes).length > 0
-          ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
-          : ''
+      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${convVars.notes && Object.keys(convVars.notes).length > 0
+        ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
+        : ''
       }`
       : '';
 
@@ -2258,7 +2255,7 @@ app.get('/debug-prompt', async (req, res) => {
       } else {
         sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer. Their first session will be an introductory session. When mentioning the first session price, use this exact line: "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." Treat the booking flow the same as a regular session after that.`;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const exampleChat = findBestExampleChat(message);
     const exampleBlock = exampleChat
@@ -2288,8 +2285,8 @@ app.get('/debug-prompt', async (req, res) => {
   }
 });
 
-    /*
-    const systemPrompt_old = `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 4 months).
+/*
+const systemPrompt_old = `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 4 months).
 
 Your tone:
 - Friendly, warm, and human-like (like a real WhatsApp agent)
@@ -2336,17 +2333,17 @@ PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
 - If age is not known yet, naturally ask for the child's age — phrase it conversationally, e.g. "Could you share your child's age?" or "May I know how old your child is?" — do NOT start with "Sure,"
 - Once age is known, give the appropriate activities response (paraphrasing is fine, keep the core activities accurate):
-  • Under 4 months: Explain this is too young and you might not be the right fit.
-  • 4m–under 1 year: Explain the age category starts from 1 year, but on request of parents you have provided service for infants as young as 4 months. The team engages through verbal interaction, rhymes, flashcards etc. The aim is to give parents some free time. Clarify no massage/bathing. All members are female graduates, English interaction.
-  • Age 1 to under 2 (including 1.5 years, 18 months): Verbal interaction, age-appropriate puzzles, flashcards, rhymes, storybook reading, park outings.
-  • Age 2: Verbal interaction, puzzles, rhymes, simple art & craft, storybook reading, shapes/colours/numbers, park outings.
-  • Age 3: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, phonics, writing practice, park outings.
-  • Age 4 to 8: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, worksheets, study help if needed, park outings.
-  • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
+• Under 4 months: Explain this is too young and you might not be the right fit.
+• 4m–under 1 year: Explain the age category starts from 1 year, but on request of parents you have provided service for infants as young as 4 months. The team engages through verbal interaction, rhymes, flashcards etc. The aim is to give parents some free time. Clarify no massage/bathing. All members are female graduates, English interaction.
+• Age 1 to under 2 (including 1.5 years, 18 months): Verbal interaction, age-appropriate puzzles, flashcards, rhymes, storybook reading, park outings.
+• Age 2: Verbal interaction, puzzles, rhymes, simple art & craft, storybook reading, shapes/colours/numbers, park outings.
+• Age 3: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, phonics, writing practice, park outings.
+• Age 4 to 8: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, worksheets, study help if needed, park outings.
+• Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
-  • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
+• If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
+• If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
 - Do NOT add nanny disclaimer unless the user specifically asked about nanny services.
@@ -2410,19 +2407,19 @@ BEFORE BOOKING:
 
 - NEVER ask for information that the user has already provided earlier in the conversation.
 - Before asking booking questions, carefully check the full conversation history for:
-  - Child's age
-  - Parent/customer name
-  - Preferred date/time
-  - Area/locality
+- Child's age
+- Parent/customer name
+- Preferred date/time
+- Area/locality
 - Only ask for the missing information.
 
 - If the user requests booking for Sunday or says "tomorrow" when tomorrow is Sunday, reply that we are currently operational Monday to Saturday only, and ask if they would like to schedule for another day instead.
 - Do NOT proceed to slot-availability flow for Sunday requests.
 
 - Before proceeding to check slot availability, you MUST gather ALL of the following:
-  1. Parent's/customer's name — if not known, ask: "And may I know your name as well?"
-  2. Preferred date and time — ask: "What date and time would work best for you?"
-  3. Area/locality — if not already known, ask: "Could you also share your area or locality so I can confirm we service your location?"
+1. Parent's/customer's name — if not known, ask: "And may I know your name as well?"
+2. Preferred date and time — ask: "What date and time would work best for you?"
+3. Area/locality — if not already known, ask: "Could you also share your area or locality so I can confirm we service your location?"
 - You can combine multiple missing questions into one message.
 - Only proceed to check availability once all required details are already available.
 - IMPORTANT: While gathering details/date/time, you are still in normal conversation mode. Reply normally to their answers. Do NOT reply UNSURE during this phase.
@@ -2454,17 +2451,17 @@ RULE 0 — USER ASKING WHERE WE ARE BASED:
 
 RULE 1 — NON-BANGALORE CITY DETECTED:
 - If the system injects a "NON-BANGALORE CITY DETECTED" message above, or if you yourself can tell the user mentioned a city/area/state that is NOT Bangalore/Bengaluru (e.g. Mumbai, Delhi, Kolkata, Chennai, Hyderabad, Pune, Nagpur, Mysore, Jaipur, Lucknow, Ahmedabad, Kochi, Goa, Noida, Gurgaon, Chandigarh, Indore, Bhopal, Patna, Coimbatore, Vizag, Mangalore, or ANY other non-Bangalore location), say EXACTLY:
-  "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
-  Then STOP. If the user replies after that, respond UNSURE.
-  This is NON-NEGOTIABLE. NEVER say "yes we service there" for any non-Bangalore city.
+"Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?"
+Then STOP. If the user replies after that, respond UNSURE.
+This is NON-NEGOTIABLE. NEVER say "yes we service there" for any non-Bangalore city.
 
 RULE 2 — PINCODES:
 - If the user shares a pincode (any 6-digit number), do NOT try to verify it. Respond UNSURE. A human agent will check.
 
 RULE 3 — BANGALORE AREAS:
 - If the user mentions an area/locality within Bangalore (e.g. Koramangala, BTM, Whitefield, HSR Layout, Indiranagar, JP Nagar, Marathahalli, Electronic City, Jayanagar, etc.), say EXACTLY:
-  "Let me check if we can service your area and get back to you."
-  Then STOP. If the user replies after that, respond UNSURE. A human agent will confirm.
+"Let me check if we can service your area and get back to you."
+Then STOP. If the user replies after that, respond UNSURE. A human agent will confirm.
 - NEVER confirm serviceability yourself. You cannot verify areas. Always defer to human.
 
 RULE 4 — GOOGLE MAPS LINKS:
@@ -2479,22 +2476,22 @@ RULE 6 — ASKING FOR LOCATION:
 - Once they share it, follow Rules 1-5 above.
 ---
 ` +
-      `Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session.` +
-      (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
-      exampleBlock;
+  `Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session.` +
+  (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
+  exampleBlock;
 
-    res.json({
-      systemPrompt,
-      history,
-      userMessage: message,
-      exampleChatFile: exampleChat?.file || null,
-      websiteContentLength: KIDDOST_WEBSITE_CONTENT.length
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+res.json({
+  systemPrompt,
+  history,
+  userMessage: message,
+  exampleChatFile: exampleChat?.file || null,
+  websiteContentLength: KIDDOST_WEBSITE_CONTENT.length
 });
-    */
+} catch (e) {
+res.status(500).json({ error: e.message });
+}
+});
+*/
 
 // Debug endpoint: return recent messages (for troubleshooting frontend visibility)
 app.get('/debug-messages', async (req, res) => {
