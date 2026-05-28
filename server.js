@@ -105,7 +105,7 @@ function sanitizeExampleText(text) {
     .replace(/https?:\/\/\S+/g, "[link]")
     // Remove Indian rupee prices e.g. Rs 500, Rs. 1000, ₹500
     .replace(/(?:Rs\.?\s*|₹\s*)\d[\d,]*/gi, "[price]")
-    // Remove time ranges e.g. 9:30 AM, 5:45-7:45 PM, 6-8pm
+    // Remove time ranges e.g. 9:00 AM, 5:45-7:45 PM, 6-8pm
     .replace(/\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)/g, "[time]")
     .replace(/\d{1,2}(?::\d{2})?\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?/g, "[time range]")
     // Remove session/number counts e.g. "11 sessions", "3 hours"
@@ -389,7 +389,7 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })} IST (24-hour format)
+CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -476,11 +476,22 @@ We are able to commit for 11 sessions at a time. You can renew your value packag
   • NEVER say this twin line if they only asked about monthly package for a single child.
 
 JOB INQUIRIES / HIRING:
-- If a user asks about job openings, hiring, "job available hai", careers, working at KidDost, or submitting a resume, you MUST respond with EXACTLY this:
+- If a user asks about job openings, hiring, "job available hai", careers, working at KidDost, or submitting a resume:
+
+  • If the current message ALREADY contains a document/file attachment (resume/CV), respond with EXACTLY:
+  "Could you please tell your location in Bangalore? We will get back to you."
+
+  • If NO resume/document is attached yet, respond with EXACTLY:
   "Could you please tell your location in Bangalore and share your resume? We will get back to you."
+
+- IMPORTANT:
+  • If the user already shared a resume earlier in the conversation, NEVER ask for the resume again.
+  • After sending the hiring response, STOP. Do not send any follow-up message.
+  • Do NOT ask additional questions.
+  • Do NOT continue the conversation automatically.
+
 - DO NOT say anything else.
 - DO NOT mention hiring, job opportunities, or share this job info with normal customers under any other circumstances.
-
 SESSION LENGTH / DURATION:
 - If the user asks "how long are the sessions" or similar, answer: "You can book as per your requirement."
 
@@ -509,17 +520,17 @@ PAYMENT POLICY:
 - Say EXACTLY: "For booking confirmation we would need payment in advance as travel charges are involved and exclusive slot needs to be reserved."
 
 BUSINESS HOURS:
-- Our services are typically available from 9:30 AM to 7:45 PM IST, Monday to Saturday.
-- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday only. Would you like to schedule for another day instead?"
+- Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
+- If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
-- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:30 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
+- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:30 AM – 7:45 PM) and on a working day (Monday to Saturday).
+-- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
-- If the user suggests an explicit time outside the 9:30 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:30 AM to 7:45 PM. Would you like to schedule for another time?" 
+-- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "Could I please know the child's age first?" before asking for the parent's name or location. Ask for age FIRST and wait for the answer.
@@ -869,7 +880,7 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })} IST (24-hour format)
+CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -963,17 +974,17 @@ PAYMENT POLICY:
 - Say EXACTLY: "For booking confirmation we would need payment in advance as travel charges are involved and exclusive slot needs to be reserved."
 
 BUSINESS HOURS:
-- Our services are typically available from 9:30 AM to 7:45 PM IST, Monday to Saturday.
-- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday only. Would you like to schedule for another day instead?"
+- Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
+- If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
-- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:30 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
+- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:30 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
-- If the user suggests an explicit time outside the 9:30 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:30 AM to 7:45 PM. Would you like to schedule for another time?" 
+- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "May I know the child's age?" before asking for the parent's name or location. Do NOT combine the age question with name/location questions. Ask for age FIRST and wait for the answer.
@@ -1114,7 +1125,42 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       }
     );
 
-    let aiReply = aiResponse.data.choices[0].message.content;
+    // Log the raw OpenAI choice for debugging (finish_reason, tokens, etc.)
+    console.log("OpenAI choice:", JSON.stringify(aiResponse.data.choices[0] || {}));
+    let aiReply = aiResponse.data.choices[0].message.content || '';
+    const finishReason = aiResponse.data.choices[0].finish_reason || null;
+
+    // If the model stopped because of max tokens (truncated) or the reply ends mid-sentence,
+    // request a short continuation (up to 2 attempts) to avoid sending incomplete sentences.
+    const seemsIncomplete = !/[\.\?!"]\s*$/.test(aiReply.trim());
+    if ((finishReason === 'length' || seemsIncomplete) && !process.env.DISABLE_CONTINUE) {
+      try {
+        let contAttempts = 0;
+        while (contAttempts < 2 && (finishReason === 'length' || !/[\.\?!"]\s*$/.test(aiReply.trim()))) {
+          contAttempts++;
+          console.log(`[OpenAI] continuation attempt ${contAttempts} (finishReason=${finishReason})`);
+          const contRes = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+              model: "gpt-4o-mini",
+              messages: [
+                ...messagesForAI,
+                { role: 'assistant', content: aiReply },
+                { role: 'user', content: 'Please continue the previous reply and finish the sentence if it was cut off.' }
+              ],
+              temperature: 0
+            },
+            { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
+          );
+          const extra = contRes.data.choices[0].message.content || '';
+          console.log('OpenAI continuation choice:', JSON.stringify(contRes.data.choices[0] || {}));
+          aiReply = (aiReply + '\n' + extra).trim();
+          if (contRes.data.choices[0].finish_reason !== 'length') break;
+        }
+      } catch (e) {
+        console.warn('[OpenAI] continuation failed:', e.message || e);
+      }
+    }
 
     // Safety net: patch known model misfires before sending to user.
     // 1) Prevent false out-of-hours replies during working hours.
@@ -1127,9 +1173,9 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     }).format(new Date());
     const [hStr, mStr] = nowIst.split(':');
     const nowMins = (parseInt(hStr, 10) * 60) + parseInt(mStr, 10);
-    const isWithinBusinessHours = nowMins >= (9 * 60 + 30) && nowMins <= (19 * 60 + 45);
+    const isWithinBusinessHours = nowMins >= (9 * 60) && nowMins <= (19 * 60 + 45);
 
-    const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9:?30\s*am\s*(?:and|-)\s*7:?45\s*pm|first thing in the morning|could we find a slot within that window)/i;
+    const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9(?:\:?00)?\s*am\s*(?:and|-)\s*7(?:\:?45)?\s*pm|first thing in the morning|could we find a slot within that window|would you like to schedule for another time)/i;
     const mentionsNanny = /\b(nanny|babysitter|caretaker|caregiver)\b/i.test(combinedMessage || '');
 
     const extractTimesToMinutes = (text) => {
@@ -1149,7 +1195,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     const timesInMessage = extractTimesToMinutes(combinedMessage);
     const hasTimes = timesInMessage.length > 0;
-    const allTimesWithinHours = hasTimes && timesInMessage.every(t => t >= (9 * 60 + 30) && t <= (19 * 60 + 45));
+    const allTimesWithinHours = hasTimes && timesInMessage.every(t => t >= (9 * 60) && t <= (19 * 60 + 45));
 
     if (OUT_OF_HOURS_REPLY_RE.test(aiReply)) {
       // If current time is within business hours, this out-of-hours response is invalid.
@@ -1208,19 +1254,33 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       await supabase.from("messages").insert({
         phone: fullPhone, role: "assistant", content: text, sender: "ai", agent: null, ai_enabled: true
       });
-      await axios.post(
-        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-        { name: "User", phone: fullPhone, text },
-        { params: { apiKey: BOTSPACE_API_KEY }, headers: { "Content-Type": "application/json" } }
-      );
+      const payload = { name: "User", phone: fullPhone, text };
+      console.log('[BotSpace] Outgoing session message payload:', JSON.stringify(payload));
+      try {
+        const res = await axios.post(
+          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+          payload,
+          { params: { apiKey: BOTSPACE_API_KEY }, headers: { "Content-Type": "application/json" } }
+        );
+        console.log('[BotSpace] send-session-message response:', res.status, JSON.stringify(res.data || {}));
+      } catch (err) {
+        console.warn('[BotSpace] send-session-message failed:', err?.response?.data || err.message || err);
+        throw err;
+      }
     };
     const sendAIImage = async (filename) => {
       const mediaUrl = `${SERVER_URL}/static/${filename}`;
-      await axios.post(
-        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
-        { name: 'KidDost', phone: fullPhone, mediaUrl, mediaType: 'image', label: '' },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      try {
+        const res = await axios.post(
+          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
+          { name: 'KidDost', phone: fullPhone, mediaUrl, mediaType: 'image', label: '' },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        console.log('[BotSpace] send-session-media-message response:', res.status, JSON.stringify(res.data || {}));
+      } catch (err) {
+        console.warn('[BotSpace] send-session-media-message failed:', err?.response?.data || err.message || err);
+        throw err;
+      }
     };
 
     if (prependWelcomeBack) {
@@ -2304,7 +2364,7 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })} IST (24-hour format)
+CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -2398,17 +2458,17 @@ PAYMENT POLICY:
 - Say EXACTLY: "For booking confirmation we would need payment in advance as travel charges are involved and exclusive slot needs to be reserved."
 
 BUSINESS HOURS:
-- Our services are typically available from 9:30 AM to 7:45 PM IST, Monday to Saturday.
-- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday only. Would you like to schedule for another day instead?"
+- Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
+- If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
-- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:30 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
+- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:30 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
-- If the user suggests an explicit time outside the 9:30 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:30 AM to 7:45 PM. Would you like to schedule for another time?" 
+- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "May I know the child's age?" before asking for the parent's name or location. Do NOT combine the age question with name/location questions. Ask for age FIRST and wait for the answer.
@@ -3009,7 +3069,7 @@ function formatTimeIST(timeStr) {
 
 async function sendMemberSessionReminders() {
   try {
-    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const todayStr = nowIST.toISOString().split('T')[0];
     const target = new Date(nowIST.getTime() + 15 * 60 * 1000);
     const targetTime = `${String(target.getUTCHours()).padStart(2, '0')}:${String(target.getUTCMinutes()).padStart(2, '0')}`;
@@ -3092,7 +3152,7 @@ const REMINDER_PHONE = process.env.REMINDER_PHONE || '919901029836';
 async function sendDailyReminder() {
   try {
     // Get tomorrow's date in IST (UTC+5:30)
-    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const tomorrow = new Date(nowIST);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
