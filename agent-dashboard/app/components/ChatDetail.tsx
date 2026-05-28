@@ -15,6 +15,7 @@ interface Message {
   ai_enabled?: boolean;
   status?: string | null;
   media_url?: string | null;
+  created_at?: string;
 }
 
 interface ChatDetailProps {
@@ -203,7 +204,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
               return;
             }
             const publicURL = json.publicUrl;
-            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), media_url: publicURL, status: 'sending' } as Message]);
+            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
             await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -224,7 +225,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         return;
       }
 
-      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), media_url: publicURL, status: 'sending' } as Message]);
+      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
 
       await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
         method: 'POST',
@@ -590,31 +591,70 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       )}
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
-        {messages.filter(m => m.sender !== 'system').map((message) => {
-          const isMe = message.sender === 'me';
-          return (
-            <div key={message.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${isDarkMode ? (isMe ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white backdrop-blur-sm' : 'bg-gray-900/80 text-gray-100 border border-blue-500/20 backdrop-blur-sm') : (isMe ? 'bg-[#d9fdd3]' : 'bg-white')}`} style={isDarkMode ? (isMe ? { boxShadow: '0 0 15px rgba(37, 99, 235, 0.2)' } : { boxShadow: '0 0 15px rgba(59, 130, 246, 0.1)' }) : {}}>
-                {message.media_url && (
-                  <div className="mb-2">
-                    <MediaRenderer url={message.media_url} isDark={isDarkMode} />
+        {(() => {
+          let lastDateStr = '';
+          return messages.filter(m => m.sender !== 'system').map((message) => {
+            const isMe = message.sender === 'me';
+            const msgDate = message.created_at ? new Date(message.created_at) : new Date();
+            const dateStr = msgDate.toDateString();
+            let showDivider = false;
+            if (dateStr !== lastDateStr) {
+              showDivider = true;
+              lastDateStr = dateStr;
+            }
+
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+
+            let dividerLabel = '';
+            if (showDivider) {
+              if (dateStr === today.toDateString()) {
+                dividerLabel = 'Today';
+              } else if (dateStr === yesterday.toDateString()) {
+                dividerLabel = 'Yesterday';
+              } else {
+                dividerLabel = msgDate.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+              }
+            }
+
+            return (
+              <React.Fragment key={message.id}>
+                {showDivider && (
+                  <div className="flex justify-center my-4">
+                    <span className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide shadow-sm border ${
+                      isDarkMode 
+                        ? 'bg-gray-900/90 text-blue-400 border-blue-500/20 backdrop-blur-md' 
+                        : 'bg-white/80 text-gray-600 border-gray-200/60 backdrop-blur-md shadow-sm'
+                    }`}>
+                      {dividerLabel}
+                    </span>
                   </div>
                 )}
-                {message.text ? <p className={`text-sm ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
-                <div className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
-                  <span>{message.time}</span>
-                  {isMe && (() => {
-                    const s = message.status?.toLowerCase() || '';
-                    if (s === 'read' || s === 'seen') return <CheckCheck className="w-4 h-4" style={{ color: '#22aaff' }} />;
-                    if (s === 'delivered' || s === 'delivery') return <CheckCheck className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
-                    if (s === 'sent' || s === 'accepted' || s === 'enqueued') return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
-                    return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#4b5563' : '#d1d5db' }} />;
-                  })()}
+                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${isDarkMode ? (isMe ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white backdrop-blur-sm' : 'bg-gray-900/80 text-gray-100 border border-blue-500/20 backdrop-blur-sm') : (isMe ? 'bg-[#d9fdd3]' : 'bg-white')}`} style={isDarkMode ? (isMe ? { boxShadow: '0 0 15px rgba(37, 99, 235, 0.2)' } : { boxShadow: '0 0 15px rgba(59, 130, 246, 0.1)' }) : {}}>
+                    {message.media_url && (
+                      <div className="mb-2">
+                        <MediaRenderer url={message.media_url} isDark={isDarkMode} />
+                      </div>
+                    )}
+                    {message.text ? <p className={`text-sm ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
+                    <div className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
+                      <span title={message.created_at ? new Date(message.created_at).toLocaleString() : undefined}>{message.time}</span>
+                      {isMe && (() => {
+                        const s = message.status?.toLowerCase() || '';
+                        if (s === 'read' || s === 'seen') return <CheckCheck className="w-4 h-4" style={{ color: '#22aaff' }} />;
+                        if (s === 'delivered' || s === 'delivery') return <CheckCheck className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
+                        if (s === 'sent' || s === 'accepted' || s === 'enqueued') return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
+                        return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#4b5563' : '#d1d5db' }} />;
+                      })()}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              </React.Fragment>
+            );
+          });
+        })()}
         <div ref={messagesEndRef} />
       </div>
 
