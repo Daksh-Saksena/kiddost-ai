@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
   Send,
@@ -149,7 +149,12 @@ export function ChatDetail({
     chat.messages,
   );
   const [inputValue, setInputValue] = useState("");
-
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({
+    behavior: "auto",
+  });
+}, [messages, chatId]);
   const handleSend = () => {
     if (inputValue.trim()) {
       const newMessage: Message = {
@@ -307,7 +312,9 @@ export function ChatDetail({
               </div>
             </div>
           </div>
-        ))}
+                ))}
+
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
