@@ -595,6 +595,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
           let lastDateStr = '';
           return messages.filter(m => m.sender !== 'system').map((message) => {
             const isMe = message.sender === 'me';
+            console.log("[ChatDetail DEBUG] message id:", message.id, "created_at:", message.created_at, "time:", message.time);
             const msgDate = message.created_at ? new Date(message.created_at) : new Date();
             const dateStr = msgDate.toDateString();
             let showDivider = false;

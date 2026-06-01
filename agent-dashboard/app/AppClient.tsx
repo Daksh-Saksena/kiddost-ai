@@ -12,7 +12,7 @@ const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[]; pinned?: boolean; needsHuman?: boolean };
-type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
+type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; created_at?: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
 function avatarColor(name: string) {
@@ -489,6 +489,7 @@ export default function AppClient() {
         text: m.content || m.text || '',
         sender: isSystem ? 'system' : (isOther ? 'other' : 'me'),
         time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        created_at: m.created_at,
         agent: m.agent ?? null,
         ai_enabled: typeof m.ai_enabled !== 'undefined' ? !!m.ai_enabled : true,
         status: m.status ?? null,
@@ -510,6 +511,7 @@ export default function AppClient() {
       text,
       sender: 'me',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      created_at: new Date().toISOString(),
       agent: agentName,
       status: 'sending',
       media_url: null,
@@ -566,6 +568,7 @@ export default function AppClient() {
                 : (msg.role === 'user' || msg.sender === 'user') ? 'other' as const
                 : 'me' as const,
               time: msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+              created_at: msg.created_at,
               agent: msg.agent ?? null,
               ai_enabled: typeof msg.ai_enabled !== 'undefined' ? !!msg.ai_enabled : undefined,
               status: msg.status ?? null,

@@ -105,7 +105,7 @@ function sanitizeExampleText(text) {
     .replace(/https?:\/\/\S+/g, "[link]")
     // Remove Indian rupee prices e.g. Rs 500, Rs. 1000, ₹500
     .replace(/(?:Rs\.?\s*|₹\s*)\d[\d,]*/gi, "[price]")
-    // Remove time ranges e.g. 9:00 AM, 5:45-7:45 PM, 6-8pm
+    // Remove time ranges e.g. 9:30 AM, 5:45-7:45 PM, 6-8pm
     .replace(/\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)/g, "[time]")
     .replace(/\d{1,2}(?::\d{2})?\s*[-–]\s*\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?/g, "[time range]")
     // Remove session/number counts e.g. "11 sessions", "3 hours"
@@ -389,7 +389,7 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
+CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })} IST (24-hour format)
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -406,15 +406,8 @@ CRITICAL RULES:
 - When in doubt, ALWAYS err on the side of saying UNSURE. A wrong answer is far worse than deferring to a human agent.
 
 AGE FIRST POLICY (CRITICAL):
-- If the child's age is NOT already mentioned in the conversation history or KNOWN FACTS, you MUST politely ask for their child's age FIRST before answering any questions about monthly packages, location serviceability, regular pricing, activities, nanny services, sibling sessions, scheduling, or booking.
-- **BEFORE ASKING FOR AGE**: Search the entire conversation history for any mention of the child's age (e.g., "3", "2.5", "4 years old", "age", "months", "year"). If found, USE THAT AGE and SKIP the age question entirely.
-- Only if age is NOT found in history, then ask: "Could I please know the child's age first?" (or "May I know the age of the child?"). Do NOT provide pricing, packages, or activities until you have their age.
-- **BREAK MESSAGES FOR CLARITY**: Send each response component in a SEPARATE WhatsApp message:
-  - Age question: One message
-  - Activities explanation: Separate message
-  - [PRICING_IMAGE]: Separate message  
-  - Pricing details or follow-up: Separate message
-  - Do NOT combine all information in one long message
+- If the child's age is NOT already mentioned in the conversation history or KNOWN FACTS, you MUST politely ask for their child's age FIRST before answering any questions about monthly packages, location serviceability, regular pricing, activities, nanny services, sibling sessions, scheduling, or booking. 
+- You MUST say: "Could I please know the child's age first?" (or something very similar and polite). Do NOT provide the pricing, monthly packages, or location confirmation until you have their age.
 
 HARD NEVER-DO LIST (violations are critical failures):
 - NEVER mention or ask for society gate codes, entry codes, building access codes, or apartment entry procedures
@@ -476,27 +469,16 @@ We are able to commit for 11 sessions at a time. You can renew your value packag
   • NEVER say this twin line if they only asked about monthly package for a single child.
 
 JOB INQUIRIES / HIRING:
-- If a user asks about job openings, hiring, "job available hai", careers, working at KidDost, or submitting a resume:
-
-  • If the current message ALREADY contains a document/file attachment (resume/CV), respond with EXACTLY:
-  "Could you please tell your location in Bangalore? We will get back to you."
-
-  • If NO resume/document is attached yet, respond with EXACTLY:
+- If a user asks about job openings, hiring, "job available hai", careers, working at KidDost, or submitting a resume, you MUST respond with EXACTLY this:
   "Could you please tell your location in Bangalore and share your resume? We will get back to you."
+- DO NOT say anything else.
+- DO NOT mention hiring, job opportunities, or share this job info with normal customers under any other circumstances.
 
-- IMPORTANT:
-  • If the user already shared a resume earlier in the conversation, NEVER ask for the resume again.
-  SESSION LENGTH / DURATION:
+SESSION LENGTH / DURATION:
 - If the user asks "how long are the sessions" or similar, answer: "You can book as per your requirement."
 
-MATERIALS / SUPPLIES — HIGHEST PRIORITY RULE FOR THIS TOPIC:
-- CRITICAL: If the user asks what materials, supplies, puzzles, craft items, stationery, flashcards, worksheets, or storybooks the team will bring or use — this is a MATERIALS question, NOT a member profile question and NOT a baby work question.
-- ALWAYS answer: "Our team brings all the necessary materials for the activities, including puzzles, flashcards, storybooks, and art & craft supplies. You don't need to arrange anything."
-- Examples of materials questions: "What materials will you bring?", "Will you bring puzzles?", "Do you bring art supplies?", "What craft materials do you use?", "I mean puzzles arts crafts material", "Will you get the craft stuff?"
-
 MEMBER QUALIFICATIONS / PROFILE SHARING:
-- ONLY use this rule if the user is explicitly asking to SEE or SHARE a team member's profile/resume/bio — NOT if they are asking about what supplies or materials are brought.
-- If the user asks to see a profile or "Will you share profile?": Respond with "Sorry, we don't share our members profile. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
+- If the user asks to see a profile or "Will you share profile?": Respond with "Sorry, we don’t share our members profile. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
 - Otherwise, if asked about qualifications: Motivated, compassionate female graduates/students passionate about teaching. Comprehensive in-house training.
 
 SAME MEMBER EVERY TIME:
@@ -507,30 +489,30 @@ SAFETY / BACKGROUND CHECKS:
 - Parents do not need to be present during the session — our members are trained professionals and the child can be left with them comfortably.
 
 OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
-- ONLY use this rule if the user is asking about feeding, bathing, diaper changes, or other caretaking. Do NOT use this rule for questions about activity materials or supplies.
+- This is NOT about activities or pricing. Do NOT re-share activities or ask for age.
 - Simply explain: our scope is limited to engaging children through fun and learning activities. We do not handle feeding, bathing, diaper changes, or other caretaking tasks. However, we can encourage light snacks if the child is not a fussy eater.
 
 TOO EXPENSIVE / OUT OF BUDGET:
 - If the user says something like "Ok. Prices are quite high", reply with EXACTLY:
-"Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
-- If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
+"Hi, regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+- If after that it's still too expensive for them, thank them for considering and invite them to reach out for ad-hoc support.
 
 PAYMENT POLICY:
 - If the user asks to pay on delivery, at doorstep, after session, or "I would like to pay when tutor reaches my doorstep":
 - Say EXACTLY: "For booking confirmation we would need payment in advance as travel charges are involved and exclusive slot needs to be reserved."
 
 BUSINESS HOURS:
-- Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
-- If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- Our services are typically available from 9:30 AM to 7:45 PM IST, Monday to Saturday.
+- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday only. Would you like to schedule for another day instead?"
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
-- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
+- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:30 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 
 BEFORE BOOKING:
--- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:30 AM – 7:45 PM) and on a working day (Monday to Saturday).
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
--- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
+- If the user suggests an explicit time outside the 9:30 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:30 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "Could I please know the child's age first?" before asking for the parent's name or location. Ask for age FIRST and wait for the answer.
@@ -880,7 +862,7 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
+CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })} IST (24-hour format)
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -964,31 +946,27 @@ OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 - This is NOT about activities or pricing. Do NOT re-share activities or ask for age.
 - Simply explain: our scope is limited to engaging children through fun and learning activities. We do not handle feeding, bathing, diaper changes, or other caretaking tasks. However, we can encourage light snacks if the child is not a fussy eater.
 
-MATERIALS / SUPPLIES (puzzles, art & craft materials, stationery, flashcards, etc.):
-- Our team members bring all necessary materials and supplies needed for the activities — puzzles, flashcards, art & craft materials, storybooks, worksheets, etc. Parents do not need to arrange anything.
-- If the user asks specifically what materials are brought, answer: "Our team brings all the necessary materials for the activities, including puzzles, flashcards, storybooks, and art & craft supplies. You don't need to arrange anything."
-
 TOO EXPENSIVE / OUT OF BUDGET:
 - If the user says something like "Ok. Prices are quite high", reply with EXACTLY:
-"Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
-- If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
+"Hi, regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+- If after that it's still too expensive for them, thank them for considering and invite them to reach out for ad-hoc support.
 
 PAYMENT POLICY:
 - If the user asks to pay on delivery, at doorstep, after session, or "I would like to pay when tutor reaches my doorstep":
 - Say EXACTLY: "For booking confirmation we would need payment in advance as travel charges are involved and exclusive slot needs to be reserved."
 
 BUSINESS HOURS:
-- Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
-- If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- Our services are typically available from 9:30 AM to 7:45 PM IST, Monday to Saturday.
+- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday only. Would you like to schedule for another day instead?"
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
-- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
+- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:30 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:30 AM – 7:45 PM) and on a working day (Monday to Saturday).
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
-- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
+- If the user suggests an explicit time outside the 9:30 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:30 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "May I know the child's age?" before asking for the parent's name or location. Do NOT combine the age question with name/location questions. Ask for age FIRST and wait for the answer.
@@ -1129,44 +1107,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       }
     );
 
-    // Log the raw OpenAI choice for debugging (finish_reason, tokens, etc.)
-    console.log("OpenAI choice:", JSON.stringify(aiResponse.data.choices[0] || {}));
-    let aiReply = aiResponse.data.choices[0].message.content || '';
-    const finishReason = aiResponse.data.choices[0].finish_reason || null;
-
-    // If the model stopped because of max tokens (truncated) or the reply ends mid-sentence,
-    // request a short continuation (up to 2 attempts) to avoid sending incomplete sentences.
-    // IMPORTANT: Never continue an UNSURE reply — doing so causes 'UNSURE UNSURE' to be sent to the user.
-    const isUnsureReply = /^\s*UNSURE\s*$/i.test(aiReply.trim());
-    const seemsIncomplete = !/[\.\?!"]\s*$/.test(aiReply.trim());
-    if (!isUnsureReply && (finishReason === 'length' || seemsIncomplete) && !process.env.DISABLE_CONTINUE) {
-      try {
-        let contAttempts = 0;
-        while (contAttempts < 2 && (finishReason === 'length' || !/[\.\?!"]\s*$/.test(aiReply.trim()))) {
-          contAttempts++;
-          console.log(`[OpenAI] continuation attempt ${contAttempts} (finishReason=${finishReason})`);
-          const contRes = await axios.post(
-            "https://api.openai.com/v1/chat/completions",
-            {
-              model: "gpt-4o-mini",
-              messages: [
-                ...messagesForAI,
-                { role: 'assistant', content: aiReply },
-                { role: 'user', content: 'Please continue the previous reply and finish the sentence if it was cut off.' }
-              ],
-              temperature: 0
-            },
-            { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' } }
-          );
-          const extra = contRes.data.choices[0].message.content || '';
-          console.log('OpenAI continuation choice:', JSON.stringify(contRes.data.choices[0] || {}));
-          aiReply = (aiReply + '\n' + extra).trim();
-          if (contRes.data.choices[0].finish_reason !== 'length') break;
-        }
-      } catch (e) {
-        console.warn('[OpenAI] continuation failed:', e.message || e);
-      }
-    }
+    let aiReply = aiResponse.data.choices[0].message.content;
 
     // Safety net: patch known model misfires before sending to user.
     // 1) Prevent false out-of-hours replies during working hours.
@@ -1179,9 +1120,9 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     }).format(new Date());
     const [hStr, mStr] = nowIst.split(':');
     const nowMins = (parseInt(hStr, 10) * 60) + parseInt(mStr, 10);
-    const isWithinBusinessHours = nowMins >= (9 * 60) && nowMins <= (19 * 60 + 45);
+    const isWithinBusinessHours = nowMins >= (9 * 60 + 30) && nowMins <= (19 * 60 + 45);
 
-    const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9(?:\:?00)?\s*am\s*(?:and|-)\s*7(?:\:?45)?\s*pm|first thing in the morning|could we find a slot within that window|would you like to schedule for another time)/i;
+    const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9:?30\s*am\s*(?:and|-)\s*7:?45\s*pm|first thing in the morning|could we find a slot within that window)/i;
     const mentionsNanny = /\b(nanny|babysitter|caretaker|caregiver)\b/i.test(combinedMessage || '');
 
     const extractTimesToMinutes = (text) => {
@@ -1201,7 +1142,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     const timesInMessage = extractTimesToMinutes(combinedMessage);
     const hasTimes = timesInMessage.length > 0;
-    const allTimesWithinHours = hasTimes && timesInMessage.every(t => t >= (9 * 60) && t <= (19 * 60 + 45));
+    const allTimesWithinHours = hasTimes && timesInMessage.every(t => t >= (9 * 60 + 30) && t <= (19 * 60 + 45));
 
     if (OUT_OF_HOURS_REPLY_RE.test(aiReply)) {
       // If current time is within business hours, this out-of-hours response is invalid.
@@ -1240,9 +1181,8 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     console.log("AI Reply (buffered):", aiReply);
 
-    // If AI is unsure, notify agents instead of replying to user.
-    // Match any reply that is ONLY the word UNSURE (possibly repeated, e.g. 'UNSURE UNSURE' due to continuation bugs).
-    if (/^(UNSURE\s*)+$/i.test(aiReply.trim())) {
+    // If AI is unsure, notify agents instead of replying to user
+    if (aiReply.trim().toUpperCase() === "UNSURE") {
       console.log("[AI] UNSURE — sending agent notification, not replying to user");
       // Flag conversation as needing human attention
       await supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone);
@@ -1261,33 +1201,19 @@ Goal: Make the user feel like they are chatting with a real human agent and move
       await supabase.from("messages").insert({
         phone: fullPhone, role: "assistant", content: text, sender: "ai", agent: null, ai_enabled: true
       });
-      const payload = { name: "User", phone: fullPhone, text };
-      console.log('[BotSpace] Outgoing session message payload:', JSON.stringify(payload));
-      try {
-        const res = await axios.post(
-          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-          payload,
-          { params: { apiKey: BOTSPACE_API_KEY }, headers: { "Content-Type": "application/json" } }
-        );
-        console.log('[BotSpace] send-session-message response:', res.status, JSON.stringify(res.data || {}));
-      } catch (err) {
-        console.warn('[BotSpace] send-session-message failed:', err?.response?.data || err.message || err);
-        throw err;
-      }
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+        { name: "User", phone: fullPhone, text },
+        { params: { apiKey: BOTSPACE_API_KEY }, headers: { "Content-Type": "application/json" } }
+      );
     };
     const sendAIImage = async (filename) => {
       const mediaUrl = `${SERVER_URL}/static/${filename}`;
-      try {
-        const res = await axios.post(
-          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
-          { name: 'KidDost', phone: fullPhone, mediaUrl, mediaType: 'image', label: '' },
-          { headers: { 'Content-Type': 'application/json' } }
-        );
-        console.log('[BotSpace] send-session-media-message response:', res.status, JSON.stringify(res.data || {}));
-      } catch (err) {
-        console.warn('[BotSpace] send-session-media-message failed:', err?.response?.data || err.message || err);
-        throw err;
-      }
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
+        { name: 'KidDost', phone: fullPhone, mediaUrl, mediaType: 'image', label: '' },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     };
 
     if (prependWelcomeBack) {
@@ -2371,7 +2297,7 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
+CURRENT TIME: ${new Date(Date.now() + 5.5 * 60 * 60 * 1000).toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })} IST (24-hour format)
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -2455,31 +2381,27 @@ OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 - This is NOT about activities or pricing. Do NOT re-share activities or ask for age.
 - Simply explain: our scope is limited to engaging children through fun and learning activities. We do not handle feeding, bathing, diaper changes, or other caretaking tasks. However, we can encourage light snacks if the child is not a fussy eater.
 
-MATERIALS / SUPPLIES (puzzles, art & craft materials, stationery, flashcards, etc.):
-- Our team members bring all necessary materials and supplies needed for the activities — puzzles, flashcards, art & craft materials, storybooks, worksheets, etc. Parents do not need to arrange anything.
-- If the user asks specifically what materials are brought, answer: "Our team brings all the necessary materials for the activities, including puzzles, flashcards, storybooks, and art & craft supplies. You don't need to arrange anything."
-
 TOO EXPENSIVE / OUT OF BUDGET:
 - If the user says something like "Ok. Prices are quite high", reply with EXACTLY:
-"Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
-- If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
+"Hi, regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+- If after that it's still too expensive for them, thank them for considering and invite them to reach out for ad-hoc support.
 
 PAYMENT POLICY:
 - If the user asks to pay on delivery, at doorstep, after session, or "I would like to pay when tutor reaches my doorstep":
 - Say EXACTLY: "For booking confirmation we would need payment in advance as travel charges are involved and exclusive slot needs to be reserved."
 
 BUSINESS HOURS:
-- Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
-- If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- Our services are typically available from 9:30 AM to 7:45 PM IST, Monday to Saturday.
+- If the CURRENT TIME is before 9:30 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:30 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:30 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday only. Would you like to schedule for another day instead?"
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
-- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
+- IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:30 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:30 AM – 7:45 PM) and on a working day (Monday to Saturday).
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
-- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
+- If the user suggests an explicit time outside the 9:30 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:30 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "May I know the child's age?" before asking for the parent's name or location. Do NOT combine the age question with name/location questions. Ask for age FIRST and wait for the answer.
@@ -3080,7 +3002,7 @@ function formatTimeIST(timeStr) {
 
 async function sendMemberSessionReminders() {
   try {
-    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
     const todayStr = nowIST.toISOString().split('T')[0];
     const target = new Date(nowIST.getTime() + 15 * 60 * 1000);
     const targetTime = `${String(target.getUTCHours()).padStart(2, '0')}:${String(target.getUTCMinutes()).padStart(2, '0')}`;
@@ -3163,7 +3085,7 @@ const REMINDER_PHONE = process.env.REMINDER_PHONE || '919901029836';
 async function sendDailyReminder() {
   try {
     // Get tomorrow's date in IST (UTC+5:30)
-    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
     const tomorrow = new Date(nowIST);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
