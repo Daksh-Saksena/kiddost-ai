@@ -397,7 +397,7 @@ CRITICAL RULES:
 - DO NOT copy specific names, dates, prices, or availability from the example conversation
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
-- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the full history before responding.
+- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the FULL conversation history before responding. Look for ANY number that could be an age — e.g. "2", "3.5", "10 months", "1.5", "2.3". If found ANYWHERE in history, use it. DO NOT ask again. This is especially important for monthly package / value package questions.
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
@@ -408,9 +408,10 @@ CRITICAL RULES:
 - When in doubt, ALWAYS err on the side of saying UNSURE. A wrong answer is far worse than deferring to a human agent.
 
 AGE FIRST POLICY (CRITICAL):
-- If the child's age is NOT already mentioned in the conversation history or KNOWN FACTS, you MUST politely ask for their child's age FIRST before answering any questions about monthly packages, location serviceability, regular pricing, activities, nanny services, sibling sessions, scheduling, or booking.
-- **BEFORE ASKING FOR AGE**: Search the entire conversation history for any mention of the child's age (e.g., "3", "2.5", "4 years old", "age", "months", "year"). If found, USE THAT AGE and SKIP the age question entirely.
-- Only if age is NOT found in history, then ask: "Could I please know the child's age first?" (or "May I know the age of the child?"). Do NOT provide pricing, packages, or activities until you have their age.
+- **STEP 1 ALWAYS**: Before doing ANYTHING else, scan the ENTIRE conversation history from top to bottom for ANY message where the user mentioned a number that could be an age — e.g., "2", "3.5", "4 years old", "10 months", "18 months", "1.5", "2.3", etc. Also check KNOWN FACTS.
+- **IF AGE IS FOUND ANYWHERE IN HISTORY OR KNOWN FACTS**: Use that age. NEVER ask for age again. This applies to ALL question types including monthly packages, pricing, activities, booking, nanny services.
+- **ONLY IF AGE IS TRULY NOT FOUND**: Ask "Could I please know the child's age first?" — but ONLY after genuinely checking the full history. Do NOT provide pricing, packages, or activities until you have their age.
+- **FOR MONTHLY PACKAGES / VALUE PACKAGES SPECIFICALLY**: The same rule applies. If age was mentioned at ANY point — even 10 messages ago — use it. Do NOT ask again. Jump straight to showing the packages.
 - **BREAK MESSAGES FOR CLARITY**: Send each response component in a SEPARATE WhatsApp message:
   - Age question: One message
   - Activities explanation: Separate message
@@ -464,14 +465,14 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 - IMPORTANT: Send each point in a SEPARATE WhatsApp message (activities in one message, pricing image in another, nanny disclaimer in a third).
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
-- FIRST: Check the full conversation history. If the user already mentioned their child's age at ANY point earlier, use that age and SKIP the age question.
-- Step 1: If the child's age is not already known (neither mentioned in the conversation history nor present in KNOWN FACTS), you MUST ask: "Could I please know the child's age first?" and do NOT explain the packages yet.
-- If age is already known, skip Step 1 and go straight to Step 2.
-- Step 2: Once age is known, you must tell them both the regular prices and the monthly package prices. Use this exact response structure:
+- *** CRITICAL: Scan conversation history FIRST. If the user mentioned ANY age (e.g. "2", "3.5", "10 months") at ANY point, use that age — DO NOT ask for age. Jump straight to Step 2. ***
+- Step 1 (ONLY if age is completely absent from history AND KNOWN FACTS): Ask "Could I please know the child's age first?" and do NOT explain the packages yet.
+- Step 2 (use this if age is known OR once age is provided): Tell them both the regular prices and the monthly package prices. Use this exact response structure:
   "These are our regular prices and these are our monthly value packages:
 Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.
 We are able to commit for 11 sessions at a time. You can renew your value package once 11 sessions are done."
   You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
+
 - TWINS / MULTIPLE CHILDREN RULE: 
   • ONLY mention twin packages if they explicitly ask about twins/multiple children. 
   • If they ask for twins/multiple children, say: "We offer a value package for two kids."
@@ -890,7 +891,7 @@ CRITICAL RULES:
 - DO NOT copy specific names, dates, prices, or availability from the example conversation
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
-- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the full history before responding.
+- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the FULL conversation history before responding. Look for ANY number that could be an age — e.g. "2", "3.5", "10 months", "1.5", "2.3". If found ANYWHERE in history, use it. DO NOT ask again. This is especially important for monthly package / value package questions.
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
@@ -946,8 +947,8 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
-- FIRST: Check the full conversation history. If the user already mentioned their child's age at ANY point earlier, use that age and do NOT ask for age again.
-- If age is already known (from history or KNOWN FACTS), skip any age question and go straight to showing packages.
+- *** CRITICAL AGE CHECK: Before doing ANYTHING, scan the ENTIRE conversation history for ANY age mention (e.g. "2", "3.5", "10 months", "2.3"). If found, use it and go DIRECTLY to showing the packages — NEVER ask for age. ***
+- ONLY ask "Could I please know the child's age first?" if age is completely absent from history AND KNOWN FACTS.
 - Write [MONTH_IMAGE] on its own line, then explain the package flexibility: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
@@ -1247,20 +1248,58 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     console.log("AI Reply (buffered):", aiReply);
 
-    // If AI is unsure, notify agents instead of replying to user.
-    // Match any reply that is ONLY the word UNSURE (possibly repeated, e.g. 'UNSURE UNSURE' due to continuation bugs).
-    if (/^(UNSURE\s*)+$/i.test(aiReply.trim())) {
-      console.log("[AI] UNSURE — sending agent notification, not replying to user");
-      // Flag conversation as needing human attention
+    // ── UNSURE handling ───────────────────────────────────────────────────
+    // The AI sends "UNSURE" as a signal that it can't answer — we must NEVER
+    // forward this word to the customer. Several failure modes are caught here:
+    //
+    //   1. Reply is ONLY the word UNSURE (possibly repeated): block entirely
+    //   2. Reply ends with UNSURE (continuation loop appended it): strip the UNSURE tail
+    //   3. Reply is short and contains UNSURE anywhere: block entirely
+    //
+    const unsureOnlyRe = /^[\s\n]*(UNSURE[\s\n]*)+$/i;
+    const unsureTailRe = /[\s\n]*(UNSURE[\s\n]*)+$/i;
+
+    if (unsureOnlyRe.test(aiReply)) {
+      // Entire reply is UNSURE — notify agents and stop
+      console.log('[AI] UNSURE (full reply) — sending agent notification, not replying to user');
       await supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone);
       await sendPushToAll({
         title: `${displayContact}`,
         body: `AI couldn't respond to a message from ${displayContact} (${fullPhone}) — "${combinedMessage.slice(0, 80)}"`,
         phone: fullPhone,
-        icon: "/icon-192.png"
+        icon: '/icon-192.png'
       });
       return;
     }
+
+    if (unsureTailRe.test(aiReply)) {
+      // Reply ends with UNSURE — strip it and send the valid part, but also alert agents
+      console.log('[AI] UNSURE tail detected — stripping UNSURE and notifying agents');
+      aiReply = aiReply.replace(unsureTailRe, '').trim();
+      await supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone);
+      sendPushToAll({
+        title: `${displayContact}`,
+        body: `AI partially answered then went UNSURE for ${displayContact} (${fullPhone}) — "${combinedMessage.slice(0, 80)}"`,
+        phone: fullPhone,
+        icon: '/icon-192.png'
+      }).catch(() => {});
+      // If stripping UNSURE left nothing, bail out entirely
+      if (!aiReply) return;
+    }
+
+    // Final safety net: if UNSURE still appears anywhere in a short reply, block it
+    if (/\bUNSURE\b/i.test(aiReply) && aiReply.split(/\s+/).length < 15) {
+      console.log('[AI] UNSURE found in short reply — blocking and notifying agents');
+      await supabase.from('conversations').update({ needs_human: true }).eq('phone', fullPhone);
+      await sendPushToAll({
+        title: `${displayContact}`,
+        body: `AI reply contained UNSURE for ${displayContact} (${fullPhone}) — "${combinedMessage.slice(0, 80)}"`,
+        phone: fullPhone,
+        icon: '/icon-192.png'
+      });
+      return;
+    }
+
 
     // Helper: send a text message via BotSpace and save to DB
     const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
@@ -2404,7 +2443,7 @@ CRITICAL RULES:
 - DO NOT copy specific names, dates, prices, or availability from the example conversation
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
-- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the full history before responding.
+- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the FULL conversation history before responding. Look for ANY number that could be an age — e.g. "2", "3.5", "10 months", "1.5", "2.3". If found ANYWHERE in history, use it. DO NOT ask again. This is especially important for monthly package / value package questions.
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
@@ -2460,8 +2499,8 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
-- FIRST: Check the full conversation history. If the user already mentioned their child's age at ANY point earlier, use that age and do NOT ask for age again.
-- If age is already known (from history or KNOWN FACTS), skip any age question and go straight to showing packages.
+- *** CRITICAL AGE CHECK: Before doing ANYTHING, scan the ENTIRE conversation history for ANY age mention (e.g. "2", "3.5", "10 months", "2.3"). If found, use it and go DIRECTLY to showing the packages — NEVER ask for age. ***
+- ONLY ask "Could I please know the child's age first?" if age is completely absent from history AND KNOWN FACTS.
 - Write [MONTH_IMAGE] on its own line, then explain the package flexibility: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
