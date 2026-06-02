@@ -401,6 +401,8 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
+- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
+- GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
 - When in doubt, ALWAYS err on the side of saying UNSURE. A wrong answer is far worse than deferring to a human agent.
@@ -627,7 +629,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       .select("role, content")
       .eq("phone", fullPhone)
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(50);
 
     if (error) {
       console.log("Supabase fetch error:", error);
@@ -892,6 +894,8 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
+- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
+- GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
 - When in doubt, ALWAYS err on the side of saying UNSURE. A wrong answer is far worse than deferring to a human agent.
@@ -942,8 +946,10 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
+- FIRST: Check the full conversation history. If the user already mentioned their child's age at ANY point earlier, use that age and do NOT ask for age again.
+- If age is already known (from history or KNOWN FACTS), skip any age question and go straight to showing packages.
 - Write [MONTH_IMAGE] on its own line, then explain the package flexibility: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-- If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we can customize a package for two kids once we have done the introductory session and confirmed that we are a good fit for your requirements.
+- If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
 
 SESSION LENGTH / DURATION:
@@ -1259,6 +1265,24 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     // Helper: send a text message via BotSpace and save to DB
     const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
     const sendAIText = async (text) => {
+      // Duplicate guard: don't send the same text if the last AI message in the last 20 seconds is identical
+      try {
+        const twentySecondsAgo = new Date(Date.now() - 20000).toISOString();
+        const { data: recentMsgs } = await supabase
+          .from('messages')
+          .select('content')
+          .eq('phone', fullPhone)
+          .eq('role', 'assistant')
+          .gte('created_at', twentySecondsAgo)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        if (Array.isArray(recentMsgs) && recentMsgs.some(m => m.content === text)) {
+          console.log('[Dedup] Skipping duplicate AI message:', text.slice(0, 80));
+          return;
+        }
+      } catch (e) {
+        console.warn('[Dedup] check failed, proceeding:', e.message);
+      }
       await supabase.from("messages").insert({
         phone: fullPhone, role: "assistant", content: text, sender: "ai", agent: null, ai_enabled: true
       });
@@ -2384,6 +2408,8 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
+- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
+- GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
 - When in doubt, ALWAYS err on the side of saying UNSURE. A wrong answer is far worse than deferring to a human agent.
@@ -2434,8 +2460,10 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
+- FIRST: Check the full conversation history. If the user already mentioned their child's age at ANY point earlier, use that age and do NOT ask for age again.
+- If age is already known (from history or KNOWN FACTS), skip any age question and go straight to showing packages.
 - Write [MONTH_IMAGE] on its own line, then explain the package flexibility: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-- If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we can customize a package for two kids once we have done the introductory session and confirmed that we are a good fit for your requirements.
+- If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
 
 SESSION LENGTH / DURATION:
