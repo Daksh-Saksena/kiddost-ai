@@ -454,14 +454,15 @@ PRICING / SERVICES / QUOTATION:
   • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
-- Do NOT add nanny disclaimer unless the user specifically asked about nanny services.
+- Do NOT add nanny disclaimer unless the user specifically asked about nanny services or a 'permanent basis'.
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
 
-NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
+NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
+- CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
 - Step 0: CHECK CONVERSATION HISTORY CAREFULLY. Look for any message where the user stated or answered about child's age (e.g., "3", "2.5", "4 years old"). If age is already known from earlier in the conversation, SKIP Step 1 entirely.
 - Step 1: If child's age is NOT known and NOT found in conversation history, send ONLY "Could I please know the child's age first?" and nothing else in that message. Stop there.
 - Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
-- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify — we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 - IMPORTANT: Send each point in a SEPARATE WhatsApp message (activities in one message, pricing image in another, nanny disclaimer in a third).
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
@@ -936,13 +937,14 @@ PRICING / SERVICES / QUOTATION:
   • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
-- Do NOT add nanny disclaimer unless the user specifically asked about nanny services.
+- Do NOT add nanny disclaimer unless the user specifically asked about nanny services or a 'permanent basis'.
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
 
-NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
+NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
+- CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
 - Step 1: If child's age is not already known, send ONLY "May I know the age of the child?" and nothing else in that message. Stop there.
 - Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
-- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify — we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 - If age is already known, skip Step 1 and go straight to Step 2.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
@@ -1145,12 +1147,16 @@ Goal: Make the user feel like they are chatting with a real human agent and move
     // If the model stopped because of max tokens (truncated) or the reply ends mid-sentence,
     // request a short continuation (up to 2 attempts) to avoid sending incomplete sentences.
     // IMPORTANT: Never continue an UNSURE reply — doing so causes 'UNSURE UNSURE' to be sent to the user.
+    // IMPORTANT: Never continue a reply that contains image markers ([PRICING_IMAGE], [MONTH_IMAGE]) —
+    //            these replies are complete by design; continuing them causes the AI to add garbage text.
     const isUnsureReply = /^\s*UNSURE\s*$/i.test(aiReply.trim());
-    const seemsIncomplete = !/[\.\?!"]\s*$/.test(aiReply.trim());
-    if (!isUnsureReply && (finishReason === 'length' || seemsIncomplete) && !process.env.DISABLE_CONTINUE) {
+    const hasImageMarker = /\[(PRICING_IMAGE|MONTH_IMAGE)\]/i.test(aiReply);
+    // A reply is complete if it ends with sentence-ending punctuation OR an image marker OR a closing bracket
+    const seemsIncomplete = !/([.?!"\]]\s*|\[(PRICING_IMAGE|MONTH_IMAGE)\]\s*)$/.test(aiReply.trim());
+    if (!isUnsureReply && !hasImageMarker && (finishReason === 'length' || seemsIncomplete) && !process.env.DISABLE_CONTINUE) {
       try {
         let contAttempts = 0;
-        while (contAttempts < 2 && (finishReason === 'length' || !/[\.\?!"]\s*$/.test(aiReply.trim()))) {
+        while (contAttempts < 2 && (finishReason === 'length' || !/([.?!"\]]\s*|\[(PRICING_IMAGE|MONTH_IMAGE)\]\s*)$/.test(aiReply.trim()))) {
           contAttempts++;
           console.log(`[OpenAI] continuation attempt ${contAttempts} (finishReason=${finishReason})`);
           const contRes = await axios.post(
@@ -2488,13 +2494,14 @@ PRICING / SERVICES / QUOTATION:
 • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
-- Do NOT add nanny disclaimer unless the user specifically asked about nanny services.
+- Do NOT add nanny disclaimer unless the user specifically asked about nanny services or a 'permanent basis'.
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
 
-NANNY SERVICES (only when user asks about nanny/caretaker/babysitter):
+NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
+- CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
 - Step 1: If child's age is not already known, send ONLY "May I know the age of the child?" and nothing else in that message. Stop there.
 - Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
-- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify — we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 - If age is already known, skip Step 1 and go straight to Step 2.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
