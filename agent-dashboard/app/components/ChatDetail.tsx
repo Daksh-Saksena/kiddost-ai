@@ -256,7 +256,12 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     if (!url) return url;
     // Route BotSpace-hosted media through the server proxy so browsers render inline
     if (url.includes('bot.space') || url.includes('botspace')) {
-      return `https://kiddost-ai.onrender.com/proxy-image?url=${encodeURIComponent(url)}`;
+      try {
+        return `https://kiddost-ai.onrender.com/proxy-image?url=${encodeURIComponent(url)}`;
+      } catch (err) {
+        console.warn('Malformed URI in resolveMediaUrl:', url);
+        return url;
+      }
     }
     return url;
   }
