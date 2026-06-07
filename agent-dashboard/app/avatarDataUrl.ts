@@ -42,7 +42,7 @@ export function avatarDataUrl(displayName: string, phone = '', color = '#ffffff'
   try {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   } catch (err) {
-    console.error('Failed to encode avatar SVG:', err);
+    console.error('Failed to encode avatar SVG:', err, { displayName, phone, svg });
     const fallbackSvg = `<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><rect width='100%' height='100%' fill='${bg}' rx='20'/></svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
   }
