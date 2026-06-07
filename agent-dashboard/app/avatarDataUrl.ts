@@ -28,7 +28,7 @@ export function avatarDataUrl(displayName: string, phone = '', color = '#ffffff'
       .split(/\s+/)
       .slice(0, 2)
       .map((s) => s[0]?.toUpperCase() || '')
-      .join('') || displayName.slice(0, 2).toUpperCase();
+      .join('') || Array.from(displayName).slice(0, 2).join('').toUpperCase();
   }
 
   const size = 128;
@@ -39,5 +39,11 @@ export function avatarDataUrl(displayName: string, phone = '', color = '#ffffff'
     <text x='50%' y='50%' dy='.35em' text-anchor='middle' fill='${color}' font-family='Helvetica, Arial, sans-serif' font-size='${fontSize}'>${initials}</text>
   </svg>`;
 
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  try {
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  } catch (err) {
+    console.error('Failed to encode avatar SVG:', err);
+    const fallbackSvg = `<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><rect width='100%' height='100%' fill='${bg}' rx='20'/></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
+  }
 }
