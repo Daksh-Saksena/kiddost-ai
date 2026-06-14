@@ -26,6 +26,26 @@ function avatarInitials(name: string) {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
+export function formatFriendlyDate(isoString: string | undefined | null) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  
+  const isToday = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+}
+
 function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
   const [mode, setMode] = useState<'pick' | 'pin' | 'create_step1' | 'create_step2'>('pick');
   const [agents, setAgents] = useState<AgentProfile[]>([]);
@@ -442,7 +462,7 @@ export default function AppClient() {
         name: contacts[phone]?.name || phone,
         avatar: avatarDataUrl(contacts[phone]?.name || phone, phone),
         lastMessage: latestMsg?.content || 'No recent messages',
-        time: latestMsg?.created_at ? new Date(latestMsg.created_at).toLocaleString() : "",
+        time: latestMsg?.created_at ? formatFriendlyDate(latestMsg.created_at) : "",
         agent: latestMsg?.agent ?? null,
         unread: unreadCount[phone] || 0,
         lastMsgAt: latestMsg?.created_at || null,
@@ -462,7 +482,7 @@ export default function AppClient() {
           name: contacts[phone]?.name || phone,
           avatar: avatarDataUrl(contacts[phone]?.name || phone, phone),
           lastMessage: latestMsg?.content || '',
-          time: latestMsg?.created_at ? new Date(latestMsg.created_at).toLocaleString() : "",
+          time: latestMsg?.created_at ? formatFriendlyDate(latestMsg.created_at) : "",
           agent: latestMsg?.agent ?? null,
           unread: unreadCount[phone] || 0,
           lastMsgAt: latestMsg?.created_at || null,
@@ -588,18 +608,18 @@ export default function AppClient() {
           } else if (msg.role === 'user' || msg.sender === 'user') {
             // Message for a background chat — bump its unread count
             setChats(prev => prev.map(c =>
-              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1, lastMessage: msg.content || '', time: msg.created_at ? new Date(msg.created_at).toLocaleString() : c.time, lastMsgAt: msg.created_at || c.lastMsgAt } : c
+              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1, lastMessage: msg.content || '', time: msg.created_at ? formatFriendlyDate(msg.created_at) : c.time, lastMsgAt: msg.created_at || c.lastMsgAt } : c
             ));
           }
           // Update the chat's lastMessage without re-fetching everything
           setChats(prev => {
             const exists = prev.some(c => c.id === msg.phone);
             if (exists) {
-              return prev.map(c => c.id === msg.phone ? { ...c, lastMessage: msg.content || c.lastMessage, time: msg.created_at ? new Date(msg.created_at).toLocaleString() : c.time, lastMsgAt: msg.created_at || c.lastMsgAt, agent: msg.agent ?? c.agent } : c);
+              return prev.map(c => c.id === msg.phone ? { ...c, lastMessage: msg.content || c.lastMessage, time: msg.created_at ? formatFriendlyDate(msg.created_at) : c.time, lastMsgAt: msg.created_at || c.lastMsgAt, agent: msg.agent ?? c.agent } : c);
             }
             // New phone not in list — add it
             const contacts = getContacts();
-            return [{ id: msg.phone, name: contacts[msg.phone]?.name || msg.phone, avatar: avatarDataUrl(contacts[msg.phone]?.name || msg.phone, msg.phone), lastMessage: msg.content || '', time: msg.created_at ? new Date(msg.created_at).toLocaleString() : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
+            return [{ id: msg.phone, name: contacts[msg.phone]?.name || msg.phone, avatar: avatarDataUrl(contacts[msg.phone]?.name || msg.phone, msg.phone), lastMessage: msg.content || '', time: msg.created_at ? formatFriendlyDate(msg.created_at) : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
           });
         }
       )

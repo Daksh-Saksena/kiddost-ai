@@ -620,7 +620,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
               } else if (dateStr === yesterday.toDateString()) {
                 dividerLabel = 'Yesterday';
               } else {
-                dividerLabel = msgDate.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+                dividerLabel = msgDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
               }
             }
 
@@ -644,8 +644,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                         <MediaRenderer url={message.media_url} isDark={isDarkMode} />
                       </div>
                     )}
-                    {message.text ? <p className={`text-sm ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
-                    <div className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
+                    {message.text ? <p className={`text-base ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
+                    <div className={`flex items-center justify-end gap-1 mt-1.5 text-sm ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
                       <span title={message.created_at ? new Date(message.created_at).toLocaleString() : undefined}>{message.time}</span>
                       {isMe && (() => {
                         const s = message.status?.toLowerCase() || '';
@@ -722,7 +722,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                           value={v}
                           onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
                           placeholder={`Variable ${i + 1}`}
-                          className={`flex-1 rounded-xl px-3 py-2 text-sm outline-none ${
+                          className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${
                             isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
                           }`}
                         />
@@ -792,7 +792,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                           value={v}
                           onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
                           placeholder={`Variable ${i + 1}`}
-                          className={`flex-1 rounded-xl px-3 py-2 text-sm outline-none ${
+                          className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${
                             isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
                           }`}
                         />

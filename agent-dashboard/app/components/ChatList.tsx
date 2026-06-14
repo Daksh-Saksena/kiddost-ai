@@ -237,13 +237,13 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
             <div className="flex-1 ml-4 min-w-0">
               <div className="flex justify-between items-baseline">
                 <div className="flex items-center gap-2 min-w-0">
-                  <h3 className={`font-bold truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
+                  <h3 className={`font-bold text-lg truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
                   {chat.pinned && <Pin className={`w-3.5 h-3.5 flex-shrink-0 ${isDarkMode ? 'text-yellow-300' : 'text-amber-500'}`} fill="currentColor" />}
                 </div>
                 <span className={`text-xs ml-2 flex-shrink-0 ${isDarkMode ? "text-blue-400" : "text-gray-500"}`}>{chat.time}</span>
               </div>
               <div className="flex justify-between items-center mt-1.5">
-                <p className={`text-sm truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
+                <p className={`text-base truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                   <button
                     onMouseDown={(e) => e.stopPropagation()}
