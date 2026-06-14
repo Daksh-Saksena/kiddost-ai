@@ -204,7 +204,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
               return;
             }
             const publicURL = json.publicUrl;
-            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
+            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
             await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -225,7 +225,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         return;
       }
 
-      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
+      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
 
       await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
         method: 'POST',

@@ -38,7 +38,7 @@ export function formatFriendlyDate(isoString: string | undefined | null) {
   yesterday.setDate(now.getDate() - 1);
   const isYesterday = d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
 
-  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
   if (isToday) return `Today, ${timeStr}`;
   if (isYesterday) return `Yesterday, ${timeStr}`;
