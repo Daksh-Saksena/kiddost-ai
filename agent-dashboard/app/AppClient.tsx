@@ -501,6 +501,7 @@ export default function AppClient() {
   };
 
   const loadMessages = async (phone: string) => {
+    setMessages([]);
     const { data, error } = await supabase.from("messages").select("*").eq("phone", phone).order("created_at", { ascending: true });
     if (error) return;
     if (selectedChatRef.current !== phone) return;
