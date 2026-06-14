@@ -410,6 +410,10 @@ export default function AppClient() {
   };
 
   const loadChats = async () => {
+    // Read pinned chats locally to avoid waiting for state sync
+    const store = getPinnedStore();
+    const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
+
     // 1. Fetch all conversations from the conversations table to ensure no active chat is ever omitted
     const { data: convs, error: convsError } = await supabase
       .from("conversations")
@@ -467,7 +471,7 @@ export default function AppClient() {
         unread: unreadCount[phone] || 0,
         lastMsgAt: latestMsg?.created_at || null,
         labels: contacts[phone]?.labels || [],
-        pinned: pinnedChatIds.includes(phone),
+        pinned: scopedPinned.includes(phone),
         needsHuman: c.needs_human || needsHumanPhones.has(phone),
       });
       addedPhones.add(phone);
@@ -487,7 +491,7 @@ export default function AppClient() {
           unread: unreadCount[phone] || 0,
           lastMsgAt: latestMsg?.created_at || null,
           labels: contacts[phone]?.labels || [],
-          pinned: pinnedChatIds.includes(phone),
+          pinned: scopedPinned.includes(phone),
           needsHuman: needsHumanPhones.has(phone),
         });
       }
@@ -499,6 +503,7 @@ export default function AppClient() {
   const loadMessages = async (phone: string) => {
     const { data, error } = await supabase.from("messages").select("*").eq("phone", phone).order("created_at", { ascending: true });
     if (error) return;
+    if (selectedChatRef.current !== phone) return;
     if (!data) return setMessages([]);
     const msgs: Message[] = data.map((m: any) => {
       // prefer explicit sender column when present
@@ -550,17 +555,9 @@ export default function AppClient() {
     }
   };
 
+  const selectedChatRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!authed) return;
-    loadChats();
-  }, [authed, pinnedChatIds]);
-
-  // When needsHumanPhones changes, patch chats in-place (no refetch)
-  useEffect(() => {
-    setChats(prev => prev.map(c => ({ ...c, needsHuman: needsHumanPhones.has(c.id) })));
-  }, [needsHumanPhones]);
-
-  useEffect(() => {
+    selectedChatRef.current = selectedChat;
     if (selectedChat) {
       loadMessages(selectedChat);
       markRead(selectedChat);
@@ -568,6 +565,16 @@ export default function AppClient() {
       setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, unread: 0 } : c));
     }
   }, [selectedChat]);
+
+  useEffect(() => {
+    if (!authed) return;
+    loadChats();
+  }, [authed]);
+
+  // When needsHumanPhones changes, patch chats in-place (no refetch)
+  useEffect(() => {
+    setChats(prev => prev.map(c => ({ ...c, needsHuman: needsHumanPhones.has(c.id) })));
+  }, [needsHumanPhones]);
 
   useEffect(() => {
     if (!authed) return;
