@@ -153,15 +153,15 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   useEffect(() => {
     const end = messagesEndRef.current;
     const container = scrollContainerRef.current;
-    if (!end || messages.length === 0) return;
+    if (!end || messages.length === 0) {
+      if (messages.length === 0) prevLengthRef.current = 0;
+      return;
+    }
     const isInitialLoad = prevLengthRef.current === 0;
     if (isInitialLoad) {
       end.scrollIntoView({ behavior: 'instant' });
     } else if (messages.length > prevLengthRef.current) {
-      const isNearBottom = container
-        ? container.scrollHeight - container.scrollTop - container.clientHeight < 200
-        : true;
-      if (isNearBottom) end.scrollIntoView({ behavior: 'smooth' });
+      end.scrollIntoView({ behavior: 'smooth' });
     }
     prevLengthRef.current = messages.length;
   }, [messages]);
