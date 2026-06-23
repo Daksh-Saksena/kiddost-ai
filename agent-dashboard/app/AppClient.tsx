@@ -424,7 +424,7 @@ export default function AppClient() {
       .from("messages")
       .select("phone, content, role, sender, agent, created_at")
       .order("created_at", { ascending: false })
-      .limit(3000);
+      .limit(500);
 
     if (msgsError && !convs) return;
 

@@ -217,7 +217,7 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
             {query ? "No chats match your search." : "No chats yet."}
           </p>
         )}
-        {sorted.map((chat) => (
+        {sorted.slice(0, 75).map((chat) => (
           <div
             key={chat.id}
             onClick={() => onSelectChat(chat.id)}
