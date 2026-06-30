@@ -1412,6 +1412,14 @@ Goal: Make the user feel like they are chatting with a real human agent and move
         }
         if (part) {
           await sendAIText(part);
+          if (part.toLowerCase().includes('allow me to check the slot availability')) {
+            sendPushToAll({
+              title: `📅 Session Requested`,
+              body: `${displayContact} (${fullPhone}) has requested to book a session!`,
+              phone: fullPhone,
+              icon: '/icon-192.png'
+            }).catch(() => {});
+          }
           await new Promise(r => setTimeout(r, 400));
         }
       }
