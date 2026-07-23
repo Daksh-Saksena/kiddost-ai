@@ -818,32 +818,49 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         </div>
       )}
 
-      <div className={`px-4 py-3 flex items-end gap-3 relative z-10 ${isDarkMode ? "bg-gradient-to-t from-gray-900 to-black border-t border-blue-900/30" : "bg-[#f0f0f0]"}`}>
-        <label className="cursor-pointer mb-1.5">
-          <input type="file" onChange={uploadMedia} className="hidden" />
-          <div className={`px-3 py-2 rounded-full ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'}`}>+</div>
-        </label>
-        <button
-          onClick={openTemplateModal}
-          title="Send Template"
-          className={`p-2 mb-1 rounded-full transition-all flex-shrink-0 ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-white text-[#008069] hover:bg-gray-100'}`}
-        >
-          <FileText className="w-5 h-5" />
-        </button>
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder={isDarkMode ? "Transmit message..." : "Type a message"}
-          className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-base resize-none overflow-y-auto ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white border border-gray-300 text-gray-900 focus:border-[#008069] focus:ring-2 focus:ring-[#008069]/20"} transition-all`}
-          style={{ height: '40px', minHeight: '40px', maxHeight: '120px' }}
-        />
-        <button onClick={handleSend} disabled={sendCooldown} className={`p-3 mb-1 rounded-full active:scale-95 transition-all ${sendCooldown ? 'opacity-40 cursor-not-allowed' : ''} ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
-          <Send className="w-5 h-5" />
-        </button>
-      </div>
+      {(() => {
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user' || m.sender === 'user');
+        const is24hWindowClosed = lastUserMsg
+          ? (new Date().getTime() - new Date(lastUserMsg.created_at).getTime()) > 24 * 60 * 60 * 1000
+          : true;
+
+        return (
+          <div className={`px-4 py-3 flex items-end gap-3 relative z-10 ${isDarkMode ? "bg-gradient-to-t from-gray-900 to-black border-t border-blue-900/30" : "bg-[#f0f0f0]"}`}>
+            <button
+              onClick={openTemplateModal}
+              title="Send Template"
+              className={`p-2 mb-1 rounded-full transition-all flex-shrink-0 ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-white text-[#008069] hover:bg-gray-100'}`}
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+            {is24hWindowClosed ? (
+              <div className={`flex-1 text-center py-2.5 mb-1 text-sm rounded-xl font-medium ${isDarkMode ? 'bg-amber-900/20 text-amber-500 border border-amber-900/50' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                24-hour window closed. Please send a template message.
+              </div>
+            ) : (
+              <>
+                <label className="cursor-pointer mb-1.5 flex-shrink-0">
+                  <input type="file" onChange={uploadMedia} className="hidden" />
+                  <div className={`px-3 py-2 rounded-full ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'}`}>+</div>
+                </label>
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={isDarkMode ? "Transmit message..." : "Type a message"}
+                  className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-base resize-none overflow-y-auto ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white border border-gray-300 text-gray-900 focus:border-[#008069] focus:ring-2 focus:ring-[#008069]/20"} transition-all`}
+                  style={{ height: '40px', minHeight: '40px', maxHeight: '120px' }}
+                />
+                <button onClick={handleSend} disabled={sendCooldown} className={`p-3 mb-1 rounded-full flex-shrink-0 active:scale-95 transition-all ${sendCooldown ? 'opacity-40 cursor-not-allowed' : ''} ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
+                  <Send className="w-5 h-5" />
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Calendar extraction confirmation modal */}
       {showCalModal && (
