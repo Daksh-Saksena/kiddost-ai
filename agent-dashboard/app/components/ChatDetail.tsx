@@ -819,7 +819,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       )}
 
       {(() => {
-        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user' || m.sender === 'user');
+        const lastUserMsg = [...messages].reverse().find(m => m.sender === 'other');
         const is24hWindowClosed = lastUserMsg
           ? (new Date().getTime() - new Date(lastUserMsg.created_at).getTime()) > 24 * 60 * 60 * 1000
           : true;
