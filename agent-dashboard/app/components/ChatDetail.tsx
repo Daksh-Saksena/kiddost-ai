@@ -787,20 +787,37 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                       <p className={`text-xs ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>No variables — tap + Add if your template needs them.</p>
                     )}
                     {templateVars.map((v, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <span className={`text-xs w-6 text-center flex-shrink-0 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{i + 1}</span>
-                        <input
-                          type="text"
-                          value={v}
-                          onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                          placeholder={`Variable ${i + 1}`}
-                          className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${
-                            isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
-                          }`}
-                        />
-                        <button onClick={() => setTemplateVars(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300">
-                          <X className="w-4 h-4" />
-                        </button>
+                      <div key={i} className="flex flex-col gap-2">
+                        <div className="flex gap-2 items-center">
+                          <span className={`text-xs w-6 text-center flex-shrink-0 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{i + 1}</span>
+                          <input
+                            type="text"
+                            value={v}
+                            onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                            placeholder={`Variable ${i + 1}`}
+                            className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${
+                              isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
+                            }`}
+                          />
+                          <button onClick={() => setTemplateVars(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex gap-2 ml-8 overflow-x-auto pb-1 no-scrollbar">
+                          {['today', 'tomorrow', 'day after tomorrow'].map(quick => (
+                            <button
+                              key={quick}
+                              onClick={() => setTemplateVars(prev => prev.map((x, j) => j === i ? quick : x))}
+                              className={`text-[11px] font-medium whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
+                                v === quick 
+                                  ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white')
+                                  : (isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300')
+                              }`}
+                            >
+                              {quick.charAt(0).toUpperCase() + quick.slice(1)}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
