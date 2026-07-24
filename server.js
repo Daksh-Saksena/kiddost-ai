@@ -453,12 +453,17 @@ PRICING / SERVICES / QUOTATION:
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
   • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
-  • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
+  • If they ask specifically about hourly calculations (e.g. "for 1 hour so its 700 rupees"): Provide the EXACT calculation below. Do NOT guess or say anything wrong if it doesn't align perfectly with this table:
+      - First hour ₹700, Every subsequent hour ₹500 per hour.
+      - So for 2 hours ₹1200 and 3 hours ₹1700.
+      - For the first time experience it’s on discounted rate of ₹500 per hour.
+    If their specific math question doesn't align perfectly with this table, reply UNSURE.
+  • If they just ask generally for pricing (not specific math) and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
 - Do NOT add nanny disclaimer unless the user specifically asked about nanny services or a 'permanent basis'.
 - Do NOT send [PRICING_IMAGE] unless the conversation is specifically about pricing, services, or packages.
-- NEVER calculate, invent, or confirm specific total amounts (like 10450, 15000, etc.) that the user suggests. If the user asks if the price is a specific amount (e.g., "10450 for a month?", "Is it 5000?"), DO NOT confirm their number. Say EXACTLY: "Please refer to the pricing details above for the exact package prices."
+- NEVER calculate, invent, or confirm specific total package amounts (like 10450, 15000, etc.) for monthly packages that the user suggests. For these, say: "Please refer to the pricing details above for the exact package prices." (Note: This does not apply to hourly math, which uses the hourly table above).
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
 - CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
@@ -954,7 +959,12 @@ PRICING / SERVICES / QUOTATION:
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
   • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
-  • If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
+  • If they ask specifically about hourly calculations (e.g. "for 1 hour so its 700 rupees"): Provide the EXACT calculation below. Do NOT guess or say anything wrong if it doesn't align perfectly with this table:
+      - First hour ₹700, Every subsequent hour ₹500 per hour.
+      - So for 2 hours ₹1200 and 3 hours ₹1700.
+      - For the first time experience it’s on discounted rate of ₹500 per hour.
+    If their specific math question doesn't align perfectly with this table, reply UNSURE.
+  • If they just ask generally for pricing (not specific math) and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
 - Do NOT add nanny disclaimer unless the user specifically asked about nanny services or a 'permanent basis'.
@@ -1526,6 +1536,9 @@ async function sendWelcome(fullPhone) {
     await new Promise(r => setTimeout(r, 3000));
     // 3. Follow-up
     await sendText('Feel free to let us know if you have any questions.');
+    await new Promise(r => setTimeout(r, 800));
+    // 4. Ask age
+    await sendText('Could you please share your child’s age with us?');
     console.log('[welcome] sent to', fullPhone);
   } catch (e) {
     console.error('[welcome] failed:', e.response?.data || e.message);
@@ -2535,8 +2548,13 @@ PRICING / SERVICES / QUOTATION:
 • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-• If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
-• If they just asked about pricing as a follow-up and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
+  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
+  • If they ask specifically about hourly calculations (e.g. "for 1 hour so its 700 rupees"): Provide the EXACT calculation below. Do NOT guess or say anything wrong if it doesn't align perfectly with this table:
+      - First hour ₹700, Every subsequent hour ₹500 per hour.
+      - So for 2 hours ₹1200 and 3 hours ₹1700.
+      - For the first time experience it’s on discounted rate of ₹500 per hour.
+    If their specific math question doesn't align perfectly with this table, reply UNSURE.
+  • If they just ask generally for pricing (not specific math) and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
 - End with "Feel free to let us know if you have any questions." as a separate line.
 - Do NOT add nanny disclaimer unless the user specifically asked about nanny services or a 'permanent basis'.
