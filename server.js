@@ -462,11 +462,10 @@ PRICING / SERVICES / QUOTATION:
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
 - CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
-- Step 0: CHECK CONVERSATION HISTORY CAREFULLY. Look for any message where the user stated or answered about child's age (e.g., "3", "2.5", "4 years old"). If age is already known from earlier in the conversation, SKIP Step 1 entirely.
-- Step 1: If child's age is NOT known and NOT found in conversation history, send ONLY "Could I please know the child's age first?" and nothing else in that message. Stop there.
-- Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
-- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
-- IMPORTANT: Send each point in a SEPARATE WhatsApp message (activities in one message, pricing image in another, nanny disclaimer in a third).
+- Step 1: CHECK CONVERSATION HISTORY. If the child's age is NOT known, you MUST ask EXACTLY "Could I please know the child's age first?". Do NOT say anything else in that message. Do NOT mention the nanny disclaimer yet. Stop and wait for their reply.
+- Step 2: Once the age is known (or if they just provided it), FIRST give the standard activity and pricing details exactly as you would for a normal inquiry (write the activities based on age, then write [PRICING_IMAGE]). 
+- Step 3: ONLY AFTER giving the activities and pricing, add this exact disclaimer at the very end of your response: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
 - *** CRITICAL: Scan conversation history FIRST. If the user mentioned ANY age (e.g. "2", "3.5", "10 months") at ANY point, use that age — DO NOT ask for age. Jump straight to Step 2. ***
@@ -963,10 +962,10 @@ PRICING / SERVICES / QUOTATION:
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
 - CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
-- Step 1: If child's age is not already known, send ONLY "May I know the age of the child?" and nothing else in that message. Stop there.
-- Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
-- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
-- If age is already known, skip Step 1 and go straight to Step 2.
+- Step 1: CHECK CONVERSATION HISTORY. If the child's age is NOT known, you MUST ask EXACTLY "Could I please know the child's age first?". Do NOT say anything else in that message. Do NOT mention the nanny disclaimer yet. Stop and wait for their reply.
+- Step 2: Once the age is known (or if they just provided it), FIRST give the standard activity and pricing details exactly as you would for a normal inquiry (write the activities based on age, then write [PRICING_IMAGE]). 
+- Step 3: ONLY AFTER giving the activities and pricing, add this exact disclaimer at the very end of your response: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
@@ -2545,10 +2544,10 @@ PRICING / SERVICES / QUOTATION:
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
 - CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
-- Step 1: If child's age is not already known, send ONLY "May I know the age of the child?" and nothing else in that message. Stop there.
-- Step 2: Once age is known, give the appropriate activities response (follow the age-based scripts above), then write [PRICING_IMAGE].
-- Step 3: After the activities and pricing image, add on a new line: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
-- If age is already known, skip Step 1 and go straight to Step 2.
+- Step 1: CHECK CONVERSATION HISTORY. If the child's age is NOT known, you MUST ask EXACTLY "Could I please know the child's age first?". Do NOT say anything else in that message. Do NOT mention the nanny disclaimer yet. Stop and wait for their reply.
+- Step 2: Once the age is known (or if they just provided it), FIRST give the standard activity and pricing details exactly as you would for a normal inquiry (write the activities based on age, then write [PRICING_IMAGE]). 
+- Step 3: ONLY AFTER giving the activities and pricing, add this exact disclaimer at the very end of your response: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
