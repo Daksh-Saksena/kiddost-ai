@@ -7,6 +7,8 @@ const SERVER = 'https://kiddost-ai.onrender.com';
 
 const KNOWN_TEMPLATES = [
   { id: 'session', name: 'Session Today?', body: 'Hi, Would you like to go ahead with the session today?' },
+  { id: 'confirm_booking', name: 'Confirm Booking', body: 'Hi! Would you like to go ahead and confirm your booking for tomorrow?' },
+  { id: 'slots_available', name: 'Slots Available', body: 'Hi! We have slots available {{1}} . Would you like to try a session and see how it works for you?' }
 ];
 
 interface Chat {
