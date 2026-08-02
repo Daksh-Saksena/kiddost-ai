@@ -653,7 +653,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
     // Fetch last 10 messages for conversation memory
     const { data, error } = await supabase
       .from("messages")
-      .select("role, content")
+      .select("role, content, media_url")
       .eq("phone", fullPhone)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -662,7 +662,10 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       console.log("Supabase fetch error:", error);
     }
 
-    let history = Array.isArray(data) ? data.reverse() : [];
+    let history = Array.isArray(data) ? data.reverse().map(m => ({
+      role: m.role,
+      content: m.media_url ? `${m.content}\n[Media/Document Attached]`.trim() : m.content
+    })) : [];
 
     // Filter history to prevent duplicating the current incoming user message(s)
     const bufferedCount = options.bufferedCount || 1;
@@ -2472,12 +2475,15 @@ app.get('/debug-prompt', async (req, res) => {
 
     const { data } = await supabase
       .from("messages")
-      .select("role, content")
+      .select("role, content, media_url")
       .eq("phone", phone)
       .order("created_at", { ascending: false })
       .limit(10);
 
-    const history = Array.isArray(data) ? data.reverse() : [];
+    const history = Array.isArray(data) ? data.reverse().map(m => ({
+      role: m.role,
+      content: m.media_url ? `${m.content}\n[Media/Document Attached]`.trim() : m.content
+    })) : [];
 
     res.json({
       systemPrompt,
