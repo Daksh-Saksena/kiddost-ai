@@ -1,10 +1,10 @@
 # KidDost AI & Business Operations Platform
 
-This repository contains the complete source code for an AI-powered WhatsApp chatbot and agent dashboard backend. It was originally built to manage, scale, and automate customer interactions for my mother's business, KidDost.
+This repository contains the COMPLETE source code for an AI-powered WhatsApp chatbot and agent dashboard backend. It was originally built to manage, scale, and automate customer interactions for my mother's business (kiddost)!
 
 ## Vision and Future Plans
 
-Small businesses—ranging from local grocery shops to clinics, hospitals, and service providers—are often overloaded with repetitive customer inquiries, wasting valuable time that could be spent on core operations. Existing automated solutions in the market are prohibitively expensive and overly complicated for the average business owner.
+Small businesses ranging from local grocery shops to clinics, hospitals, and service providers are often overloaded with repetitive customer inquiries, wasting valuable time that could be spent on core operations. Existing automated solutions in the market are prohibitively expensive and overly complicated for the average business owner.
 
 My plan is to launch this platform as a B2B SaaS company for small businesses at a highly affordable price point of **₹999 per month**. It is designed to be fully customizable to fit the specific needs and workflows of any business. It completely automates customer acquisition, FAQ handling, and booking processes, while seamlessly allowing business owners to step in when a human touch is required.
 
@@ -24,15 +24,8 @@ The platform is a comprehensive CRM and automated messaging system, encompassing
 ## Screenshots
 
 *Note: All customer names, phone numbers, and sensitive information in the following screenshots have been intentionally blurred to protect privacy.*
+## Screenshots
 
-### Live Conversation View
-![Live Conversation](Convo%20Eg.png)
-
-### Agent Dashboard & Chat List
-![Dashboard Chat List](Convo%20list.png)
-
-### Booking Calendar
-![Calendar View](Calender.png)
-
-### Agent Login
-![Agent Login](login.png)
+| Live Conversation | Dashboard & Chat List | Booking Calendar | Agent Login |
+|-------------------|-----------------------|------------------|-------------|
+| <img src="Convo%20Eg.png" width="220"> | <img src="Convo%20list.png" width="220"> | <img src="Calender.png" width="220"> | <img src="login.png" width="220"> |
