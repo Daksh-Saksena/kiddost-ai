@@ -1737,11 +1737,28 @@ async function sendPushToAll(payload) {
 
 // Shared contacts (stored in Supabase so all agents see the same names)
 app.get('/contacts', async (req, res) => {
-  const { data, error } = await supabase.from('contacts').select('phone, name, notes, labels');
-  if (error) return res.status(500).json({ error: error.message });
-  const map = {};
-  for (const row of (data || [])) map[row.phone] = { name: row.name || '', notes: row.notes || '', labels: row.labels || [] };
-  res.json({ contacts: map });
+  try {
+    let allData = [];
+    let from = 0;
+    const step = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase.from('contacts').select('phone, name, notes, labels').range(from, from + step - 1);
+      if (error) return res.status(500).json({ error: error.message });
+      if (!data || data.length === 0) break;
+      allData = allData.concat(data);
+      if (data.length < step) break;
+      from += step;
+    }
+    
+    const map = {};
+    for (const row of allData) {
+      map[row.phone] = { name: row.name || '', notes: row.notes || '', labels: row.labels || [] };
+    }
+    res.json({ contacts: map });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Return phones that need human attention (red dot on dashboard)
