@@ -1756,9 +1756,9 @@ app.post('/contacts', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'missing phone' });
   
   try {
-    const { data: existing } = await supabase.from('contacts').select('id').eq('phone', phone).maybeSingle();
+    const { data: existingAll } = await supabase.from('contacts').select('id').eq('phone', phone);
     
-    if (existing) {
+    if (existingAll && existingAll.length > 0) {
       const { error } = await supabase.from('contacts').update({ name: name || '', notes: notes || '' }).eq('phone', phone);
       if (error) return res.status(500).json({ error: error.message });
     } else {
