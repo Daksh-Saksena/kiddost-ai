@@ -1754,9 +1754,21 @@ app.get('/needs-human', async (req, res) => {
 app.post('/contacts', async (req, res) => {
   const { phone, name, notes } = req.body;
   if (!phone) return res.status(400).json({ error: 'missing phone' });
-  const { error } = await supabase.from('contacts').upsert({ phone, name: name || '', notes: notes || '' }, { onConflict: 'phone' });
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ ok: true });
+  
+  try {
+    const { data: existing } = await supabase.from('contacts').select('id').eq('phone', phone).maybeSingle();
+    
+    if (existing) {
+      const { error } = await supabase.from('contacts').update({ name: name || '', notes: notes || '' }).eq('phone', phone);
+      if (error) return res.status(500).json({ error: error.message });
+    } else {
+      const { error } = await supabase.from('contacts').insert({ phone, name: name || '', notes: notes || '' });
+      if (error) return res.status(500).json({ error: error.message });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Label endpoints — persist to Supabase and proxy add/remove to BotSpace
@@ -1873,7 +1885,11 @@ app.post("/webhook", async (req, res) => {
     }
 
     const fullPhone = `+${countryCode}${phone}`;
-    const contactName = (body?.customer?.name || body?.contacts?.[0]?.profile?.name || '').trim();
+    let contactName = (body?.contacts?.[0]?.profile?.name || body?.customer?.firstName || body?.customer?.name || '').trim();
+    // If the extracted name is just the phone number, ignore it so we don't overwrite with a fake name
+    if (contactName && contactName.replace(/\D/g, '') === phone.replace(/\D/g, '')) {
+      contactName = '';
+    }
 
     // Safely extract message or media
     let message = null;
