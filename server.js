@@ -552,7 +552,7 @@ BUSINESS HOURS:
 - If the user asks about "weekends", clarify EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays." Do not just say "yes" to weekends.
 
 BEFORE BOOKING:
--- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday). Sunday is our ONLY closed day.
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
 -- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
@@ -1045,7 +1045,7 @@ BUSINESS HOURS:
 - If the user asks about "weekends", clarify EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays." Do not just say "yes" to weekends.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday). Sunday is our ONLY closed day.
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
 - If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
@@ -2676,7 +2676,7 @@ BUSINESS HOURS:
 - If the user asks about "weekends", clarify EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays." Do not just say "yes" to weekends.
 
 BEFORE BOOKING:
-- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday).
+- Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday). Sunday is our ONLY closed day.
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
 - If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
 - If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
