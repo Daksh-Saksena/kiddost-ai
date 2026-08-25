@@ -534,8 +534,10 @@ TRANSPORTATION / OUTSIDE TRIPS:
 - If a user asks for school or tuition drop-off, clarify this policy: "We do not provide any transportation outside. However, if the school bus pick-up or tuition is located strictly within your apartment society, our caretaker can assist with dropping the child there."
 
 TOO EXPENSIVE / OUT OF BUDGET:
-- If the user says something like "Ok. Prices are quite high", reply with EXACTLY:
-"Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+- If the user says something like "Ok. Prices are quite high" or "The cost is too high":
+  1. FIRST, check the conversation history. Have you already offered them Value Packages?
+  2. If NO (Value Packages have NOT been offered yet): Do not use the discount rejection. Instead, pivot to Value Packages: "We also offer value packages which give you a bundle of sessions at a discounted rate!" Then proceed to use the VALUE PACKAGES rule (share the images and the exact script).
+  3. If YES (Value Packages have already been offered) or if they still object after seeing them: Reply EXACTLY: "Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
 - If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
 
 PAYMENT POLICY:
@@ -1027,8 +1029,10 @@ TRANSPORTATION / OUTSIDE TRIPS:
 - However, we CAN do pick-ups or drop-offs if they are STRICTLY WITHIN the same apartment complex or society (e.g. dropping the kid to the school bus stop inside the society, or walking them to a tuition class inside the same apartment complex).
 - If a user asks for school or tuition drop-off, clarify this policy: "We do not provide any transportation outside. However, if the school bus pick-up or tuition is located strictly within your apartment society, our caretaker can assist with dropping the child there."
 TOO EXPENSIVE / OUT OF BUDGET:
-- If the user says something like "Ok. Prices are quite high", reply with EXACTLY:
-"Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+- If the user says something like "Ok. Prices are quite high" or "The cost is too high":
+  1. FIRST, check the conversation history. Have you already offered them Value Packages?
+  2. If NO (Value Packages have NOT been offered yet): Do not use the discount rejection. Instead, pivot to Value Packages: "We also offer value packages which give you a bundle of sessions at a discounted rate!" Then proceed to use the VALUE PACKAGES rule (share the images and the exact script).
+  3. If YES (Value Packages have already been offered) or if they still object after seeing them: Reply EXACTLY: "Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
 - If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
 
 PAYMENT POLICY:
@@ -1277,28 +1281,7 @@ Goal: Make the user feel like they are chatting with a real human agent and move
 
     // Never move to slot-check unless key booking details are known.
     // If the model jumps early, force a details-collection question instead.
-    const CHECK_SLOT_REPLY_RE = /allow me to check the slot availability/i;
-    if (!mentionsNanny && CHECK_SLOT_REPLY_RE.test(aiReply)) {
-      const notes = (convVars && convVars.notes && typeof convVars.notes === 'object') ? convVars.notes : {};
-      const children = Array.isArray(allChildren) ? allChildren : [];
 
-      const hasChildAge = children.some(c => c && c.age != null);
-      const hasParentName = Boolean(notes.parentName || notes.parent || notes.customerName || notes.name);
-      const hasLocation = Boolean(notes.location || notes.area || notes.locality || notes.address);
-
-      const missing = [];
-      if (!hasChildAge) missing.push("child's age");
-      if (!hasParentName) missing.push('your name');
-      if (!hasLocation) missing.push('your area/locality');
-
-      if (missing.length > 0) {
-        const missingText =
-          missing.length === 1
-            ? missing[0]
-            : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
-        aiReply = `Sure, before I check slot availability, could you share ${missingText}?`;
-      }
-    }
 
     // Nanny: handled by AI prompt (ask age first, then clarify) — no override needed
 
@@ -2658,8 +2641,10 @@ TRANSPORTATION / OUTSIDE TRIPS:
 - However, we CAN do pick-ups or drop-offs if they are STRICTLY WITHIN the same apartment complex or society (e.g. dropping the kid to the school bus stop inside the society, or walking them to a tuition class inside the same apartment complex).
 - If a user asks for school or tuition drop-off, clarify this policy: "We do not provide any transportation outside. However, if the school bus pick-up or tuition is located strictly within your apartment society, our caretaker can assist with dropping the child there."
 TOO EXPENSIVE / OUT OF BUDGET:
-- If the user says something like "Ok. Prices are quite high", reply with EXACTLY:
-"Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+- If the user says something like "Ok. Prices are quite high" or "The cost is too high":
+  1. FIRST, check the conversation history. Have you already offered them Value Packages?
+  2. If NO (Value Packages have NOT been offered yet): Do not use the discount rejection. Instead, pivot to Value Packages: "We also offer value packages which give you a bundle of sessions at a discounted rate!" Then proceed to use the VALUE PACKAGES rule (share the images and the exact script).
+  3. If YES (Value Packages have already been offered) or if they still object after seeing them: Reply EXACTLY: "Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
 - If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
 
 PAYMENT POLICY:
