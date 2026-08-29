@@ -626,8 +626,9 @@ RULE 3 — BANGALORE AREAS:
   Then STOP. If the user replies after that, respond UNSURE. A human agent will confirm.
 - NEVER confirm serviceability yourself. You cannot verify areas. Always defer to human.
 
-RULE 4 — GOOGLE MAPS LINKS:
-- If the user shares a Google Maps link, say: "Let me check if we can service your area and get back to you." Then STOP. Respond UNSURE to follow-ups.
+RULE 4 — LINKS AND LOCATIONS:
+- If the user shares an actual Google Maps link (e.g., maps.app.goo.gl), say: "Let me check if we can service your area and get back to you." Then STOP. Respond UNSURE to follow-ups.
+- If the user shares ANY OTHER type of link (e.g., Facebook, Instagram, YouTube, random websites) that is NOT a Google Maps link, DO NOT treat it as a location. Respond EXACTLY with ONLY the word: UNSURE
 
 RULE 5 — UNKNOWN / AMBIGUOUS LOCATION OR CONFUSION:
 - If the user replies with a question mark (?), confusion, or if you are not 100% sure whether the location is in Bangalore or not, respond UNSURE.
@@ -1119,8 +1120,9 @@ RULE 3 — BANGALORE AREAS:
   Then STOP. If the user replies after that, respond UNSURE. A human agent will confirm.
 - NEVER confirm serviceability yourself. You cannot verify areas. Always defer to human.
 
-RULE 4 — GOOGLE MAPS LINKS:
-- If the user shares a Google Maps link, say: "Let me check if we can service your area and get back to you." Then STOP. Respond UNSURE to follow-ups.
+RULE 4 — LINKS AND LOCATIONS:
+- If the user shares an actual Google Maps link (e.g., maps.app.goo.gl), say: "Let me check if we can service your area and get back to you." Then STOP. Respond UNSURE to follow-ups.
+- If the user shares ANY OTHER type of link (e.g., Facebook, Instagram, YouTube, random websites) that is NOT a Google Maps link, DO NOT treat it as a location. Respond EXACTLY with ONLY the word: UNSURE
 
 RULE 5 — UNKNOWN / AMBIGUOUS LOCATION OR CONFUSION:
 - If the user replies with a question mark (?), confusion, or if you are not 100% sure whether the location is in Bangalore or not, respond UNSURE.
@@ -2732,8 +2734,9 @@ RULE 3 — BANGALORE AREAS:
 Then STOP. If the user replies after that, respond UNSURE. A human agent will confirm.
 - NEVER confirm serviceability yourself. You cannot verify areas. Always defer to human.
 
-RULE 4 — GOOGLE MAPS LINKS:
-- If the user shares a Google Maps link, say: "Let me check if we can service your area and get back to you." Then STOP. Respond UNSURE to follow-ups.
+RULE 4 — LINKS AND LOCATIONS:
+- If the user shares an actual Google Maps link (e.g., maps.app.goo.gl), say: "Let me check if we can service your area and get back to you." Then STOP. Respond UNSURE to follow-ups.
+- If the user shares ANY OTHER type of link (e.g., Facebook, Instagram, YouTube, random websites) that is NOT a Google Maps link, DO NOT treat it as a location. Respond EXACTLY with ONLY the word: UNSURE
 
 RULE 5 — UNKNOWN / AMBIGUOUS LOCATION OR CONFUSION:
 - If the user replies with a question mark (?), confusion, or if you are not 100% sure whether the location is in Bangalore or not, respond UNSURE.
