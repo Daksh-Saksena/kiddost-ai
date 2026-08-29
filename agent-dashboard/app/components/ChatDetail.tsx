@@ -646,7 +646,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                         <MediaRenderer url={message.media_url} isDark={isDarkMode} />
                       </div>
                     )}
-                    {message.text ? <p className={`text-base ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
+                    {message.text ? <p className={`text-base break-words whitespace-pre-wrap ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
                     <div className={`flex items-center justify-end gap-1 mt-1.5 text-sm ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
                       <span title={message.created_at ? new Date(message.created_at).toLocaleString() : undefined}>{message.time}</span>
                       {isMe && (() => {
