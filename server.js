@@ -447,7 +447,7 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
 PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
 - If age is not known yet, you MUST politely ask for the child's age first: "Could I please know the child's age first?"
-- Once age is known, give the appropriate activities response (paraphrasing is fine, keep the core activities accurate):
+- Once age is known, calculate the child's age based on Today's Date (if a DOB is provided). Give the appropriate activities response for their EXACT age bracket ONLY. NEVER output multiple contradictory age scripts (e.g. do not say they are 2 years old and also under 4 months).
   • Under 4 months: Use this EXACT script: "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time." NEVER use the special needs script for this.
   • 4m–under 1 year: Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English." DO NOT reject them. NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
   • Age 1 to under 2 (including 1.5 years, 18 months): Verbal interaction, age-appropriate puzzles, flashcards, rhymes, storybook reading, park outings.
@@ -860,12 +860,14 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         if (c.name) return `- Child named ${c.name} (age unknown)`;
         return `- Unnamed child: ${c.age} years old`;
       });
-    const varsBlock = childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
-      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${convVars.notes && Object.keys(convVars.notes).length > 0
-        ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
-        : ''
-      }`
-      : '';
+    const currentDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const varsBlock = `\n\nSYSTEM INFO:\n- Today's Date: ${currentDateStr}` +
+      (childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
+        ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${convVars.notes && Object.keys(convVars.notes).length > 0
+          ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
+          : ''
+        }`
+        : '');
 
     // ── Check if this customer has had any previous sessions ─────────────
     let sessionStatusBlock = '';
@@ -959,7 +961,7 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
 PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
 - If age is not known yet, naturally ask for the child's age — phrase it conversationally, e.g. "Could you share your child's age?" or "May I know how old your child is?" — do NOT start with "Sure,"
-- Once age is known, give the appropriate activities response (paraphrasing is fine, keep the core activities accurate):
+- Once age is known, calculate the child's age based on Today's Date (if a DOB is provided). Give the appropriate activities response for their EXACT age bracket ONLY. NEVER output multiple contradictory age scripts (e.g. do not say they are 2 years old and also under 4 months).
   • Under 4 months: Use this EXACT script: "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time." NEVER use the special needs script for this.
   • 4m–under 1 year: Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English." DO NOT reject them. NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
   • Age 1 to under 2 (including 1.5 years, 18 months): Verbal interaction, age-appropriate puzzles, flashcards, rhymes, storybook reading, park outings.
@@ -2463,12 +2465,14 @@ app.get('/debug-prompt', async (req, res) => {
         if (c.name) return `- Child named ${c.name} (age unknown)`;
         return `- Unnamed child: ${c.age} years old`;
       });
-    const varsBlock = childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
-      ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${convVars.notes && Object.keys(convVars.notes).length > 0
-        ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
-        : ''
-      }`
-      : '';
+    const currentDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const varsBlock = `\n\nSYSTEM INFO:\n- Today's Date: ${currentDateStr}` +
+      (childFacts.length > 0 || (convVars.notes && Object.keys(convVars.notes).length > 0)
+        ? `\n\nKNOWN FACTS about this family (do NOT ask for this again, use it naturally — do NOT mix up different children's ages):\n${childFacts.join('\n')}${convVars.notes && Object.keys(convVars.notes).length > 0
+          ? '\n' + Object.entries(convVars.notes).map(([k, v]) => `- ${k}: ${v}`).join('\n')
+          : ''
+        }`
+        : '');
 
     let sessionStatusBlock = '';
     try {
@@ -2573,7 +2577,7 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
 PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
 - If age is not known yet, naturally ask for the child's age — phrase it conversationally, e.g. "Could you share your child's age?" or "May I know how old your child is?" — do NOT start with "Sure,"
-- Once age is known, give the appropriate activities response (paraphrasing is fine, keep the core activities accurate):
+- Once age is known, calculate the child's age based on Today's Date (if a DOB is provided). Give the appropriate activities response for their EXACT age bracket ONLY. NEVER output multiple contradictory age scripts (e.g. do not say they are 2 years old and also under 4 months).
 • Under 4 months: Use this EXACT script: "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time." NEVER use the special needs script for this.
   • 4m–under 1 year: Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English." DO NOT reject them. NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
 • Age 1 to under 2 (including 1.5 years, 18 months): Verbal interaction, age-appropriate puzzles, flashcards, rhymes, storybook reading, park outings.
