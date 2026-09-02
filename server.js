@@ -457,11 +457,11 @@ PRICING / SERVICES / QUOTATION:
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
+  • If they asked about full pricing/services: Just provide the pricing details. DO NOT proactively push or mention an introductory/trial session unless they specifically ask for one. Just say: "Please refer to the pricing details in the image above."
   • If they ask specifically about hourly calculations (e.g. "for 1 hour so its 700 rupees"): Provide the EXACT calculation below. DO NOT DO ANY CALCULATIONS YOURSELF.
       - First hour ₹700, Every subsequent hour ₹500 per hour.
       - So for 2 hours ₹1200 and 3 hours ₹1700.
-      - For the first time experience it’s on discounted rate of ₹500 per hour.
+      - DO NOT mention the discounted introductory rate unless they explicitly ask for a trial/intro session.
     If the customer keeps asking for specific info beyond this (e.g. "7 hours a day", "what is the total for 1 month"), DO NOT DO THE MATH. Reply EXACTLY with ONLY the word: UNSURE (this triggers a human agent to calculate).
   • If they just ask generally for pricing (not specific math) and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
@@ -638,7 +638,7 @@ RULE 6 — ASKING FOR LOCATION:
 - During the BEFORE BOOKING flow, after collecting parent name / preferred time, ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
 - Once they share it, follow Rules 1-5 above.
 ---
-Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session. ${KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : ""
+Goal: Make the user feel like they are chatting with a real human agent. Answer their questions clearly. ${KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : ""
     }${varsBlock}${sessionStatusBlock}${exampleBlock}`;
 }
 
@@ -880,7 +880,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         const trialDone = pastEvents.some(e => e.is_trial);
         sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Introductory session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer an introductory session again. Focus on scheduling regular sessions.`;
       } else {
-        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer. Their first session will be an introductory session. When mentioning the first session price, use this exact line: "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." Treat the booking flow the same as a regular session after that.`;
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer.`;
       }
     } catch (e) {
       console.log('[session-check] failed:', e.message);
@@ -969,11 +969,11 @@ PRICING / SERVICES / QUOTATION:
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
+  • If they asked about full pricing/services: Just provide the pricing details. DO NOT proactively push or mention an introductory/trial session unless they specifically ask for one. Just say: "Please refer to the pricing details in the image above."
   • If they ask specifically about hourly calculations (e.g. "for 1 hour so its 700 rupees"): Provide the EXACT calculation below. DO NOT DO ANY CALCULATIONS YOURSELF.
       - First hour ₹700, Every subsequent hour ₹500 per hour.
       - So for 2 hours ₹1200 and 3 hours ₹1700.
-      - For the first time experience it’s on discounted rate of ₹500 per hour.
+      - DO NOT mention the discounted introductory rate unless they explicitly ask for a trial/intro session.
     If the customer keeps asking for specific info beyond this (e.g. "7 hours a day", "what is the total for 1 month"), DO NOT DO THE MATH. Reply EXACTLY with ONLY the word: UNSURE (this triggers a human agent to calculate).
   • If they just ask generally for pricing (not specific math) and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
@@ -1133,7 +1133,7 @@ RULE 6 — ASKING FOR LOCATION:
 - Once they share it, follow Rules 1-5 above.
 ---
 
-Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session.` +
+Goal: Make the user feel like they are chatting with a real human agent. Answer their questions clearly.` +
           (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
           varsBlock +
           sessionStatusBlock +
@@ -2482,7 +2482,7 @@ app.get('/debug-prompt', async (req, res) => {
         const trialDone = pastEvents.some(e => e.is_trial);
         sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- Total sessions booked: ${totalSessions}\n- Introductory session completed: ${trialDone ? 'Yes' : 'No'}\nThis is a RETURNING customer — do NOT offer an introductory session again. Focus on scheduling regular sessions.`;
       } else {
-        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer. Their first session will be an introductory session. When mentioning the first session price, use this exact line: "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." Treat the booking flow the same as a regular session after that.`;
+        sessionStatusBlock = `\n\nSESSION HISTORY for this customer:\n- No previous sessions found.\n- This is a FIRST-TIME customer.`;
       }
     } catch (e) { }
 
@@ -2583,11 +2583,11 @@ PRICING / SERVICES / QUOTATION:
 • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - After the activities (for ages 8 and below), write [PRICING_IMAGE] on its own line so the pricing image is sent.
 - After the image, include the pricing context — use judgment on how much to say based on what they asked:
-  • If they asked about full pricing/services: use this exact line — "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
+  • If they asked about full pricing/services: Just provide the pricing details. DO NOT proactively push or mention an introductory/trial session unless they specifically ask for one. Just say: "Please refer to the pricing details in the image above."
   • If they ask specifically about hourly calculations (e.g. "for 1 hour so its 700 rupees"): Provide the EXACT calculation below. DO NOT DO ANY CALCULATIONS YOURSELF.
       - First hour ₹700, Every subsequent hour ₹500 per hour.
       - So for 2 hours ₹1200 and 3 hours ₹1700.
-      - For the first time experience it’s on discounted rate of ₹500 per hour.
+      - DO NOT mention the discounted introductory rate unless they explicitly ask for a trial/intro session.
     If the customer keeps asking for specific info beyond this (e.g. "7 hours a day", "what is the total for 1 month"), DO NOT DO THE MATH. Reply EXACTLY with ONLY the word: UNSURE (this triggers a human agent to calculate).
   • If they just ask generally for pricing (not specific math) and age is already known: write [PRICING_IMAGE] then briefly say "Please refer to the pricing details above."
 - IMPORTANT: ALWAYS send [PRICING_IMAGE] before referencing pricing. Never say "refer to the pricing above" without first writing [PRICING_IMAGE] on its own line.
@@ -2747,7 +2747,7 @@ RULE 6 — ASKING FOR LOCATION:
 - Once they share it, follow Rules 1-5 above.
 ---
 ` +
-  `Goal: Make the user feel like they are chatting with a real human agent and move them towards booking an introductory session.` +
+  `Goal: Make the user feel like they are chatting with a real human agent. Answer their questions clearly.` +
   (KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost Knowledge Base (from www.kiddost.com — use this to answer factual questions about services, activities, philosophy, and contact):\n${KIDDOST_WEBSITE_CONTENT}\n---` : "") +
   exampleBlock;
 
