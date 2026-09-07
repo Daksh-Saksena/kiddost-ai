@@ -399,6 +399,7 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
+- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
@@ -435,7 +436,6 @@ IMPORTANT — UNSURE threshold:
 
 ---
 RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing slightly for natural conversation, but do NOT add information that isn't explicitly stated here. If the user asks something not covered below, reply UNSURE.
-- ABSOLUTE PRIORITY 0: GREETINGS RULE - If the user's CURRENT message is ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, you MUST immediately STOP processing all other rules (including AGE FIRST POLICY) and respond ONLY with a short friendly greeting such as "Hello! How can I help you today?" Do NOT ask for age. Do NOT give pricing. Do NOT say anything else.
 - ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message contains Hindi, Hinglish (e.g., "mera name", "han ji", "kya"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
 - STRICT SPECIAL NEEDS RULE: If the user explicitly mentions that their child has autism, ADHD, or a known disability, you MUST completely ignore all other instructions and reply EXACTLY: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services." If they use an unfamiliar acronym or you are NOT 100% sure if it is a special need (e.g. "HNI"), DO NOT GUESS. Respond EXACTLY with ONLY the word: UNSURE
 - ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
@@ -925,6 +925,7 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
+- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
@@ -949,7 +950,6 @@ IMPORTANT — UNSURE threshold:
 
 ---
 RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing slightly for natural conversation, but do NOT add information that isn't explicitly stated here. If the user asks something not covered below, reply UNSURE.
-- ABSOLUTE PRIORITY 0: GREETINGS RULE - If the user's CURRENT message is ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, you MUST immediately STOP processing all other rules (including AGE FIRST POLICY) and respond ONLY with a short friendly greeting such as "Hello! How can I help you today?" Do NOT ask for age. Do NOT give pricing. Do NOT say anything else.
 - ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message contains Hindi, Hinglish (e.g., "mera name", "han ji", "kya"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
 - STRICT SPECIAL NEEDS RULE: If the user explicitly mentions that their child has autism, ADHD, or a known disability, you MUST completely ignore all other instructions and reply EXACTLY: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services." If they use an unfamiliar acronym or you are NOT 100% sure if it is a special need (e.g. "HNI"), DO NOT GUESS. Respond EXACTLY with ONLY the word: UNSURE
 - ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
@@ -1516,8 +1516,26 @@ async function sendWelcome(fullPhone) {
   };
   try {
     // 1. Greeting
-    await sendText('Hi, thank you for contacting KidDost. How can we assist you today?');
-    // Let the AI handle the rest of the conversation naturally instead of slamming the user with 4 messages.
+    await sendText('Hi, thank you for contacting KidDost.');
+    await new Promise(r => setTimeout(r, 800));
+    // 2. Flyer image (send via BotSpace; save a placeholder to DB so dashboard shows it)
+    const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
+    const imageUrl = `${SERVER_URL}/static/image.png`;
+    await supabase.from('messages').insert({
+      phone: fullPhone, role: 'assistant', content: '', media_url: imageUrl, sender: 'ai', agent: null, ai_enabled: true
+    });
+    await axios.post(
+      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
+      { name: 'KidDost', phone: fullPhone, mediaUrl: imageUrl, mediaType: 'image', label: '' },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    await new Promise(r => setTimeout(r, 3000));
+    // 3. Follow-up
+    await sendText('Feel free to let us know if you have any questions.');
+    await new Promise(r => setTimeout(r, 800));
+    // 4. Ask age
+    await sendText('Could you please share your child’s age with us?');
+    console.log('[welcome] sent to', fullPhone);
   } catch (e) {
     console.error('[welcome] failed:', e.response?.data || e.message);
   }
@@ -2523,6 +2541,7 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Only include "Feel free to let us know if you have any questions." ONCE, at the end of the FIRST pricing/activities info block you send. NEVER use it again in the same conversation. NEVER use it as a sign-off or farewell.
+- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
@@ -2547,7 +2566,6 @@ IMPORTANT — UNSURE threshold:
 
 ---
 RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing slightly for natural conversation, but do NOT add information that isn't explicitly stated here. If the user asks something not covered below, reply UNSURE.
-- ABSOLUTE PRIORITY 0: GREETINGS RULE - If the user's CURRENT message is ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, you MUST immediately STOP processing all other rules (including AGE FIRST POLICY) and respond ONLY with a short friendly greeting such as "Hello! How can I help you today?" Do NOT ask for age. Do NOT give pricing. Do NOT say anything else.
 - ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message contains Hindi, Hinglish (e.g., "mera name", "han ji", "kya"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
 - STRICT SPECIAL NEEDS RULE: If the user explicitly mentions that their child has autism, ADHD, or a known disability, you MUST completely ignore all other instructions and reply EXACTLY: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services." If they use an unfamiliar acronym or you are NOT 100% sure if it is a special need (e.g. "HNI"), DO NOT GUESS. Respond EXACTLY with ONLY the word: UNSURE
 - ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
