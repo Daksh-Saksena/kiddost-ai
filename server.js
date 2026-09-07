@@ -1516,26 +1516,8 @@ async function sendWelcome(fullPhone) {
   };
   try {
     // 1. Greeting
-    await sendText('Hi, thank you for contacting KidDost.');
-    await new Promise(r => setTimeout(r, 800));
-    // 2. Flyer image (send via BotSpace; save a placeholder to DB so dashboard shows it)
-    const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
-    const imageUrl = `${SERVER_URL}/static/image.png`;
-    await supabase.from('messages').insert({
-      phone: fullPhone, role: 'assistant', content: '', media_url: imageUrl, sender: 'ai', agent: null, ai_enabled: true
-    });
-    await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
-      { name: 'KidDost', phone: fullPhone, mediaUrl: imageUrl, mediaType: 'image', label: '' },
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-    await new Promise(r => setTimeout(r, 3000));
-    // 3. Follow-up
-    await sendText('Feel free to let us know if you have any questions.');
-    await new Promise(r => setTimeout(r, 800));
-    // 4. Ask age
-    await sendText('Could you please share your child’s age with us?');
-    console.log('[welcome] sent to', fullPhone);
+    await sendText('Hi, thank you for contacting KidDost. How can we assist you today?');
+    // Let the AI handle the rest of the conversation naturally instead of slamming the user with 4 messages.
   } catch (e) {
     console.error('[welcome] failed:', e.response?.data || e.message);
   }
