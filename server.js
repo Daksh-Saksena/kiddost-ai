@@ -409,7 +409,7 @@ AGE FIRST POLICY (CRITICAL):
 - **STEP 1 ALWAYS**: Before doing ANYTHING else, scan the ENTIRE conversation history VERY CAREFULLY for the child's age. Look for digits (e.g. "6", "3.5", "18 months") and words (e.g. "six years old"). If the user mentions multiple numbers in one sentence (e.g., "6 years old for 4 hours a day"), use basic logic to identify which number is the age! Also check KNOWN FACTS.
 - **IF AGE IS FOUND ANYWHERE IN HISTORY OR KNOWN FACTS**: Use that age. NEVER ask for age again. This applies to ALL question types including monthly packages, pricing, activities, booking, nanny services.
 - **ONLY IF AGE IS TRULY NOT FOUND**: Ask "Could I please know the child's age first?" — but ONLY after genuinely checking the full history. Do NOT provide pricing, packages, or activities until you have their age.
-- **FOR MONTHLY PACKAGES / VALUE PACKAGES SPECIFICALLY**: The same rule applies. If age was mentioned at ANY point — even 10 messages ago — use it. Do NOT ask again. Jump straight to showing the packages.
+- **FOR MONTHLY PACKAGES / VALUE PACKAGES SPECIFICALLY**: If ANY age (e.g. "10 months", "4 months", "2 years") was mentioned anywhere earlier in history or KNOWN FACTS, NEVER ask for the child's age! Jump straight to showing the packages. You are STRICTLY FORBIDDEN from asking for age again if it was already mentioned.
 - **BREAK MESSAGES FOR CLARITY**: Send each response component in a SEPARATE WhatsApp message:
   - Age question: One message
   - Activities explanation: Separate message
@@ -477,16 +477,19 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permane
 - IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing.
 
 VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
-- *** CRITICAL: Scan conversation history FIRST. If the user mentioned ANY age (e.g. "2", "3.5", "10 months") at ANY point, use that age — DO NOT ask for age. Jump straight to Step 2. ***
-- Step 1 (ONLY if age is completely absent from history AND KNOWN FACTS): Ask "Could I please know the child's age first?" and do NOT explain the packages yet.
-- Step 2: Check conversation history to see if regular pricing details or the pricing image have ALREADY been shared.
-  • IF regular pricing WAS NOT shared yet: Send BOTH images first, then the text. Use this EXACT response structure:
+- IMPORTANT: We call them "value packages", NOT "monthly packages".
+- CRITICAL: NEVER ask for the child's age if ANY age was ALREADY mentioned anywhere in the conversation history or KNOWN FACTS (including "10 months", "4 months", "1.5", "2", etc.). The customer already shared their child's age!
+- If the child's age was ALREADY mentioned: Go DIRECTLY to sending the package details below. You are STRICTLY FORBIDDEN from asking for age again.
+- ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
+- Package response structure:
+  • IF regular pricing WAS NOT shared yet: Send BOTH images first, then the text.
     You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
     After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-  • IF regular pricing WAS ALREADY shared: Do NOT resend the regular prices. Only send the monthly pricing image and text. Use this EXACT response structure:
+  • IF regular pricing WAS ALREADY shared: Do NOT resend the regular prices. Only send the monthly pricing image and text.
     You MUST write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
     After the image, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-
+- NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
+- End with "Feel free to let us know if you have any questions."
 
 - TWINS / MULTIPLE CHILDREN RULE: 
   • ONLY mention twin packages if they explicitly ask about twins/multiple children. 
@@ -740,7 +743,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
               content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
 Return ONLY valid JSON with these fields:
 - "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
-- "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": number or null }. If the same child is mentioned with both name and age, combine them into one entry. If a new age is mentioned for a different (second) child, add a separate entry. Example: [{"name":"Ram","age":4},{"name":null,"age":2}]
+- "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": string or number or null }. CRITICAL: If the child's age is in months (e.g. "10 months", "4 months", "18 months"), keep it as a string with "months" (e.g. "10 months"). Example: [{"name":"Ram","age":4},{"name":null,"age":"10 months"}]
 - "notes": an object of important facts/details about the customer mentioned ANYWHERE in the conversation. Extract things like:
   • "parentName": mother's/father's name if mentioned
   • "spouseName": husband/wife name if mentioned
@@ -775,11 +778,17 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     let varsUpdated = false;
     const storedChildren = Array.isArray(convVars.children) ? convVars.children : [];
 
-    // Coerce child ages to number if string representations are returned from intent classifier
+    // Coerce child ages: preserve months strings, only parse pure numbers to float
     const parsedIntentChildren = (intent.children || []).map(c => {
       let age = c.age;
-      if (typeof age === 'string' && !isNaN(parseFloat(age))) {
-        age = parseFloat(age);
+      if (typeof age === 'string') {
+        const trimmed = age.trim();
+        if (/(?:month|mth|m\b)/i.test(trimmed)) {
+          return { name: c.name || null, age: trimmed };
+        }
+        if (!isNaN(Number(trimmed))) {
+          age = parseFloat(trimmed);
+        }
       }
       return { name: c.name || null, age: age != null ? age : null };
     });
@@ -856,9 +865,14 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const childFacts = allChildren
       .filter(c => c.name || c.age != null)
       .map(c => {
-        if (c.name && c.age != null) return `- ${c.name}: ${c.age} years old`;
-        if (c.name) return `- Child named ${c.name} (age unknown)`;
-        return `- Unnamed child: ${c.age} years old`;
+        const ageStr = c.age != null
+          ? (String(c.age).toLowerCase().includes('month') || String(c.age).toLowerCase().includes('year')
+              ? String(c.age)
+              : `${c.age} years old`)
+          : 'age unknown';
+        if (c.name && c.age != null) return `- ${c.name}: ${ageStr}`;
+        if (c.name) return `- Child named ${c.name} (${ageStr})`;
+        return `- Unnamed child: ${ageStr}`;
       });
     const currentDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const varsBlock = `\n\nSYSTEM INFO:\n- Today's Date: ${currentDateStr}` +
@@ -990,11 +1004,18 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permane
 - Step 3: ONLY AFTER giving the activities and pricing, add this exact disclaimer at the very end of your response: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 - IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing.
 
-VALUE PACKAGES (only when user asks about packages/plans/bundles):
+VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
-- *** CRITICAL AGE CHECK: Before doing ANYTHING, scan the ENTIRE conversation history for ANY age mention (e.g. "2", "3.5", "10 months", "2.3"). If found, use it and go DIRECTLY to showing the packages — NEVER ask for age. ***
-- ONLY ask "Could I please know the child's age first?" if age is completely absent from history AND KNOWN FACTS.
-- Write [MONTH_IMAGE] on its own line, then explain the package flexibility: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+- CRITICAL: NEVER ask for the child's age if ANY age was ALREADY mentioned anywhere in the conversation history or KNOWN FACTS (including "10 months", "4 months", "1.5", "2", etc.). The customer already shared their child's age!
+- If the child's age was ALREADY mentioned: Go DIRECTLY to sending the package details below. You are STRICTLY FORBIDDEN from asking for age again.
+- ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
+- Package response structure:
+  • IF regular pricing WAS NOT shared yet: Send BOTH images first, then the text.
+    You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
+    After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+  • IF regular pricing WAS ALREADY shared: Do NOT resend the regular prices. Only send the monthly pricing image and text.
+    You MUST write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
+    After the image, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
 - If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
@@ -2461,9 +2482,14 @@ app.get('/debug-prompt', async (req, res) => {
     const childFacts = allChildren
       .filter(c => c.name || c.age != null)
       .map(c => {
-        if (c.name && c.age != null) return `- ${c.name}: ${c.age} years old`;
-        if (c.name) return `- Child named ${c.name} (age unknown)`;
-        return `- Unnamed child: ${c.age} years old`;
+        const ageStr = c.age != null
+          ? (String(c.age).toLowerCase().includes('month') || String(c.age).toLowerCase().includes('year')
+              ? String(c.age)
+              : `${c.age} years old`)
+          : 'age unknown';
+        if (c.name && c.age != null) return `- ${c.name}: ${ageStr}`;
+        if (c.name) return `- Child named ${c.name} (${ageStr})`;
+        return `- Unnamed child: ${ageStr}`;
       });
     const currentDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const varsBlock = `\n\nSYSTEM INFO:\n- Today's Date: ${currentDateStr}` +
@@ -2606,11 +2632,18 @@ NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permane
 - Step 3: ONLY AFTER giving the activities and pricing, add this exact disclaimer at the very end of your response: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
 - IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing.
 
-VALUE PACKAGES (only when user asks about packages/plans/bundles):
+VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly packages):
 - IMPORTANT: We call them "value packages", NOT "monthly packages".
-- *** CRITICAL AGE CHECK: Before doing ANYTHING, scan the ENTIRE conversation history for ANY age mention (e.g. "2", "3.5", "10 months", "2.3"). If found, use it and go DIRECTLY to showing the packages — NEVER ask for age. ***
-- ONLY ask "Could I please know the child's age first?" if age is completely absent from history AND KNOWN FACTS.
-- Write [MONTH_IMAGE] on its own line, then explain the package flexibility: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+- CRITICAL: NEVER ask for the child's age if ANY age was ALREADY mentioned anywhere in the conversation history or KNOWN FACTS (including "10 months", "4 months", "1.5", "2", etc.). The customer already shared their child's age!
+- If the child's age was ALREADY mentioned: Go DIRECTLY to sending the package details below. You are STRICTLY FORBIDDEN from asking for age again.
+- ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
+- Package response structure:
+  • IF regular pricing WAS NOT shared yet: Send BOTH images first, then the text.
+    You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
+    After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+  • IF regular pricing WAS ALREADY shared: Do NOT resend the regular prices. Only send the monthly pricing image and text.
+    You MUST write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
+    After the image, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
 - If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
