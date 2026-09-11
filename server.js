@@ -437,7 +437,17 @@ IMPORTANT — UNSURE threshold:
 ---
 RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing slightly for natural conversation, but do NOT add information that isn't explicitly stated here. If the user asks something not covered below, reply UNSURE.
 - ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message contains Hindi, Hinglish (e.g., "mera name", "han ji", "kya"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
-- STRICT SPECIAL NEEDS RULE: If the user explicitly mentions that their child has autism, ADHD, or a known disability, you MUST completely ignore all other instructions and reply EXACTLY: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services." If they use an unfamiliar acronym or you are NOT 100% sure if it is a special need (e.g. "HNI"), DO NOT GUESS. Respond EXACTLY with ONLY the word: UNSURE
+- STRICT SPECIAL NEEDS RULE:
+  • TRIGGER: This rule applies ONLY if the customer EXPLICITLY mentions that their child has "autism", "autistic", "ADHD", "Down syndrome", or a known "disability".
+  • STRICT NEGATIVE CONSTRAINT: You are STRICTLY FORBIDDEN from using this special needs script if the user has NOT explicitly mentioned a disability! NEVER use this script for:
+    - Infants or babies under 1 year (e.g. 9 months, 6 months) — infants are NOT special needs kids! Use the infant script.
+    - Questions about teachers, tutors, staff, or nannies.
+    - Job applications, hiring, vacancies, or salary questions.
+    - Unfamiliar acronyms (e.g. "HNI"). Respond with ONLY the single word UNSURE instead.
+  • Exact script when explicitly triggered: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services."
+- TEACHERS / TUTORING RULE: If the user asks "do you have teachers?", "are they teachers?", "can you send a teacher?", or asks about teacher qualifications:
+  Reply: "All our members are educated female graduates or students who engage children with educational activities, worksheets, puzzles, and homework help. While they are not school teachers, they are thoroughly trained in child engagement and learning."
+  NEVER use the special needs script for this!
 - ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
 - REJECTION / HESITATION RULE: If the user says they will let us know, will think about it, or says they are not interested right now (e.g. "I will let you know", "will inform you", "ok thanks I will let you know", "not right now", "no I'm not interested", "don't want it"), you MUST stop asking questions and reply EXACTLY: "Feel free to let us know if you have any questions."
 - INSTAGRAM RULE: If the user asks for our Instagram, insta page, or social media, reply EXACTLY: "Our insta handle is @kiddostbangalore"
@@ -448,8 +458,8 @@ PRICING / SERVICES / QUOTATION:
 - Check the conversation history first. If the child's age was already mentioned, use it — do NOT ask again.
 - If age is not known yet, you MUST politely ask for the child's age first: "Could I please know the child's age first?"
 - Once age is known, calculate the child's age based on Today's Date (if a DOB is provided). Give the appropriate activities response for their EXACT age bracket ONLY. NEVER output multiple contradictory age scripts (e.g. do not say they are 2 years old and also under 4 months).
-  • Under 4 months: Use this EXACT script: "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time." NEVER use the special needs script for this.
-  • 4m–under 1 year: Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English." DO NOT reject them. NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
+  • Under 4 months (e.g. 1 month, 2 months, 3 months): Use this EXACT script: "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time." NEVER use the special needs script for this.
+  • 4 months to under 1 year (infants aged 4 to 11 months, e.g. 4m, 6 months, 9 months, 10 months): DO NOT reject them! Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English." NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
   • Age 1 to under 2 (including 1.5 years, 18 months): Verbal interaction, age-appropriate puzzles, flashcards, rhymes, storybook reading, park outings.
   • Age 2: Verbal interaction, puzzles, rhymes, simple art & craft, storybook reading, shapes/colours/numbers, park outings.
   • Age 3: Puzzles, memory games, art & craft, brain-boosting activities, storybook reading, phonics, writing practice, park outings.
@@ -965,7 +975,17 @@ IMPORTANT — UNSURE threshold:
 ---
 RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing slightly for natural conversation, but do NOT add information that isn't explicitly stated here. If the user asks something not covered below, reply UNSURE.
 - ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message contains Hindi, Hinglish (e.g., "mera name", "han ji", "kya"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
-- STRICT SPECIAL NEEDS RULE: If the user explicitly mentions that their child has autism, ADHD, or a known disability, you MUST completely ignore all other instructions and reply EXACTLY: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services." If they use an unfamiliar acronym or you are NOT 100% sure if it is a special need (e.g. "HNI"), DO NOT GUESS. Respond EXACTLY with ONLY the word: UNSURE
+- STRICT SPECIAL NEEDS RULE:
+  • TRIGGER: This rule applies ONLY if the customer EXPLICITLY mentions that their child has "autism", "autistic", "ADHD", "Down syndrome", or a known "disability".
+  • STRICT NEGATIVE CONSTRAINT: You are STRICTLY FORBIDDEN from using this special needs script if the user has NOT explicitly mentioned a disability! NEVER use this script for:
+    - Infants or babies under 1 year (e.g. 9 months, 6 months) — infants are NOT special needs kids! Use the infant script.
+    - Questions about teachers, tutors, staff, or nannies.
+    - Job applications, hiring, vacancies, or salary questions.
+    - Unfamiliar acronyms (e.g. "HNI"). Respond with ONLY the single word UNSURE instead.
+  • Exact script when explicitly triggered: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services."
+- TEACHERS / TUTORING RULE: If the user asks "do you have teachers?", "are they teachers?", "can you send a teacher?", or asks about teacher qualifications:
+  Reply: "All our members are educated female graduates or students who engage children with educational activities, worksheets, puzzles, and homework help. While they are not school teachers, they are thoroughly trained in child engagement and learning."
+  NEVER use the special needs script for this!
 - ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
 - REJECTION / HESITATION RULE: If the user says they will let us know, will think about it, or says they are not interested right now (e.g. "I will let you know", "will inform you", "ok thanks I will let you know", "not right now", "no I'm not interested", "don't want it"), you MUST stop asking questions and reply EXACTLY: "Feel free to let us know if you have any questions."
 - INSTAGRAM RULE: If the user asks for our Instagram, insta page, or social media, reply EXACTLY: "Our insta handle is @kiddostbangalore"
@@ -1310,7 +1330,28 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
     // If the model jumps early, force a details-collection question instead.
 
 
-    // Nanny: handled by AI prompt (ask age first, then clarify) — no override needed
+    // Safety net: Block false-positive special needs rejections!
+    // The AI has a tendency to falsely send the "special needs kids" script
+    // for infants under 1 year, questions about teachers/tutors, or unfamiliar questions.
+    const SPECIAL_NEEDS_REPLY_RE = /not equipped and trained to manage special needs kids/i;
+    if (SPECIAL_NEEDS_REPLY_RE.test(aiReply)) {
+      const allCustomerText = [
+        combinedMessage,
+        ...history.filter(m => m.role === 'user').map(m => m.content)
+      ].join(' ');
+      const userMentionsDisability = /\b(special\s*needs?|autis\w*|adhd|a\.d\.h\.d|down\s*syndrome|disab\w*|handicap\w*|cerebral\s*palsy|mental\s*retardation|slow\s*learner|special\s*child)\b/i.test(allCustomerText);
+      if (!userMentionsDisability) {
+        console.warn(`[SAFETY NET] Blocked false special needs rejection for ${fullPhone}. User message: "${combinedMessage}"`);
+        // If the reply contained other text besides the special needs paragraph (e.g. infant script), keep the rest!
+        const cleanedReply = aiReply.replace(/Unfortunately,?\s*our current members are not equipped and trained to manage special needs kids\.?\s*(?:We will surely reach out to you if we expand our services to cover it\.?)?\s*(?:Thank you for considering our services\.?)?/gi, '').trim();
+        if (cleanedReply && cleanedReply.length > 20) {
+          aiReply = cleanedReply;
+        } else {
+          // If there was no other valid response, defer to human via UNSURE
+          aiReply = 'UNSURE';
+        }
+      }
+    }
 
     console.log("AI Reply (buffered):", aiReply);
 
