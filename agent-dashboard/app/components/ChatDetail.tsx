@@ -323,6 +323,39 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     return <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>📎 Download file</a>;
   }
 
+  function renderFormattedText(text: string, isMe: boolean, isDark: boolean) {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+    const parts = text.split(urlRegex);
+
+    return (
+      <p className={`text-base break-words whitespace-pre-wrap ${isDark ? '' : 'text-gray-900'}`}>
+        {parts.map((part, i) => {
+          if (part.match(urlRegex)) {
+            const href = part.startsWith('http') ? part : `https://${part}`;
+            return (
+              <a
+                key={i}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`underline font-semibold break-all hover:opacity-80 transition-opacity ${
+                  isMe
+                    ? (isDark ? 'text-blue-100 hover:text-white' : 'text-emerald-900 hover:text-emerald-950')
+                    : (isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800')
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {part}
+              </a>
+            );
+          }
+          return part;
+        })}
+      </p>
+    );
+  }
+
   const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
     const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
     return lm && typeof lm.ai_enabled !== 'undefined' ? !!lm.ai_enabled : true;
@@ -650,7 +683,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
                         <MediaRenderer url={message.media_url} isDark={isDarkMode} />
                       </div>
                     )}
-                    {message.text ? <p className={`text-base break-words whitespace-pre-wrap ${isDarkMode ? '' : 'text-gray-900'}`}>{message.text}</p> : null}
+                    {renderFormattedText(message.text, isMe, isDarkMode)}
                     <div className={`flex items-center justify-end gap-1 mt-1.5 text-sm ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
                       <span title={message.created_at ? new Date(message.created_at).toLocaleString() : undefined}>{message.time}</span>
                       {isMe && (() => {

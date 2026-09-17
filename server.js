@@ -2049,7 +2049,7 @@ app.post("/webhook", async (req, res) => {
       }
       const botspaceConversationId = body?.customer?.id || null;
       if (fullPhone && botspaceConversationId) {
-        supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone).catch(() => {});
+        supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone).then(() => {}).catch(err => console.error('[status-sync-conv]', err.message));
       }
 
       return res.status(200).json({ ok: true });
@@ -2060,11 +2060,11 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
-    // Safely extract message or media
+    // Safely extract message, media, or location
     let message = null;
     let mediaUrl = null;
     let incomingContentType = null;
-    const pType = (body.payload?.type || '').toLowerCase();
+    const pType = (body.payload?.type || body?.type || '').toLowerCase();
     if (pType === 'text') {
       message = body.payload?.payload?.text || null;
     } else if (pType === 'media' || pType === 'image' || pType === 'video' || pType === 'document' || pType === 'audio') {
@@ -2084,9 +2084,37 @@ app.post("/webhook", async (req, res) => {
       if (mediaCaption) {
         message = mediaCaption;
       }
+    } else if (pType === 'location') {
+      const loc = body.payload?.payload || body.payload || {};
+      const lat = loc.latitude || loc.lat;
+      const lng = loc.longitude || loc.lng || loc.lon;
+      const locName = (loc.name || loc.title || '').trim();
+      const locAddress = (loc.address || loc.description || '').trim();
+      const locDetails = [locName, locAddress].filter(Boolean).join(', ');
+      if (lat && lng) {
+        const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+        message = locDetails ? `📍 Location: ${locDetails}\n${mapsUrl}` : `📍 Location: ${mapsUrl}`;
+      } else if (locDetails) {
+        message = `📍 Location: ${locDetails}`;
+      } else {
+        message = `📍 Location shared`;
+      }
     }
 
-    console.log("Extracted message/caption:", message);
+    // Secondary fallback for location if payload type was not explicitly 'location'
+    if (!message && (body.payload?.payload?.latitude || body.payload?.latitude || body?.latitude)) {
+      const lat = body.payload?.payload?.latitude || body.payload?.latitude || body?.latitude;
+      const lng = body.payload?.payload?.longitude || body.payload?.longitude || body?.longitude;
+      const locName = (body.payload?.payload?.name || body.payload?.name || '').trim();
+      const locAddress = (body.payload?.payload?.address || body.payload?.address || '').trim();
+      const locDetails = [locName, locAddress].filter(Boolean).join(', ');
+      if (lat && lng) {
+        const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+        message = locDetails ? `📍 Location: ${locDetails}\n${mapsUrl}` : `📍 Location: ${mapsUrl}`;
+      }
+    }
+
+    console.log("Extracted message/location/caption:", message);
     console.log("Extracted media:", mediaUrl);
     console.log("From:", fullPhone);
 
