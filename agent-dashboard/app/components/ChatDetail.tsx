@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { avatarDataUrl } from '../avatarDataUrl';
-import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X, FileText, ChevronLeft, CalendarPlus } from "lucide-react";
+import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X, FileText, ChevronLeft, CalendarPlus, ExternalLink, MapPin } from "lucide-react";
 import { supabase } from '../../lib/supabase';
 
 interface Message {
@@ -325,34 +325,63 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   function renderFormattedText(text: string, isMe: boolean, isDark: boolean) {
     if (!text) return null;
-    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/gi;
     const parts = text.split(urlRegex);
 
+    // Detect Google Maps URL to display a dedicated action button
+    const mapsMatch = text.match(/(https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/i);
+    const mapsUrl = mapsMatch ? (mapsMatch[0].startsWith('http') ? mapsMatch[0] : `https://${mapsMatch[0]}`) : null;
+
     return (
-      <p className={`text-base break-words whitespace-pre-wrap ${isDark ? '' : 'text-gray-900'}`}>
-        {parts.map((part, i) => {
-          if (part.match(urlRegex)) {
-            const href = part.startsWith('http') ? part : `https://${part}`;
-            return (
-              <a
-                key={i}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`underline font-semibold break-all hover:opacity-80 transition-opacity ${
-                  isMe
-                    ? (isDark ? 'text-blue-100 hover:text-white' : 'text-emerald-900 hover:text-emerald-950')
-                    : (isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800')
-                }`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {part}
-              </a>
-            );
-          }
-          return part;
-        })}
-      </p>
+      <div className="space-y-2">
+        <p className={`text-base break-words whitespace-pre-wrap ${isDark ? '' : 'text-gray-900'}`}>
+          {parts.map((part, i) => {
+            if (part && part.match(urlRegex)) {
+              const href = part.startsWith('http') ? part : `https://${part}`;
+              return (
+                <a
+                  key={i}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex items-center gap-0.5 underline font-semibold break-all hover:opacity-80 transition-opacity cursor-pointer ${
+                    isMe
+                      ? (isDark ? 'text-blue-100 hover:text-white' : 'text-emerald-900 hover:text-emerald-950')
+                      : (isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800')
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(href, '_blank', 'noopener,noreferrer');
+                  }}
+                >
+                  <span>{part}</span>
+                  <ExternalLink className="w-3.5 h-3.5 inline-block ml-0.5 opacity-80 shrink-0" />
+                </a>
+              );
+            }
+            return part;
+          })}
+        </p>
+
+        {mapsUrl && (
+          <div className="pt-1">
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Open in Google Maps</span>
+              <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
+            </a>
+          </div>
+        )}
+      </div>
     );
   }
 

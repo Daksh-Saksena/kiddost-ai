@@ -288,11 +288,31 @@ export function ChatDetail({
                   : {}
               }
             >
-              <p
-                className={`text-sm ${isDarkMode ? "" : "text-gray-900"}`}
-              >
-                {message.text}
-              </p>
+              <div className="space-y-2">
+                <p className={`text-sm break-words whitespace-pre-wrap ${isDarkMode ? "" : "text-gray-900"}`}>
+                  {message.text.split(/(https?:\/\/[^\s]+|www\.[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/gi).map((part, i) => {
+                    if (part && part.match(/(https?:\/\/[^\s]+|www\.[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/i)) {
+                      const href = part.startsWith("http") ? part : `https://${part}`;
+                      return (
+                        <a
+                          key={i}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline font-semibold text-blue-500 hover:text-blue-400 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(href, "_blank", "noopener,noreferrer");
+                          }}
+                        >
+                          {part}
+                        </a>
+                      );
+                    }
+                    return part;
+                  })}
+                </p>
+              </div>
               <div
                 className={`flex items-center justify-end gap-1 mt-1.5 text-xs ${
                   isDarkMode
