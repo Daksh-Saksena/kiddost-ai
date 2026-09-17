@@ -390,6 +390,7 @@ Your tone:
 - NO emojis — ever
 
 CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
+TODAY IS: ${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })} ${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase() === 'sunday' ? '(CLOSED - Sunday)' : '(A regular WORKING DAY — Monday to Saturday)'}
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -561,8 +562,8 @@ PAYMENT POLICY:
 BUSINESS HOURS:
 - Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
 - If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
-- If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
+- SUNDAY CLOSURE: Sunday is our ONLY closed day. If today is Sunday and the user asks for "today", or if the user explicitly asks for a session on "Sunday", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- TODAY REQUESTS ON WORKING DAYS (Monday–Saturday): If today is a regular working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday), any request for "today" (e.g. "can you send someone today", "how about today?", "are you free today?") is 100% VALID! NEVER reject it, and NEVER say we are only operational Monday to Saturday. If child's age is already known, ask for the missing booking details (preferred time slot and locality), e.g. "What time slot would work best for you today, and could you please share your area or locality?"
 - IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 - If the user asks about "weekends", clarify EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays." Do not just say "yes" to weekends.
@@ -570,8 +571,8 @@ BUSINESS HOURS:
 BEFORE BOOKING:
 - Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday). Sunday is our ONLY closed day.
 - If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
--- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
-- If the user says "today" or "tomorrow" without a specific time, and it is a valid working day and within business hours, do NOT reject it.
+- If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g., 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?" 
+- If the user says "today" or "tomorrow" on a valid working day within business hours, do NOT reject it. Gather the time slot and location.
 - Step 2: Once a valid or plausible time is discussed, you MUST ensure the child's age is known.
 - CRITICAL: Child's age is the HIGHEST priority. If age is unknown, you MUST ask: "Could I please know the child's age first?" before asking for the parent's name or location. Ask for age FIRST and wait for the answer.
 - Step 3: Only after the age is known, proceed to gather the remaining details (Name, Locality, Specific Slot).
@@ -1349,6 +1350,26 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
         } else {
           // If there was no other valid response, defer to human via UNSURE
           aiReply = 'UNSURE';
+        }
+      }
+    }
+
+    // Safety net: Block false Sunday/closed rejections on working days (Monday-Saturday)
+    const isSundayToday = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase() === 'sunday';
+    const SUNDAY_REJECTION_RE = /operational Monday to Saturday.*(?:another day|confirm a session)/i;
+    if (!isSundayToday && SUNDAY_REJECTION_RE.test(aiReply)) {
+      const mentionsExplicitSunday = /\bsundays?\b/i.test(combinedMessage);
+      if (!mentionsExplicitSunday) {
+        console.warn(`[SAFETY NET] Blocked false Sunday rejection on a working day for ${fullPhone}. User message: "${combinedMessage}"`);
+        const allConvText = [
+          combinedMessage,
+          ...history.map(m => m.content)
+        ].join(' ');
+        const mentionsAge = /\b(\d{1,2}\s*(?:years?|yrs?|months?|m|yo|y\/o)|dob|born|infant|toddler)\b/i.test(allConvText);
+        if (mentionsAge) {
+          aiReply = "Sure! What time slot would work best for you today, and could you please share your area or locality?";
+        } else {
+          aiReply = "Could I please know your child's age first?";
         }
       }
     }
