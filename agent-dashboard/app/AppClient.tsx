@@ -414,19 +414,18 @@ export default function AppClient() {
     const store = getPinnedStore();
     const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
 
-    // 1. Fetch all conversations from the conversations table to ensure no active chat is ever omitted
-    const { data: convs, error: convsError } = await supabase
-      .from("conversations")
-      .select("phone, needs_human");
+    // 1. Fetch conversations, messages, AND contacts in parallel from Supabase
+    const [convsRes, msgsRes, contactsRes] = await Promise.all([
+      supabase.from("conversations").select("phone, needs_human"),
+      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("contacts").select("phone, name, notes, labels")
+    ]);
 
-    // 2. Fetch recent messages to populate lastMessage, timestamp, etc. (limit 3000 for deep history)
-    const { data: msgs, error: msgsError } = await supabase
-      .from("messages")
-      .select("phone, content, role, sender, agent, created_at")
-      .order("created_at", { ascending: false })
-      .limit(500);
+    const convs = convsRes.data;
+    const msgs = msgsRes.data;
+    const dbContacts = contactsRes.data;
 
-    if (msgsError && !convs) return;
+    if (msgsRes.error && !convs) return;
 
     const messagesData = msgs || [];
     const conversationsData = convs || [];
@@ -452,7 +451,43 @@ export default function AppClient() {
       }
     }
 
-    const contacts = getContacts();
+    // Merge contacts from DB into local cache & state
+    const contactsMap: Record<string, { name: string; notes: string; labels?: string[] }> = { ...getContacts() };
+    if (dbContacts && dbContacts.length > 0) {
+      for (const row of dbContacts) {
+        if (row.phone) {
+          const rawName = (row.name || '').trim();
+          const cleanPhone = row.phone.replace(/\D/g, '');
+          const isNum = !rawName || rawName === row.phone || rawName.replace(/\D/g, '') === cleanPhone;
+          const prevEntry = contactsMap[row.phone] || { name: '', notes: '', labels: [] };
+          contactsMap[row.phone] = {
+            name: (!isNum && rawName) ? rawName : (prevEntry.name && prevEntry.name !== row.phone ? prevEntry.name : ''),
+            notes: row.notes || prevEntry.notes || '',
+            labels: row.labels || prevEntry.labels || []
+          };
+        }
+      }
+      setContacts(contactsMap);
+      try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(contactsMap)); } catch {}
+    }
+
+    const getDisplayName = (phone: string) => {
+      const entry = contactsMap[phone];
+      if (entry?.name && entry.name !== phone && !/^(\+?\d+)$/.test(entry.name)) {
+        return entry.name;
+      }
+      return phone;
+    };
+
+    const formatLastMsg = (m: any) => {
+      if (!m) return '';
+      if (m.content) {
+        return m.media_url ? `📷 ${m.content}` : m.content;
+      }
+      if (m.media_url) return '📷 Photo';
+      return '';
+    };
+
     const addedPhones = new Set<string>();
     const result: Chat[] = [];
 
@@ -460,17 +495,18 @@ export default function AppClient() {
     for (const c of conversationsData) {
       const phone = c.phone;
       const latestMsg = latestMsgMap.get(phone);
+      const dispName = getDisplayName(phone);
       
       result.push({
         id: phone,
-        name: contacts[phone]?.name || phone,
-        avatar: avatarDataUrl(contacts[phone]?.name || phone, phone),
-        lastMessage: latestMsg?.content || 'No recent messages',
+        name: dispName,
+        avatar: avatarDataUrl(dispName, phone),
+        lastMessage: formatLastMsg(latestMsg) || 'No recent messages',
         time: latestMsg?.created_at ? formatFriendlyDate(latestMsg.created_at) : "",
         agent: latestMsg?.agent ?? null,
         unread: unreadCount[phone] || 0,
         lastMsgAt: latestMsg?.created_at || null,
-        labels: contacts[phone]?.labels || [],
+        labels: contactsMap[phone]?.labels || [],
         pinned: scopedPinned.includes(phone),
         needsHuman: c.needs_human || needsHumanPhones.has(phone),
       });
@@ -481,16 +517,17 @@ export default function AppClient() {
     for (const phone of latestMsgMap.keys()) {
       if (!addedPhones.has(phone)) {
         const latestMsg = latestMsgMap.get(phone);
+        const dispName = getDisplayName(phone);
         result.push({
           id: phone,
-          name: contacts[phone]?.name || phone,
-          avatar: avatarDataUrl(contacts[phone]?.name || phone, phone),
-          lastMessage: latestMsg?.content || '',
+          name: dispName,
+          avatar: avatarDataUrl(dispName, phone),
+          lastMessage: formatLastMsg(latestMsg) || '',
           time: latestMsg?.created_at ? formatFriendlyDate(latestMsg.created_at) : "",
           agent: latestMsg?.agent ?? null,
           unread: unreadCount[phone] || 0,
           lastMsgAt: latestMsg?.created_at || null,
-          labels: contacts[phone]?.labels || [],
+          labels: contactsMap[phone]?.labels || [],
           pinned: scopedPinned.includes(phone),
           needsHuman: needsHumanPhones.has(phone),
         });
@@ -498,6 +535,36 @@ export default function AppClient() {
     }
 
     setChats(result);
+  };
+
+  const selectedChatRef = useRef<string | null>(null);
+  const sendingRef = useRef(false);
+  const sendMessage = async (text: string) => {
+    if (!text || !selectedChat || sendingRef.current) return;
+    sendingRef.current = true;
+    // Optimistic: show message immediately
+    const optimistic: Message = {
+      id: 'optimistic-' + Date.now(),
+      text,
+      sender: 'me',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      created_at: new Date().toISOString(),
+      agent: agentName,
+      status: 'sending',
+      media_url: null,
+      whatsapp_id: null,
+    };
+    setMessages(prev => [...prev, optimistic]);
+    setTimeout(scrollToBottom, 100);
+    try {
+      await fetch(`${SERVER}/agent-send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: selectedChat, message: text, agent: agentName }),
+      });
+    } finally {
+      sendingRef.current = false;
+    }
   };
 
   const loadMessages = async (phone: string) => {
@@ -524,43 +591,17 @@ export default function AppClient() {
       });
     });
     setMessages(msgs);
-    setTimeout(scrollToBottom, 100);
-  };
-
-  const sendingRef = useRef(false);
-  const sendMessage = async (text: string) => {
-    if (!text || !selectedChat || sendingRef.current) return;
-    sendingRef.current = true;
-    // Optimistic: show message immediately
-    const optimistic: Message = {
-      id: 'optimistic-' + Date.now(),
-      text,
-      sender: 'me',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      created_at: new Date().toISOString(),
-      agent: agentName,
-      status: 'sending',
-      media_url: null,
-      whatsapp_id: null,
-    };
-    setMessages(prev => [...prev, optimistic]);
     setTimeout(scrollToBottom, 50);
-    try {
-      await fetch(`${SERVER}/agent-send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: selectedChat, message: text, agent: agentName }),
-      });
-    } finally {
-      sendingRef.current = false;
-    }
   };
 
-  const selectedChatRef = useRef<string | null>(null);
+  const selectedChatData = chats.find(c => c.id === selectedChat);
+
+  // Keep ref up-to-date for async callbacks
   useEffect(() => {
     selectedChatRef.current = selectedChat;
     if (selectedChat) {
       loadMessages(selectedChat);
+      // Mark as read in local unread tracking
       markRead(selectedChat);
       // Refresh chats so unread badge clears immediately
       setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, unread: 0 } : c));
@@ -580,7 +621,7 @@ export default function AppClient() {
   useEffect(() => {
     if (!authed) return;
     const channel = supabase
-      .channel("realtime-messages")
+      .channel("realtime-dashboard")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages" },
@@ -615,19 +656,24 @@ export default function AppClient() {
             markRead(msg.phone);
           } else if (msg.role === 'user' || msg.sender === 'user') {
             // Message for a background chat — bump its unread count
+            const lastMsg = msg.content ? (msg.media_url ? `📷 ${msg.content}` : msg.content) : (msg.media_url ? '📷 Photo' : '');
             setChats(prev => prev.map(c =>
-              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1, lastMessage: msg.content || '', time: msg.created_at ? formatFriendlyDate(msg.created_at) : c.time, lastMsgAt: msg.created_at || c.lastMsgAt } : c
+              c.id === msg.phone ? { ...c, unread: (c.unread || 0) + 1, lastMessage: lastMsg || c.lastMessage, time: msg.created_at ? formatFriendlyDate(msg.created_at) : c.time, lastMsgAt: msg.created_at || c.lastMsgAt } : c
             ));
           }
           // Update the chat's lastMessage without re-fetching everything
           setChats(prev => {
+            const lastMsg = msg.content ? (msg.media_url ? `📷 ${msg.content}` : msg.content) : (msg.media_url ? '📷 Photo' : '');
             const exists = prev.some(c => c.id === msg.phone);
             if (exists) {
-              return prev.map(c => c.id === msg.phone ? { ...c, lastMessage: msg.content || c.lastMessage, time: msg.created_at ? formatFriendlyDate(msg.created_at) : c.time, lastMsgAt: msg.created_at || c.lastMsgAt, agent: msg.agent ?? c.agent } : c);
+              return prev.map(c => c.id === msg.phone ? { ...c, lastMessage: lastMsg || c.lastMessage, time: msg.created_at ? formatFriendlyDate(msg.created_at) : c.time, lastMsgAt: msg.created_at || c.lastMsgAt, agent: msg.agent ?? c.agent } : c);
             }
             // New phone not in list — add it
             const contacts = getContacts();
-            return [{ id: msg.phone, name: contacts[msg.phone]?.name || msg.phone, avatar: avatarDataUrl(contacts[msg.phone]?.name || msg.phone, msg.phone), lastMessage: msg.content || '', time: msg.created_at ? formatFriendlyDate(msg.created_at) : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
+            const rawName = (contacts[msg.phone]?.name || '').trim();
+            const isNum = !rawName || rawName === msg.phone || /^(\+?\d+)$/.test(rawName);
+            const dispName = (!isNum && rawName) ? rawName : msg.phone;
+            return [{ id: msg.phone, name: dispName, avatar: avatarDataUrl(dispName, msg.phone), lastMessage: lastMsg || '', time: msg.created_at ? formatFriendlyDate(msg.created_at) : '', unread: 1, agent: msg.agent ?? null, lastMsgAt: msg.created_at, labels: contacts[msg.phone]?.labels || [], pinned: false, needsHuman: false }, ...prev];
           });
         }
       )
@@ -644,6 +690,49 @@ export default function AppClient() {
                 ? { ...m, status: msg.status }
                 : m
             ));
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contacts" },
+        (payload) => {
+          const row: any = payload.new;
+          if (row && row.phone) {
+            const rawName = (row.name || '').trim();
+            const isNum = !rawName || rawName === row.phone || /^\+?\d+$/.test(rawName);
+            if (!isNum && rawName) {
+              setContacts(prev => {
+                const updated = {
+                  ...prev,
+                  [row.phone]: {
+                    name: rawName,
+                    notes: row.notes || prev[row.phone]?.notes || '',
+                    labels: row.labels || prev[row.phone]?.labels || []
+                  }
+                };
+                try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
+                return updated;
+              });
+              setChats(prev => prev.map(c => {
+                if (c.id === row.phone) {
+                  return { ...c, name: rawName, avatar: avatarDataUrl(rawName, row.phone), labels: row.labels || c.labels };
+                }
+                return c;
+              }));
+            }
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        (payload) => {
+          const row: any = payload.new;
+          if (row && row.phone) {
+            if (typeof row.needs_human !== 'undefined') {
+              setChats(prev => prev.map(c => c.id === row.phone ? { ...c, needsHuman: row.needs_human } : c));
+            }
           }
         }
       )

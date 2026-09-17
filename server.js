@@ -1927,6 +1927,77 @@ app.delete('/reset-conversation', async (req, res) => {
   res.json({ ok: true, message: `Cleared conversation history for ${phone}` });
 });
 
+// Helper to extract genuine contact name from BotSpace/WhatsApp webhook
+function extractContactNameCandidate(body, phone, fullPhone) {
+  const cust = body?.customer;
+  const raw = (
+    cust?.name ||
+    [cust?.firstName, cust?.lastName].filter(Boolean).join(' ') ||
+    body?.contacts?.[0]?.profile?.name ||
+    body?.contacts?.[0]?.name ||
+    body?.author?.name ||
+    body?.sender?.name ||
+    body?.from?.name ||
+    ''
+  ).trim();
+
+  if (!raw) return '';
+
+  // Reject if it's purely digits or matches phone number
+  const digits = raw.replace(/\D/g, '');
+  const cleanPhone = (phone || '').replace(/\D/g, '');
+  const cleanFull = (fullPhone || '').replace(/\D/g, '');
+  if (digits && (digits === cleanPhone || digits === cleanFull || (digits.length >= 8 && (cleanPhone.endsWith(digits) || cleanFull.endsWith(digits))))) {
+    return '';
+  }
+
+  return raw;
+}
+
+// Helper to reliably sync contact name to Supabase contacts table
+async function syncContactName(fullPhone, contactName) {
+  if (!fullPhone || !contactName) return;
+  const cleanName = contactName.trim();
+  if (!cleanName) return;
+
+  try {
+    const { data: existingContact } = await supabase
+      .from('contacts')
+      .select('phone, name')
+      .eq('phone', fullPhone)
+      .maybeSingle();
+
+    const currName = (existingContact?.name || '').trim();
+    const isPlaceholder = !currName ||
+      currName === fullPhone ||
+      currName.replace(/\D/g, '') === fullPhone.replace(/\D/g, '') ||
+      /^\+?\d+$/.test(currName) ||
+      currName.toLowerCase() === 'unknown' ||
+      currName.toLowerCase() === 'user';
+
+    if (!existingContact) {
+      const { error: insertErr } = await supabase.from('contacts').insert({
+        phone: fullPhone,
+        name: cleanName
+      });
+      if (insertErr) {
+        console.log(`[contact-sync] Insert error for ${fullPhone}, trying update:`, insertErr.message);
+        await supabase.from('contacts').update({ name: cleanName }).eq('phone', fullPhone);
+      } else {
+        console.log(`[contact-sync] Created new contact row for ${fullPhone}: "${cleanName}"`);
+      }
+    } else if (isPlaceholder && cleanName !== currName) {
+      await supabase
+        .from('contacts')
+        .update({ name: cleanName })
+        .eq('phone', fullPhone);
+      console.log(`[contact-sync] Updated name for ${fullPhone} from "${currName}" to "${cleanName}"`);
+    }
+  } catch (e) {
+    console.error('[contact-sync] error:', e.message);
+  }
+}
+
 app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
@@ -1938,6 +2009,12 @@ app.post("/webhook", async (req, res) => {
     console.log("Full incoming body:");
     console.log(JSON.stringify(body, null, 2));
     console.log('[webhook] event:', body?.event, '| type:', body?.type, '| status:', body?.status || body?.payload?.status);
+
+    // Extract phone info early for status updates and contact syncing
+    const countryCode = body?.phone?.countryCode;
+    const phone = body?.phone?.phone;
+    const fullPhone = (countryCode && phone) ? `+${countryCode}${phone}` : null;
+    const contactName = extractContactNameCandidate(body, phone, fullPhone);
 
     // Handle delivery / status webhooks from BotSpace / WhatsApp
     // Catch any event that carries a status field or has status-related event name
@@ -1965,36 +2042,51 @@ app.post("/webhook", async (req, res) => {
           console.error("Failed to update message status", e?.message || e);
         }
       }
+
+      // Sync contact name and conversation from status event if present
+      if (fullPhone && contactName) {
+        syncContactName(fullPhone, contactName).catch(err => console.error('[status-sync-contact]', err.message));
+      }
+      const botspaceConversationId = body?.customer?.id || null;
+      if (fullPhone && botspaceConversationId) {
+        supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone).catch(() => {});
+      }
+
       return res.status(200).json({ ok: true });
     }
 
-    // Extract phone info
-    const countryCode = body?.phone?.countryCode;
-    const phone = body?.phone?.phone;
-    if (!countryCode || !phone) {
+    if (!countryCode || !phone || !fullPhone) {
       console.log("Missing phone info");
       return res.status(200).json({ ok: true });
-    }
-
-    const fullPhone = `+${countryCode}${phone}`;
-    let contactName = (body?.contacts?.[0]?.profile?.name || body?.customer?.firstName || body?.customer?.name || '').trim();
-    // If the extracted name is just the phone number, ignore it so we don't overwrite with a fake name
-    if (contactName && contactName.replace(/\D/g, '') === phone.replace(/\D/g, '')) {
-      contactName = '';
     }
 
     // Safely extract message or media
     let message = null;
     let mediaUrl = null;
     let incomingContentType = null;
-    if (body.payload?.type === 'text') {
+    const pType = (body.payload?.type || '').toLowerCase();
+    if (pType === 'text') {
       message = body.payload?.payload?.text || null;
-    } else if (body.payload?.type === 'media') {
-      mediaUrl = body.payload?.payload?.url || null;
-      incomingContentType = body.payload?.payload?.contentType || null;
+    } else if (pType === 'media' || pType === 'image' || pType === 'video' || pType === 'document' || pType === 'audio') {
+      mediaUrl = body.payload?.payload?.url || body.payload?.url || null;
+      incomingContentType = body.payload?.payload?.contentType || body.payload?.contentType || null;
+      // BotSpace sends captions under label, caption, or text
+      const mediaCaption = (
+        body.payload?.payload?.label ||
+        body.payload?.payload?.caption ||
+        body.payload?.payload?.text ||
+        body.payload?.label ||
+        body.payload?.caption ||
+        body?.label ||
+        body?.caption ||
+        ''
+      ).trim();
+      if (mediaCaption) {
+        message = mediaCaption;
+      }
     }
 
-    console.log("Extracted message:", message);
+    console.log("Extracted message/caption:", message);
     console.log("Extracted media:", mediaUrl);
     console.log("From:", fullPhone);
 
@@ -2023,33 +2115,9 @@ app.post("/webhook", async (req, res) => {
       await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
     }
 
-    // Sync contact name to 'contacts' table if not already saved
+    // Sync contact name to 'contacts' table
     if (contactName) {
-      try {
-        const { data: existingContact } = await supabase
-          .from('contacts')
-          .select('name')
-          .eq('phone', fullPhone)
-          .maybeSingle();
-
-        if (!existingContact) {
-          // Contact doesn't exist yet, create it with the parsed name
-          await supabase.from('contacts').insert({
-            phone: fullPhone,
-            name: contactName
-          });
-          console.log(`[contact-sync] Created new contact row for ${fullPhone}: "${contactName}"`);
-        } else if (!existingContact.name) {
-          // Contact exists but has no name, update it
-          await supabase
-            .from('contacts')
-            .update({ name: contactName })
-            .eq('phone', fullPhone);
-          console.log(`[contact-sync] Updated name for ${fullPhone} to "${contactName}"`);
-        }
-      } catch (e) {
-        console.error('[contact-sync] error:', e.message);
-      }
+      await syncContactName(fullPhone, contactName);
     }
 
     // Determine previous AI state for this conversation

@@ -103,7 +103,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     finally { setTemplateSending(false); }
   };
 
-  // Reset info panel when switching chats
+  // Reset info panel when switching chats or when contact details update
   useEffect(() => {
     setContactName(initialContact?.name || '');
     setContactNotes(initialContact?.notes || '');
@@ -111,7 +111,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
     setLabels(initialLabels || []);
     setLabelInput('');
     setCustomerVars(null);
-  }, [chatId]);
+  }, [chatId, initialContact?.name, initialContact?.notes]);
 
   // Fetch conversation vars when info panel opens
   useEffect(() => {
@@ -181,6 +181,10 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const uploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const mediaCaption = inputValue.trim();
+    if (mediaCaption) {
+      setInputValue("");
+    }
     // Direct upload to Supabase Storage (public bucket) to avoid server proxy limits
     try {
       const safeName = file.name.replace(/[^a-zA-Z0-9.\-_\.]/g, "_");
@@ -206,11 +210,11 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
               return;
             }
             const publicURL = json.publicUrl;
-            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
+            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: mediaCaption, sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
             await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: '' })
+              body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: mediaCaption })
             });
           };
           reader.readAsDataURL(file);
@@ -227,12 +231,12 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         return;
       }
 
-      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: '', sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
+      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: mediaCaption, sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
 
       await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: '' })
+        body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: mediaCaption })
       });
     } catch (err) {
       console.error('uploadMedia error', err);
