@@ -7,9 +7,11 @@ import { Calendar } from "./components/Calendar";
 import "./mobile-styles.css";
 import { avatarDataUrl } from './avatarDataUrl';
 import { supabase } from "../lib/supabase";
+import { Sun, Moon } from "lucide-react";
 
 const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
+const THEME_KEY = "kiddost_dark_mode";
 
 type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[]; pinned?: boolean; needsHuman?: boolean };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; created_at?: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
@@ -46,7 +48,15 @@ export function formatFriendlyDate(isoString: string | undefined | null) {
   return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
 }
 
-function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
+function LoginScreen({
+  onLogin,
+  isDarkMode,
+  onToggleTheme,
+}: {
+  onLogin: (name: string) => void;
+  isDarkMode: boolean;
+  onToggleTheme: () => void;
+}) {
   const [mode, setMode] = useState<'pick' | 'pin' | 'create_step1' | 'create_step2'>('pick');
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
@@ -143,23 +153,43 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
     finally { setLoading(false); }
   };
 
-  const inputCls = "w-full rounded-xl px-5 py-3 bg-gray-900 border border-blue-500/30 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all";
-  const btnCls = "w-full py-4 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 text-white font-semibold text-sm disabled:opacity-40 hover:from-blue-600 hover:to-blue-500 active:scale-95 transition-all";
+  const inputCls = isDarkMode
+    ? "w-full rounded-xl px-5 py-3 bg-gray-900 border border-blue-500/30 text-white placeholder-gray-500 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+    : "w-full rounded-xl px-5 py-3 bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all";
+  const btnCls = "w-full py-4 rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 text-white font-semibold text-sm disabled:opacity-40 hover:from-blue-600 hover:to-blue-500 active:scale-95 transition-all shadow-md";
 
   return (
-    <div className="h-screen max-w-md mx-auto flex flex-col items-center justify-center bg-black" style={{ boxShadow: "0 0 100px rgba(59,130,246,0.3)" }}>
+    <div
+      className={`relative h-screen max-w-md mx-auto flex flex-col items-center justify-center transition-colors ${
+        isDarkMode ? "bg-black text-white" : "bg-white text-gray-900"
+      }`}
+      style={isDarkMode ? { boxShadow: "0 0 100px rgba(59,130,246,0.3)" } : { boxShadow: "0 0 50px rgba(0,0,0,0.06)" }}
+    >
+      <div className="absolute top-4 right-4">
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className={`p-2.5 rounded-full transition-all ${
+            isDarkMode ? "hover:bg-blue-900/30 text-gray-300 hover:text-white" : "hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+          }`}
+          title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+      </div>
+
       <div className="mb-8 text-center">
         <div className="text-4xl mb-2">🐣</div>
-        <h1 className="text-2xl font-bold text-white tracking-wide">Kiddost</h1>
-        <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
+        <h1 className={`text-2xl font-bold tracking-wide ${isDarkMode ? "text-white" : "text-gray-900"}`}>Kiddost</h1>
+        <p className={`text-sm mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{subtitle}</p>
       </div>
 
       {mode === 'pick' && (
         <div className="w-full px-8 flex flex-col items-center gap-8">
           {loadingAgents ? (
-            <p className="text-gray-600 text-sm animate-pulse">Loading profiles...</p>
+            <p className={`text-sm animate-pulse ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Loading profiles...</p>
           ) : agents.length === 0 ? (
-            <p className="text-gray-600 text-sm">No agents yet. Create the first one below.</p>
+            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No agents yet. Create the first one below.</p>
           ) : (
             <div className="flex flex-wrap justify-center gap-8">
               {agents.map(agent => (
@@ -167,13 +197,13 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
                   <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${avatarColor(agent.name)} flex items-center justify-center text-white text-2xl font-bold group-hover:scale-110 group-active:scale-95 transition-transform duration-200`} style={{ boxShadow: '0 0 25px rgba(59,130,246,0.3)' }}>
                     {avatarInitials(agent.name)}
                   </div>
-                  <span className="text-gray-400 text-sm font-medium group-hover:text-white transition-colors">{agent.name}</span>
+                  <span className={`text-sm font-medium transition-colors ${isDarkMode ? "text-gray-400 group-hover:text-white" : "text-gray-700 group-hover:text-gray-900"}`}>{agent.name}</span>
                 </button>
               ))}
             </div>
           )}
-          <button onClick={() => { setMode('create_step1'); setError(""); }} className="flex items-center gap-2 text-gray-600 text-xs hover:text-gray-400 transition-colors mt-2">
-            <span className="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center hover:border-gray-500 transition-colors text-base leading-none">+</span>
+          <button onClick={() => { setMode('create_step1'); setError(""); }} className={`flex items-center gap-2 text-xs transition-colors mt-2 ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-600 hover:text-gray-900"}`}>
+            <span className={`w-6 h-6 rounded-full border flex items-center justify-center transition-colors text-base leading-none ${isDarkMode ? "border-gray-700 hover:border-gray-500" : "border-gray-300 hover:border-gray-400"}`}>+</span>
             Request access for new agent
           </button>
         </div>
@@ -187,18 +217,18 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
             </div>
           </div>
           <div>
-            <label className="text-gray-400 text-xs mb-1 block text-center">ENTER YOUR PIN</label>
+            <label className={`text-xs mb-1 block text-center font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>ENTER YOUR PIN</label>
             <input type="password" value={pin} onChange={(e) => setPin(e.target.value)}
               placeholder="••••••" maxLength={20} autoFocus
               className={`${inputCls} text-center text-2xl tracking-widest`} />
           </div>
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
           <button type="submit" disabled={loading || !pin.trim()} className={btnCls}
             style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
             {loading ? "Verifying..." : "Sign In"}
           </button>
           <button type="button" onClick={() => { setMode('pick'); setError(""); setPin(""); }}
-            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
+            className={`text-xs text-center transition-colors ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-800"}`}>
             Switch profile
           </button>
         </form>
@@ -206,24 +236,24 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
 
       {mode === 'create_step1' && (
         <form onSubmit={handleRequestOtp} className="w-full px-10 flex flex-col gap-4">
-          <p className="text-gray-500 text-xs text-center">An OTP will be sent to the admin’s WhatsApp to verify this request.</p>
+          <p className={`text-xs text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>An OTP will be sent to the admin’s WhatsApp to verify this request.</p>
           <div>
-            <label className="text-gray-400 text-xs mb-1 block">AGENT NAME</label>
+            <label className={`text-xs mb-1 block font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>AGENT NAME</label>
             <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
               placeholder="e.g. Priya" maxLength={30} autoFocus className={inputCls} />
           </div>
           <div>
-            <label className="text-gray-400 text-xs mb-1 block">CHOOSE A PIN</label>
+            <label className={`text-xs mb-1 block font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>CHOOSE A PIN</label>
             <input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)}
               placeholder="Pick a secret PIN" maxLength={20} className={inputCls} />
           </div>
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
           <button type="submit" disabled={loading || !newName.trim() || !newPin.trim()} className={btnCls}
             style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
             {loading ? "Sending OTP..." : "Send OTP to Admin"}
           </button>
           <button type="button" onClick={() => { setMode('pick'); setError(""); }}
-            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
+            className={`text-xs text-center transition-colors ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-800"}`}>
             Back
           </button>
         </form>
@@ -231,21 +261,21 @@ function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
 
       {mode === 'create_step2' && (
         <form onSubmit={handleCreateAgent} className="w-full px-10 flex flex-col gap-4">
-          <p className="text-gray-500 text-xs text-center">Enter the 6-digit OTP sent to the admin’s WhatsApp.</p>
+          <p className={`text-xs text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Enter the 6-digit OTP sent to the admin’s WhatsApp.</p>
           <div>
-            <label className="text-gray-400 text-xs mb-1 block">OTP</label>
+            <label className={`text-xs mb-1 block font-medium ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>OTP</label>
             <input type="text" inputMode="numeric" value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               placeholder="123456" maxLength={6} autoFocus
               className={`${inputCls} text-center text-2xl tracking-widest`} />
           </div>
-          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+          {error && <p className="text-red-500 text-sm text-center font-medium">{error}</p>}
           <button type="submit" disabled={loading || otp.length < 6} className={btnCls}
             style={{ boxShadow: "0 0 20px rgba(37,99,235,0.4)" }}>
             {loading ? "Creating agent..." : "Create Agent"}
           </button>
           <button type="button" onClick={() => { setMode('create_step1'); setError(""); setOtp(""); }}
-            className="text-gray-600 text-xs text-center hover:text-gray-400 transition-colors">
+            className={`text-xs text-center transition-colors ${isDarkMode ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-800"}`}>
             ← Back
           </button>
         </form>
@@ -338,8 +368,43 @@ export default function AppClient() {
       })
       .catch(() => {});
   }, []);
+
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false); // Default to Light Mode!
+
+  // Load saved theme preference from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved !== null) {
+        setIsDarkMode(saved === 'true');
+      }
+    } catch {}
+  }, []);
+
+  // Synchronize document.body background and text color to match active theme
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isDarkMode) {
+        document.body.style.backgroundColor = '#0a0a0a';
+        document.body.style.color = '#ededed';
+      } else {
+        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.color = '#0f172a';
+      }
+    }
+  }, [isDarkMode]);
+
+  const handleToggleTheme = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(THEME_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const [showCalendar, setShowCalendar] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -818,10 +883,19 @@ export default function AppClient() {
   };
 
   if (!authed) {
-    return <LoginScreen onLogin={(name) => {
-      setAuthed(true); setAgentName(name);
-      try { setAgentId(JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null); } catch {}
-    }} />;
+    return (
+      <LoginScreen
+        onLogin={(name) => {
+          setAuthed(true);
+          setAgentName(name);
+          try {
+            setAgentId(JSON.parse(localStorage.getItem(SESSION_KEY) || '{}').id ?? null);
+          } catch {}
+        }}
+        isDarkMode={isDarkMode}
+        onToggleTheme={handleToggleTheme}
+      />
+    );
   }
 
   return (
@@ -845,7 +919,7 @@ export default function AppClient() {
                 onTogglePin={togglePinChat}
                 onOpenCalendar={() => setShowCalendar(true)}
                 isDarkMode={isDarkMode}
-                onToggleTheme={() => setIsDarkMode(!isDarkMode)}
+                onToggleTheme={handleToggleTheme}
                 onLogout={() => { localStorage.removeItem(SESSION_KEY); setAuthed(false); setAgentName('Agent'); setAgentId(null); }}
                 onDeleteAccount={agentId && agentId !== 'admin' ? () => { setDeletePin(''); setDeleteError(''); setShowDeleteModal(true); } : undefined}
                 chats={chats}
