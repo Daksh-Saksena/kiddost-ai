@@ -1585,22 +1585,87 @@ async function uploadToBotspace(mediaUrl) {
 // Serve the KidDost welcome flyer image
 app.use('/static', express.static(__dirname));
 
+const welcomeInProgress = new Set();
+
 // Send 3-part welcome sequence to a new user
 async function sendWelcome(fullPhone) {
-  const sendText = async (text) => {
-    await supabase.from('messages').insert({
-      phone: fullPhone, role: 'assistant', content: text, sender: 'ai', agent: null, ai_enabled: true
-    });
-    await axios.post(
-      `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-      { name: 'KidDost', phone: fullPhone, text },
-      { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
-    );
-  };
+  if (welcomeInProgress.has(fullPhone)) {
+    console.log(`[welcome] Sequence already in-progress for ${fullPhone}. Skipping duplicate execution.`);
+    return;
+  }
+  welcomeInProgress.add(fullPhone);
+
   try {
+    // Safety check 1: Check if conversation is paused
+    const { data: convData } = await supabase
+      .from('conversations')
+      .select('ai_paused')
+      .eq('phone', fullPhone)
+      .maybeSingle();
+
+    if (convData?.ai_paused === true) {
+      console.log(`[welcome] Aborted: conversation is paused (ai_paused: true) for ${fullPhone}`);
+      return;
+    }
+
+    // Safety check 2: Check if this user already received welcome message in the past
+    const { data: welcomeHistory } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('phone', fullPhone)
+      .ilike('content', '%thank you for contacting KidDost%')
+      .limit(1);
+
+    if (welcomeHistory && welcomeHistory.length > 0) {
+      console.log(`[welcome] Aborted: ${fullPhone} has already received welcome sequence in the past.`);
+      return;
+    }
+
+    // Safety check 3: Check if there's any agent message or substantial message history
+    const { count: msgCount } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('phone', fullPhone);
+
+    // If there are already multiple messages, don't send welcome
+    if (msgCount && msgCount > 1) {
+      console.log(`[welcome] Aborted: ${fullPhone} already has message history (${msgCount} messages).`);
+      return;
+    }
+
+    const sendText = async (text) => {
+      // Re-check pause status before sending each message
+      const { data: cCheck } = await supabase
+        .from('conversations')
+        .select('ai_paused')
+        .eq('phone', fullPhone)
+        .maybeSingle();
+      if (cCheck?.ai_paused === true) {
+        console.log(`[welcome] Paused mid-sequence for ${fullPhone}, stopping.`);
+        return false;
+      }
+
+      await supabase.from('messages').insert({
+        phone: fullPhone, role: 'assistant', content: text, sender: 'ai', agent: null, ai_enabled: true
+      });
+      await axios.post(
+        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+        { name: 'KidDost', phone: fullPhone, text },
+        { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+      );
+      return true;
+    };
+
     // 1. Greeting
-    await sendText('Hi, thank you for contacting KidDost.');
+    const sentGreeting = await sendText('Hi, thank you for contacting KidDost.');
+    if (!sentGreeting) return;
+
     await new Promise(r => setTimeout(r, 800));
+
+    // Re-check pause
+    const { data: checkMid } = await supabase.from('conversations').select('ai_paused').eq('phone', fullPhone).maybeSingle();
+    if (checkMid?.ai_paused === true) return;
+
     // 2. Flyer image (send via BotSpace; save a placeholder to DB so dashboard shows it)
     const SERVER_URL = process.env.SERVER_URL || 'https://kiddost-ai.onrender.com';
     const imageUrl = `${SERVER_URL}/static/image.png`;
@@ -1612,15 +1677,22 @@ async function sendWelcome(fullPhone) {
       { name: 'KidDost', phone: fullPhone, mediaUrl: imageUrl, mediaType: 'image', label: '' },
       { headers: { 'Content-Type': 'application/json' } }
     );
+
     await new Promise(r => setTimeout(r, 3000));
+
     // 3. Follow-up
-    await sendText('Feel free to let us know if you have any questions.');
+    const sentFollowUp = await sendText('Feel free to let us know if you have any questions.');
+    if (!sentFollowUp) return;
+
     await new Promise(r => setTimeout(r, 800));
+
     // 4. Ask age
     await sendText('Could you please share your child’s age with us?');
     console.log('[welcome] sent to', fullPhone);
   } catch (e) {
     console.error('[welcome] failed:', e.response?.data || e.message);
+  } finally {
+    welcomeInProgress.delete(fullPhone);
   }
 }
 
@@ -2123,24 +2195,38 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
-    const { data: existingConversation } = await supabase
-      .from("conversations")
-      .select("phone")
-      .eq("phone", fullPhone)
-      .maybeSingle();
+    // Robust check for existing conversation and message history
+    let existingConversation = null;
+    let priorMsgCount = 0;
+    try {
+      const [convRes, msgCountRes] = await Promise.all([
+        supabase.from("conversations").select("phone, ai_paused").eq("phone", fullPhone).maybeSingle(),
+        supabase.from("messages").select("id", { count: 'exact', head: true }).eq("phone", fullPhone)
+      ]);
+      existingConversation = convRes?.data || null;
+      priorMsgCount = msgCountRes?.count || 0;
+    } catch (checkErr) {
+      console.error('[webhook] Error checking existing conversation status:', checkErr.message);
+    }
 
     const botspaceConversationId = body?.customer?.id || null;
+    const isAiPaused = existingConversation?.ai_paused === true;
+    // A user is strictly new ONLY if they have no conversation row AND zero prior messages in database
+    const isNewUser = !existingConversation && priorMsgCount === 0;
 
-    const isNewUser = !existingConversation;
-    if (isNewUser) {
-      await supabase.from("conversations").insert({
+    if (!existingConversation) {
+      await supabase.from("conversations").upsert({
         phone: fullPhone,
-        conversation_id: botspaceConversationId
-      });
-      // Trigger welcome sequence for brand-new users (don't await — fire and forget)
-      sendWelcome(fullPhone).catch(e => console.error('[welcome] error', e.message));
+        conversation_id: botspaceConversationId,
+        ai_paused: false
+      }, { onConflict: 'phone' });
     } else if (botspaceConversationId) {
       await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
+    }
+
+    if (isNewUser && !isAiPaused) {
+      // Trigger welcome sequence for brand-new users (don't await — fire and forget)
+      sendWelcome(fullPhone).catch(e => console.error('[welcome] error', e.message));
     }
 
     // Sync contact name to 'contacts' table
@@ -2385,7 +2471,7 @@ app.post('/send-template', async (req, res) => {
       whatsapp_id: whatsappId,
       status: 'sent',
     });
-    await supabase.from('conversations').update({ ai_paused: true }).eq('phone', phone);
+    await supabase.from('conversations').upsert({ phone, ai_paused: true }, { onConflict: 'phone' });
   } catch (dbErr) {
     console.error('[send-template] DB error', dbErr?.message || dbErr);
   }
@@ -2448,8 +2534,7 @@ app.post("/agent-send", async (req, res) => {
       // Also update conversations table flag for compatibility
       await supabase
         .from("conversations")
-        .update({ ai_paused: true, needs_human: false })
-        .eq("phone", phone);
+        .upsert({ phone: phone, ai_paused: true, needs_human: false }, { onConflict: 'phone' });
     } catch (dbErr) {
       console.error("Failed to insert agent message into supabase", dbErr?.message || dbErr);
     }
