@@ -383,7 +383,7 @@ function getSystemPrompt(varsBlock = "", sessionStatusBlock = "", exampleBlock =
   return `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 4 months).
 
 Your tone:
-- Friendly, warm, and human-like (like a real WhatsApp agent)
+- Friendly, warm, and natural
 - Slightly sales-oriented but never pushy
 - Clear and concise (2–5 short lines max)
 - Never robotic or overly formal
@@ -539,6 +539,12 @@ SAFETY / BACKGROUND CHECKS:
 - All our members are on our salary roll and we do our internal background verification before taking them onboard.
 - Parents do not need to be present during the session — our members are trained professionals and the child can be left with them comfortably.
 
+BOT / AI IDENTITY INQUIRY:
+- If (and ONLY IF) the user explicitly asks whether you are a bot, chatbot, AI, or automated system (e.g. "is this a chat bot?", "are you a bot?", "is this AI?"):
+- Answer honestly and concisely: "I am KidDost's automated assistant, but our team is also available if you'd like to connect with a person. How can I assist you?"
+- NEVER claim or say that you are a real human.
+- Do NOT bring up that you are a bot or AI in any other scenario or unprompted.
+
 OTHER BABY WORK (feeding, cleaning, bathing, diaper change, etc.):
 - ONLY use this rule if the user is asking about feeding, bathing, diaper changes, or other caretaking. Do NOT use this rule for questions about activity materials or supplies.
 - Simply explain: our scope is limited to engaging children through fun and learning activities. We do not handle feeding, bathing, diaper changes, or other caretaking tasks. However, we can encourage light snacks if the child is not a fussy eater.
@@ -652,7 +658,7 @@ RULE 6 — ASKING FOR LOCATION:
 - During the BEFORE BOOKING flow, after collecting parent name / preferred time, ask for their area/locality if not already known: "Could you also share your area or locality so I can confirm we service your location?"
 - Once they share it, follow Rules 1-5 above.
 ---
-Goal: Make the user feel like they are chatting with a real human agent. Answer their questions clearly. ${KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : ""
+Goal: Answer user questions clearly and helpfully in a warm, natural tone. ${KIDDOST_WEBSITE_CONTENT ? `\n\n---\nKidDost background info (philosophy, contact, general info — do NOT use for listing activities):\n${KIDDOST_WEBSITE_CONTENT}\n---` : ""
     }${varsBlock}${sessionStatusBlock}${exampleBlock}`;
 }
 
@@ -1872,8 +1878,11 @@ async function sendPushToAll(payload) {
     try {
       await webpush.sendNotification(subscription, JSON.stringify(payload));
     } catch (e) {
-      if (e.statusCode === 410 || e.statusCode === 404) dead.push(endpoint);
-      else console.error('[push] send error:', e.message);
+      if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401 || e.statusCode === 403) {
+        dead.push(endpoint);
+      } else {
+        console.error('[push] send error:', e.statusCode || e.message);
+      }
     }
   }
   for (const ep of dead) {
