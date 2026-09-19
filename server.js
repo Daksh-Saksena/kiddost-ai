@@ -2108,61 +2108,21 @@ app.post("/webhook", async (req, res) => {
     const fullPhone = (countryCode && phone) ? `+${countryCode}${phone}` : null;
     const contactName = extractContactNameCandidate(body, phone, fullPhone);
 
-    // Handle delivery / status webhooks from BotSpace / WhatsApp
-    // Catch any event that carries a status field or has status-related event name
-    const isStatusEvent = body?.event === 'delivery-update' ||
-      body?.event === 'message-status' || body?.event === 'message-delivered' ||
-      body?.event === 'message-read' || body?.event === 'message-seen' ||
-      body?.event === 'status' || body?.type === 'status' ||
-      (body?.payload?.status && body?.direction === 'outgoing') ||
-      (body?.status && body?.direction === 'outgoing');
+    const messageId = body?.id || body?.messageId || body?.message_id || body?.payload?.messageId || body?.payload?.message_id || body?.payload?.id || null;
+    const rawStatus = body?.status || body?.payload?.status || body?.delivery_status || body?.payload?.delivery_status;
+    const statusMap = { delivered: 'delivered', delivery: 'delivered', read: 'read', seen: 'read', sent: 'sent', accepted: 'sent', enqueued: 'sent' };
+    const status = rawStatus ? (statusMap[String(rawStatus).toLowerCase()] || String(rawStatus).toLowerCase()) : null;
 
-    if (isStatusEvent) {
-      const messageId = body?.id || body?.messageId || body?.message_id || body?.payload?.messageId || body?.payload?.message_id || body?.payload?.id;
-      const rawStatus = body?.status || body?.payload?.status || body?.delivery_status || body?.payload?.delivery_status;
-      // Normalise to consistent lowercase values
-      const statusMap = { delivered: 'delivered', delivery: 'delivered', read: 'read', seen: 'read', sent: 'sent', accepted: 'sent', enqueued: 'sent' };
-      const status = rawStatus ? (statusMap[String(rawStatus).toLowerCase()] || String(rawStatus).toLowerCase()) : null;
-      if (messageId && status) {
-        try {
-          await supabase
-            .from("messages")
-            .update({ status })
-            .eq("whatsapp_id", messageId);
-          console.log(`Updated message status for ${messageId} -> ${status}`);
-        } catch (e) {
-          console.error("Failed to update message status", e?.message || e);
-        }
-      }
-
-      // Sync contact name and conversation from status event if present
-      if (fullPhone && contactName) {
-        syncContactName(fullPhone, contactName).catch(err => console.error('[status-sync-contact]', err.message));
-      }
-      const botspaceConversationId = body?.customer?.id || null;
-      if (fullPhone && botspaceConversationId) {
-        supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone).then(() => {}).catch(err => console.error('[status-sync-conv]', err.message));
-      }
-
-      return res.status(200).json({ ok: true });
-    }
-
-    if (!countryCode || !phone || !fullPhone) {
-      console.log("Missing phone info");
-      return res.status(200).json({ ok: true });
-    }
-
-    // Safely extract message, media, or location
+    // Safely extract message, media, or location from payload
     let message = null;
     let mediaUrl = null;
     let incomingContentType = null;
     const pType = (body.payload?.type || body?.type || '').toLowerCase();
     if (pType === 'text') {
-      message = body.payload?.payload?.text || null;
+      message = body.payload?.payload?.text || body.payload?.text || body.text || body.message || null;
     } else if (pType === 'media' || pType === 'image' || pType === 'video' || pType === 'document' || pType === 'audio') {
-      mediaUrl = body.payload?.payload?.url || body.payload?.url || null;
+      mediaUrl = body.payload?.payload?.url || body.payload?.url || body.mediaUrl || null;
       incomingContentType = body.payload?.payload?.contentType || body.payload?.contentType || null;
-      // BotSpace sends captions under label, caption, or text
       const mediaCaption = (
         body.payload?.payload?.label ||
         body.payload?.payload?.caption ||
@@ -2173,9 +2133,7 @@ app.post("/webhook", async (req, res) => {
         body?.caption ||
         ''
       ).trim();
-      if (mediaCaption) {
-        message = mediaCaption;
-      }
+      if (mediaCaption) message = mediaCaption;
     } else if (pType === 'location') {
       const loc = body.payload?.payload || body.payload || {};
       const lat = loc.latitude || loc.lat;
@@ -2193,7 +2151,13 @@ app.post("/webhook", async (req, res) => {
       }
     }
 
-    // Secondary fallback for location if payload type was not explicitly 'location'
+    // Secondary fallbacks for text, media, location
+    if (!message && (body.payload?.payload?.text || body.payload?.text || body.text || body.message)) {
+      message = (body.payload?.payload?.text || body.payload?.text || body.text || body.message || '').trim() || null;
+    }
+    if (!mediaUrl && (body.payload?.payload?.url || body.payload?.url || body.mediaUrl)) {
+      mediaUrl = body.payload?.payload?.url || body.payload?.url || body.mediaUrl || null;
+    }
     if (!message && (body.payload?.payload?.latitude || body.payload?.latitude || body?.latitude)) {
       const lat = body.payload?.payload?.latitude || body.payload?.latitude || body?.latitude;
       const lng = body.payload?.payload?.longitude || body.payload?.longitude || body?.longitude;
@@ -2204,6 +2168,82 @@ app.post("/webhook", async (req, res) => {
         const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
         message = locDetails ? `📍 Location: ${locDetails}\n${mapsUrl}` : `📍 Location: ${mapsUrl}`;
       }
+    }
+
+    // Check if this event represents an OUTGOING message (e.g. agent typing in BotSpace)
+    const isOutgoing = body?.direction === 'outgoing' ||
+      body?.payload?.direction === 'outgoing' ||
+      body?.type === 'outgoing' ||
+      body?.author?.type === 'user' ||
+      body?.author?.type === 'agent' ||
+      body?.sender?.type === 'agent';
+
+    if (isOutgoing) {
+      if (message || mediaUrl) {
+        // Agent sent a message from BotSpace
+        console.log(`[webhook] Detected outgoing agent message from BotSpace for ${fullPhone}:`, message || mediaUrl);
+        if (messageId) {
+          const { data: existing } = await supabase.from('messages').select('id').eq('whatsapp_id', messageId).maybeSingle();
+          if (existing) {
+            // Already saved by /agent-send, just update status if available
+            if (status) await supabase.from('messages').update({ status }).eq('id', existing.id);
+            return res.status(200).json({ ok: true, already_exists: true });
+          }
+        }
+        const agentName = body?.author?.name || body?.sender?.name || body?.user?.name || body?.from?.name || 'Agent (BotSpace)';
+        await supabase.from('messages').insert({
+          phone: fullPhone,
+          role: 'assistant',
+          content: message || '',
+          sender: 'agent',
+          agent: agentName,
+          media_url: mediaUrl || null,
+          whatsapp_id: messageId,
+          status: status || 'sent',
+          ai_enabled: false
+        });
+        // Ensure AI is paused so it doesn't talk over the human agent
+        await supabase.from('conversations').upsert({ phone: fullPhone, ai_paused: true, needs_human: false }, { onConflict: 'phone' });
+        if (contactName && fullPhone) syncContactName(fullPhone, contactName).catch(() => {});
+        return res.status(200).json({ ok: true, agent_message_saved: true });
+      } else {
+        // Outgoing status update (e.g. read/delivered receipt for an outgoing message)
+        if (messageId && status) {
+          await supabase.from('messages').update({ status }).eq('whatsapp_id', messageId);
+          console.log(`Updated outgoing message status for ${messageId} -> ${status}`);
+        }
+        if (contactName && fullPhone) syncContactName(fullPhone, contactName).catch(() => {});
+        return res.status(200).json({ ok: true, status_updated: true });
+      }
+    }
+
+    // Handle pure incoming delivery/read receipts (no text/media)
+    const isPureStatusEvent = (
+      body?.event === 'delivery-update' ||
+      body?.event === 'message-status' ||
+      body?.event === 'message-delivered' ||
+      body?.event === 'message-read' ||
+      body?.event === 'message-seen' ||
+      body?.event === 'status' ||
+      body?.type === 'status'
+    ) && !message && !mediaUrl;
+
+    if (isPureStatusEvent) {
+      if (messageId && status) {
+        await supabase.from('messages').update({ status }).eq('whatsapp_id', messageId);
+        console.log(`Updated message status for ${messageId} -> ${status}`);
+      }
+      if (fullPhone && contactName) syncContactName(fullPhone, contactName).catch(() => {});
+      const botspaceConversationId = body?.customer?.id || null;
+      if (fullPhone && botspaceConversationId) {
+        supabase.from('conversations').update({ conversation_id: botspaceConversationId }).eq('phone', fullPhone).then(() => {}).catch(() => {});
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    if (!countryCode || !phone || !fullPhone) {
+      console.log("Missing phone info");
+      return res.status(200).json({ ok: true });
     }
 
     console.log("Extracted message/location/caption:", message);

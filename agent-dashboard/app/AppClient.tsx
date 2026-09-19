@@ -309,42 +309,6 @@ function setPinnedStore(store: Record<string, string[]>) {
   try { localStorage.setItem(PINNED_CHATS_KEY, JSON.stringify(store)); } catch {}
 }
 
-async function fetchAllContacts(supabaseClient: any) {
-  let all: any[] = [];
-  let from = 0;
-  const step = 1000;
-  while (true) {
-    const { data, error } = await supabaseClient
-      .from("contacts")
-      .select("phone, name, notes, labels")
-      .order("updated_at", { ascending: false })
-      .range(from, from + step - 1);
-    if (error || !data || data.length === 0) break;
-    all = all.concat(data);
-    if (data.length < step) break;
-    from += step;
-  }
-  return all;
-}
-
-async function fetchAllConversations(supabaseClient: any) {
-  let all: any[] = [];
-  let from = 0;
-  const step = 1000;
-  while (true) {
-    const { data, error } = await supabaseClient
-      .from("conversations")
-      .select("phone, needs_human")
-      .order("created_at", { ascending: false })
-      .range(from, from + step - 1);
-    if (error || !data || data.length === 0) break;
-    all = all.concat(data);
-    if (data.length < step) break;
-    from += step;
-  }
-  return all;
-}
-
 export default function AppClient() {
   const [authed, setAuthed] = useState<boolean>(false);
   const [agentName, setAgentName] = useState<string>('Agent');
@@ -528,16 +492,16 @@ export default function AppClient() {
     const store = getPinnedStore();
     const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
 
-    // 1. Fetch conversations, messages, AND contacts in parallel with pagination so no contacts or chats are truncated
-    const [conversationsData, msgsRes, dbContacts] = await Promise.all([
-      fetchAllConversations(supabase),
-      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(500),
-      fetchAllContacts(supabase)
+    // Lightweight query: recent messages and recent conversations only (no full table scans)
+    const [convsRes, msgsRes] = await Promise.all([
+      supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(100),
+      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(250)
     ]);
 
-    if (msgsRes.error && (!conversationsData || conversationsData.length === 0)) return;
-
+    const conversationsData = convsRes.data || [];
     const messagesData = msgsRes.data || [];
+
+    if (msgsRes.error && conversationsData.length === 0) return;
 
     // Save messages to allRecentMessages for global search
     setAllRecentMessages(messagesData);
@@ -560,25 +524,8 @@ export default function AppClient() {
       }
     }
 
-    // Merge contacts from DB into local cache & state
-    const contactsMap: Record<string, { name: string; notes: string; labels?: string[] }> = { ...getContacts() };
-    if (dbContacts && dbContacts.length > 0) {
-      for (const row of dbContacts) {
-        if (row.phone) {
-          const rawName = (row.name || '').trim();
-          const cleanPhone = row.phone.replace(/\D/g, '');
-          const isNum = !rawName || rawName === row.phone || rawName.replace(/\D/g, '') === cleanPhone;
-          const prevEntry = contactsMap[row.phone] || { name: '', notes: '', labels: [] };
-          contactsMap[row.phone] = {
-            name: (!isNum && rawName) ? rawName : (prevEntry.name && prevEntry.name !== row.phone ? prevEntry.name : ''),
-            notes: row.notes || prevEntry.notes || '',
-            labels: row.labels || prevEntry.labels || []
-          };
-        }
-      }
-      setContacts(contactsMap);
-      try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(contactsMap)); } catch {}
-    }
+    // Use contacts from local cache & state (populated on mount and updated via Realtime)
+    const contactsMap: Record<string, { name: string; notes: string; labels?: string[] }> = { ...getContacts(), ...contacts };
 
     const getDisplayName = (phone: string) => {
       const entry = contactsMap[phone];
