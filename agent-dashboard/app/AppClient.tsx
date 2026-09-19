@@ -309,6 +309,42 @@ function setPinnedStore(store: Record<string, string[]>) {
   try { localStorage.setItem(PINNED_CHATS_KEY, JSON.stringify(store)); } catch {}
 }
 
+async function fetchAllContacts(supabaseClient: any) {
+  let all: any[] = [];
+  let from = 0;
+  const step = 1000;
+  while (true) {
+    const { data, error } = await supabaseClient
+      .from("contacts")
+      .select("phone, name, notes, labels")
+      .order("updated_at", { ascending: false })
+      .range(from, from + step - 1);
+    if (error || !data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < step) break;
+    from += step;
+  }
+  return all;
+}
+
+async function fetchAllConversations(supabaseClient: any) {
+  let all: any[] = [];
+  let from = 0;
+  const step = 1000;
+  while (true) {
+    const { data, error } = await supabaseClient
+      .from("conversations")
+      .select("phone, needs_human")
+      .order("created_at", { ascending: false })
+      .range(from, from + step - 1);
+    if (error || !data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < step) break;
+    from += step;
+  }
+  return all;
+}
+
 export default function AppClient() {
   const [authed, setAuthed] = useState<boolean>(false);
   const [agentName, setAgentName] = useState<string>('Agent');
@@ -362,8 +398,18 @@ export default function AppClient() {
       .then(r => r.json())
       .then(j => {
         if (j.contacts) {
-          setContacts(j.contacts);
-          try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(j.contacts)); } catch {}
+          setContacts(prev => {
+            const merged = { ...prev, ...j.contacts };
+            try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(merged)); } catch {}
+            return merged;
+          });
+          setChats(prevChats => prevChats.map(c => {
+            const entry = j.contacts[c.id];
+            if (entry?.name && entry.name !== c.id && !/^(\+?\d+)$/.test(entry.name)) {
+              return { ...c, name: entry.name, avatar: avatarDataUrl(entry.name, c.id), labels: entry.labels || c.labels };
+            }
+            return c;
+          }));
         }
       })
       .catch(() => {});
@@ -482,21 +528,16 @@ export default function AppClient() {
     const store = getPinnedStore();
     const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
 
-    // 1. Fetch conversations, messages, AND contacts in parallel from Supabase
-    const [convsRes, msgsRes, contactsRes] = await Promise.all([
-      supabase.from("conversations").select("phone, needs_human"),
+    // 1. Fetch conversations, messages, AND contacts in parallel with pagination so no contacts or chats are truncated
+    const [conversationsData, msgsRes, dbContacts] = await Promise.all([
+      fetchAllConversations(supabase),
       supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(500),
-      supabase.from("contacts").select("phone, name, notes, labels")
+      fetchAllContacts(supabase)
     ]);
 
-    const convs = convsRes.data;
-    const msgs = msgsRes.data;
-    const dbContacts = contactsRes.data;
+    if (msgsRes.error && (!conversationsData || conversationsData.length === 0)) return;
 
-    if (msgsRes.error && !convs) return;
-
-    const messagesData = msgs || [];
-    const conversationsData = convs || [];
+    const messagesData = msgsRes.data || [];
 
     // Save messages to allRecentMessages for global search
     setAllRecentMessages(messagesData);
