@@ -3558,7 +3558,10 @@ function formatTimeIST(timeStr) {
   return `${hr % 12 || 12}:${m} ${ampm}`;
 }
 
+let reminderInProgress = false;
 async function sendMemberSessionReminders() {
+  if (reminderInProgress) return;
+  reminderInProgress = true;
   try {
     const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const todayStr = nowIST.toISOString().split('T')[0];
@@ -3629,6 +3632,8 @@ async function sendMemberSessionReminders() {
     }
   } catch (e) {
     console.error('[member-reminder] Error:', e?.response?.data || e.message || e);
+  } finally {
+    reminderInProgress = false;
   }
 }
 

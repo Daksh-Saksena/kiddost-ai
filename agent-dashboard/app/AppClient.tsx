@@ -438,7 +438,10 @@ export default function AppClient() {
   useEffect(() => {
     if (!authed) return;
     loadNeedsHuman();
-    const iv = setInterval(loadNeedsHuman, 10000);
+    const iv = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadNeedsHuman();
+    }, 30000);
     return () => clearInterval(iv);
   }, [authed]);
 
@@ -808,14 +811,26 @@ export default function AppClient() {
     };
   }, [selectedChat, authed]);
 
-  // Polling fallback: refresh chats every 15s (realtime handles most updates)
+  // Polling fallback: refresh chats every 60s when tab is active (realtime handles immediate updates)
   useEffect(() => {
     if (!authed) return;
-    const iv = setInterval(() => {
-      loadChats();
-    }, 15000);
 
-    return () => clearInterval(iv);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadChats();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const iv = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadChats();
+    }, 60000);
+
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [authed]);
 
   // Register service worker and subscribe to push notifications on login
