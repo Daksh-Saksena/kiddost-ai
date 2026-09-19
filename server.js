@@ -674,17 +674,20 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
     // Fetch last 10 messages for conversation memory
     const { data, error } = await supabase
       .from("messages")
-      .select("role, content, media_url")
+      .select("role, sender, agent, content, media_url")
       .eq("phone", fullPhone)
       .order("created_at", { ascending: false })
       .limit(50);
 
     if (error) {
-      console.log("Supabase fetch error:", error);
+      console.log("Supabase fetch error in handleAIResponse, aborting AI for safety:", error);
+      return;
     }
 
     let history = Array.isArray(data) ? data.reverse().map(m => ({
       role: m.role,
+      sender: m.sender,
+      agent: m.agent,
       content: m.media_url ? `${m.content}\n[Media/Document Attached]`.trim() : m.content
     })) : [];
 
@@ -702,15 +705,20 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
     let convVars = {};
     let conversationAiPaused = false;
     try {
-      const { data: convData } = await supabase
+      const { data: convData, error: convErr } = await supabase
         .from('conversations')
         .select('vars, ai_paused')
         .eq('phone', fullPhone)
         .maybeSingle();
+      if (convErr) {
+        console.error('[vars] DB error checking conversation status, aborting AI for safety:', convErr.message);
+        return;
+      }
       convVars = convData?.vars || {};
       conversationAiPaused = convData?.ai_paused === true;
     } catch (e) {
-      console.log('[vars] failed to load:', e.message);
+      console.log('[vars] failed to load, aborting AI for safety:', e.message);
+      return;
     }
 
     // Check conversation-level ai_paused flag FIRST (most reliable)
@@ -728,10 +736,13 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       .limit(1)
       .maybeSingle();
 
-    if (lastErr) console.log("Supabase fetch error:", lastErr);
+    if (lastErr) {
+      console.log("Supabase fetch error checking last message, aborting AI for safety:", lastErr.message);
+      return;
+    }
 
-    if (last && last.ai_enabled === false) {
-      console.log('AI disabled for this conversation (last message ai_enabled=false)');
+    if (last && (last.ai_enabled === false || last.sender === 'agent')) {
+      console.log('AI disabled for this conversation (last message ai_enabled=false or sender=agent)');
       return;
     }
 
@@ -1603,51 +1614,51 @@ async function sendWelcome(fullPhone) {
 
   try {
     // Safety check 1: Check if conversation is paused
-    const { data: convData } = await supabase
+    const { data: convData, error: convErr } = await supabase
       .from('conversations')
       .select('ai_paused')
       .eq('phone', fullPhone)
       .maybeSingle();
 
-    if (convData?.ai_paused === true) {
-      console.log(`[welcome] Aborted: conversation is paused (ai_paused: true) for ${fullPhone}`);
+    if (convErr || convData?.ai_paused === true) {
+      console.log(`[welcome] Aborted: conversation is paused or DB error for ${fullPhone}`);
       return;
     }
 
     // Safety check 2: Check if this user already received welcome message in the past
-    const { data: welcomeHistory } = await supabase
+    const { data: welcomeHistory, error: whErr } = await supabase
       .from('messages')
       .select('id')
       .eq('phone', fullPhone)
       .ilike('content', '%thank you for contacting KidDost%')
       .limit(1);
 
-    if (welcomeHistory && welcomeHistory.length > 0) {
-      console.log(`[welcome] Aborted: ${fullPhone} has already received welcome sequence in the past.`);
+    if (whErr || (welcomeHistory && welcomeHistory.length > 0)) {
+      console.log(`[welcome] Aborted: ${fullPhone} has already received welcome sequence in the past or DB check failed.`);
       return;
     }
 
     // Safety check 3: Check if there's any agent message or substantial message history
-    const { count: msgCount } = await supabase
+    const { count: msgCount, error: mcErr } = await supabase
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('phone', fullPhone);
 
-    // If there are already multiple messages, don't send welcome
-    if (msgCount && msgCount > 1) {
-      console.log(`[welcome] Aborted: ${fullPhone} already has message history (${msgCount} messages).`);
+    // If there are already multiple messages or if check errored, don't send welcome
+    if (mcErr || (msgCount && msgCount > 1)) {
+      console.log(`[welcome] Aborted: ${fullPhone} already has message history (${msgCount} messages) or DB check failed.`);
       return;
     }
 
     const sendText = async (text) => {
       // Re-check pause status before sending each message
-      const { data: cCheck } = await supabase
+      const { data: cCheck, error: cErr } = await supabase
         .from('conversations')
         .select('ai_paused')
         .eq('phone', fullPhone)
         .maybeSingle();
-      if (cCheck?.ai_paused === true) {
-        console.log(`[welcome] Paused mid-sequence for ${fullPhone}, stopping.`);
+      if (cErr || cCheck?.ai_paused === true) {
+        console.log(`[welcome] Paused or DB error mid-sequence for ${fullPhone}, stopping.`);
         return false;
       }
 
@@ -2207,33 +2218,41 @@ app.post("/webhook", async (req, res) => {
     // Robust check for existing conversation and message history
     let existingConversation = null;
     let priorMsgCount = 0;
+    let dbCheckFailed = false;
     try {
       const [convRes, msgCountRes] = await Promise.all([
         supabase.from("conversations").select("phone, ai_paused").eq("phone", fullPhone).maybeSingle(),
         supabase.from("messages").select("id", { count: 'exact', head: true }).eq("phone", fullPhone)
       ]);
-      existingConversation = convRes?.data || null;
-      priorMsgCount = msgCountRes?.count || 0;
+      if (convRes?.error || msgCountRes?.error) {
+        dbCheckFailed = true;
+        console.error('[webhook] Error in conversation/message check:', convRes?.error || msgCountRes?.error);
+      } else {
+        existingConversation = convRes?.data || null;
+        priorMsgCount = msgCountRes?.count || 0;
+      }
     } catch (checkErr) {
-      console.error('[webhook] Error checking existing conversation status:', checkErr.message);
+      dbCheckFailed = true;
+      console.error('[webhook] Exception checking existing conversation status:', checkErr.message);
     }
 
     const botspaceConversationId = body?.customer?.id || null;
     const isAiPaused = existingConversation?.ai_paused === true;
-    // A user is strictly new ONLY if they have no conversation row AND zero prior messages in database
-    const isNewUser = !existingConversation && priorMsgCount === 0;
+    // A user is strictly new ONLY if there was NO DB error, NO conversation row, AND zero prior messages in database
+    const isNewUser = !dbCheckFailed && !existingConversation && priorMsgCount === 0;
 
-    if (!existingConversation) {
+    if (!existingConversation && !dbCheckFailed) {
       await supabase.from("conversations").upsert({
         phone: fullPhone,
         conversation_id: botspaceConversationId,
         ai_paused: false
       }, { onConflict: 'phone' });
     } else if (botspaceConversationId) {
+      // Crucial: only update conversation_id, preserve ai_paused!
       await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
     }
 
-    if (isNewUser && !isAiPaused) {
+    if (isNewUser && !isAiPaused && !dbCheckFailed) {
       // Trigger welcome sequence for brand-new users (don't await — fire and forget)
       sendWelcome(fullPhone).catch(e => console.error('[welcome] error', e.message));
     }
@@ -2272,7 +2291,12 @@ app.post("/webhook", async (req, res) => {
       lastUserBefore = null;
     }
 
-    const aiEnabledForInsert = lastBefore && typeof lastBefore.ai_enabled !== 'undefined' ? lastBefore.ai_enabled : true;
+    let aiEnabledForInsert = true;
+    if (isAiPaused) {
+      aiEnabledForInsert = false;
+    } else if (lastBefore && typeof lastBefore.ai_enabled !== 'undefined') {
+      aiEnabledForInsert = lastBefore.ai_enabled;
+    }
     const LONG_GAP_MS = 14 * 24 * 60 * 60 * 1000;
     const shouldWelcomeBack = !!(
       !isNewUser &&
@@ -2349,28 +2373,30 @@ app.post("/webhook", async (req, res) => {
       .limit(1)
       .maybeSingle();
 
-    if (lastErr) {
-      console.log("Supabase fetch error:", lastErr);
+    if (lastErr || dbCheckFailed) {
+      console.log("DB check error in webhook, aborting AI to fail safe");
+      return res.status(200).json({ success: true, ai_skipped: true });
     }
 
-    if (last && last.ai_enabled === false) {
-      console.log('AI disabled for this conversation');
+    if (isAiPaused || (last && (last.ai_enabled === false || last.sender === 'agent'))) {
+      console.log('AI disabled for this conversation (isAiPaused=true, last message ai_enabled=false, or sender=agent)');
       return res.status(200).json({ success: true, ai_skipped: true });
     }
 
     // Also check conversations table ai_paused flag (more reliable than message-level)
     try {
-      const { data: convCheck } = await supabase
+      const { data: convCheck, error: convCheckErr } = await supabase
         .from('conversations')
         .select('ai_paused')
         .eq('phone', fullPhone)
         .maybeSingle();
-      if (convCheck?.ai_paused === true) {
-        console.log('AI paused for this conversation (conversations.ai_paused=true)');
+      if (convCheckErr || convCheck?.ai_paused === true) {
+        console.log('AI paused for this conversation (conversations.ai_paused=true or convCheck error)');
         return res.status(200).json({ success: true, ai_skipped: true });
       }
     } catch (e) {
-      console.log('[webhook] ai_paused check error:', e.message);
+      console.log('[webhook] ai_paused check error, aborting AI for safety:', e.message);
+      return res.status(200).json({ success: true, ai_skipped: true });
     }
 
     // Only buffer text messages for AI (ignore pure media for AI, and skip for brand-new users)
