@@ -2019,6 +2019,19 @@ app.delete('/reset-conversation', async (req, res) => {
   res.json({ ok: true, message: `Cleared conversation history for ${phone}` });
 });
 
+app.post('/backfill-messages', async (req, res) => {
+  const { messages, secret } = req.body;
+  if (secret !== 'kiddost_sync_2026') return res.status(401).json({ error: 'unauthorized' });
+  if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages array required' });
+  try {
+    const { data, error } = await supabase.from('messages').insert(messages).select();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ ok: true, count: data.length });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Helper to extract genuine contact name from BotSpace/WhatsApp webhook
 function extractContactNameCandidate(body, phone, fullPhone) {
   const cust = body?.customer;
