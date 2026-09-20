@@ -1651,14 +1651,14 @@ async function sendWelcome(fullPhone) {
     }
 
     const sendText = async (text) => {
-      // Re-check pause status before sending each message
-      const { data: cCheck, error: cErr } = await supabase
+      // Only abort if explicitly paused by human agent
+      const { data: cCheck } = await supabase
         .from('conversations')
         .select('ai_paused')
         .eq('phone', fullPhone)
         .maybeSingle();
-      if (cErr || cCheck?.ai_paused === true) {
-        console.log(`[welcome] Paused or DB error mid-sequence for ${fullPhone}, stopping.`);
+      if (cCheck?.ai_paused === true) {
+        console.log(`[welcome] Human agent paused conversation for ${fullPhone}, stopping.`);
         return false;
       }
 
@@ -2193,12 +2193,49 @@ app.post("/webhook", async (req, res) => {
 
     if (isOutgoing) {
       if (message || mediaUrl) {
-        // Agent sent a message from BotSpace
-        console.log(`[webhook] Detected outgoing agent message from BotSpace for ${fullPhone}:`, message || mediaUrl);
+        // 1. Check if this is an API message echo (source is API or sent by system / KidDost)
+        const src = String(body?.source || body?.payload?.source || body?.author?.type || '').toLowerCase();
+        const authorName = String(body?.author?.name || body?.sender?.name || body?.from?.name || '').trim();
+        if (src === 'api' || authorName.toLowerCase() === 'kiddost') {
+          console.log(`[webhook] Outgoing message is from API/KidDost. Skipping agent handling.`);
+          if (messageId) {
+            await supabase.from('messages').update({ whatsapp_id: messageId, status: status || 'sent' }).eq('whatsapp_id', messageId);
+          }
+          return res.status(200).json({ ok: true, is_api_echo: true });
+        }
+
+        // 2. Check if this message matches a recent message sent by the server/AI within the last 60 seconds
+        const { data: recentMsgs } = await supabase
+          .from('messages')
+          .select('id, content, media_url, created_at, sender')
+          .eq('phone', fullPhone)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        const isEcho = recentMsgs?.some(m => {
+          const timeDiff = Date.now() - new Date(m.created_at).getTime();
+          if (timeDiff > 60000) return false;
+          if (mediaUrl && m.media_url) return true;
+          if (message && m.content === message) return true;
+          return false;
+        });
+
+        if (isEcho) {
+          console.log(`[webhook] Detected echo of recent server/AI message for ${fullPhone}. Updating whatsapp_id and skipping pause.`);
+          if (messageId) {
+            const echoMsg = recentMsgs.find(m => (mediaUrl && m.media_url) || (message && m.content === message));
+            if (echoMsg) {
+              await supabase.from('messages').update({ whatsapp_id: messageId, status: status || 'sent' }).eq('id', echoMsg.id);
+            }
+          }
+          return res.status(200).json({ ok: true, echo: true });
+        }
+
+        // 3. Genuine human agent typed directly in BotSpace dashboard!
+        console.log(`[webhook] Detected genuine outgoing agent message from BotSpace for ${fullPhone}:`, message || mediaUrl);
         if (messageId) {
           const { data: existing } = await supabase.from('messages').select('id').eq('whatsapp_id', messageId).maybeSingle();
           if (existing) {
-            // Already saved by /agent-send, just update status if available
             if (status) await supabase.from('messages').update({ status }).eq('id', existing.id);
             return res.status(200).json({ ok: true, already_exists: true });
           }
