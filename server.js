@@ -1486,6 +1486,9 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
     };
     const sendAIImage = async (filename) => {
       const mediaUrl = `${SERVER_URL}/static/${filename}`;
+      await supabase.from("messages").insert({
+        phone: fullPhone, role: "assistant", content: "", media_url: mediaUrl, sender: "ai", agent: null, ai_enabled: true
+      });
       try {
         const res = await axios.post(
           `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-media-message?apiKey=${BOTSPACE_API_KEY}`,
@@ -2212,10 +2215,17 @@ app.post("/webhook", async (req, res) => {
           .order('created_at', { ascending: false })
           .limit(5);
 
+        const isUrlMatch = (url1, url2) => {
+          if (!url1 || !url2) return false;
+          const file1 = url1.split('/').pop().split('?')[0];
+          const file2 = url2.split('/').pop().split('?')[0];
+          return file1 === file2 || url1 === url2;
+        };
+
         const isEcho = recentMsgs?.some(m => {
           const timeDiff = Date.now() - new Date(m.created_at).getTime();
           if (timeDiff > 60000) return false;
-          if (mediaUrl && m.media_url) return true;
+          if (mediaUrl && isUrlMatch(mediaUrl, m.media_url)) return true;
           if (message && m.content === message) return true;
           return false;
         });
@@ -2223,7 +2233,7 @@ app.post("/webhook", async (req, res) => {
         if (isEcho) {
           console.log(`[webhook] Detected echo of recent server/AI message for ${fullPhone}. Updating whatsapp_id and skipping pause.`);
           if (messageId) {
-            const echoMsg = recentMsgs.find(m => (mediaUrl && m.media_url) || (message && m.content === message));
+            const echoMsg = recentMsgs.find(m => (mediaUrl && isUrlMatch(mediaUrl, m.media_url)) || (message && m.content === message));
             if (echoMsg) {
               await supabase.from('messages').update({ whatsapp_id: messageId, status: status || 'sent' }).eq('id', echoMsg.id);
             }
