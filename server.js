@@ -493,12 +493,12 @@ VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly package
 - If the child's age was ALREADY mentioned: Go DIRECTLY to sending the package details below. You are STRICTLY FORBIDDEN from asking for age again.
 - ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
 - Package response structure:
-  • IF regular pricing WAS NOT shared yet: Send BOTH images first, then the text.
-    You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
-    After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-  • IF regular pricing WAS ALREADY shared: Do NOT resend the regular prices. Only send the monthly pricing image and text.
+  • IF regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in the conversation history, or if pricing was already discussed): Do NOT resend regular prices. Only send the monthly pricing image and text.
     You MUST write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
     After the image, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+  • IF regular pricing was NOT shared yet anywhere in the conversation history: Send BOTH images first, then the text.
+    You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
+    After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
 - End with "Feel free to let us know if you have any questions."
 
@@ -684,11 +684,21 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       return;
     }
 
+    const formatMediaHistory = (content, mediaUrl) => {
+      if (!mediaUrl) return content;
+      const lower = mediaUrl.toLowerCase();
+      let marker = '[Media/Document Attached]';
+      if (lower.includes('pricing.jpeg')) marker = '[PRICING_IMAGE: Regular Hourly Charges Sent]';
+      else if (lower.includes('month.jpeg')) marker = '[MONTH_IMAGE: Bulk Value Packages Sent]';
+      else if (lower.includes('image.png')) marker = '[INTRO_FLYER_IMAGE Sent]';
+      return content ? `${content}\n${marker}`.trim() : marker;
+    };
+
     let history = Array.isArray(data) ? data.reverse().map(m => ({
       role: m.role,
       sender: m.sender,
       agent: m.agent,
-      content: m.media_url ? `${m.content}\n[Media/Document Attached]`.trim() : m.content
+      content: formatMediaHistory(m.content, m.media_url)
     })) : [];
 
     // Filter history to prevent duplicating the current incoming user message(s)
@@ -1048,12 +1058,12 @@ VALUE PACKAGES (only when user asks about packages/plans/bundles/monthly package
 - If the child's age was ALREADY mentioned: Go DIRECTLY to sending the package details below. You are STRICTLY FORBIDDEN from asking for age again.
 - ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
 - Package response structure:
-  • IF regular pricing WAS NOT shared yet: Send BOTH images first, then the text.
-    You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
-    After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-  • IF regular pricing WAS ALREADY shared: Do NOT resend the regular prices. Only send the monthly pricing image and text.
+  • IF regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in the conversation history, or if pricing was already discussed): Do NOT resend regular prices. Only send the monthly pricing image and text.
     You MUST write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
     After the image, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+  • IF regular pricing was NOT shared yet anywhere in the conversation history: Send BOTH images first, then the text.
+    You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
+    After the images, write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
 - NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
 - If the user asks something like "I have twins, what will be the monthly package?" do NOT ask for children's names. First share the value package details above and Write [MONTH_IMAGE] on its own line, then tell them that we offer value packages for two kids and can discuss details further.
 - End with "Feel free to let us know if you have any questions."
@@ -2908,9 +2918,19 @@ app.get('/debug-prompt', async (req, res) => {
       .order("created_at", { ascending: false })
       .limit(10);
 
+    const formatMediaHistory = (content, mediaUrl) => {
+      if (!mediaUrl) return content;
+      const lower = mediaUrl.toLowerCase();
+      let marker = '[Media/Document Attached]';
+      if (lower.includes('pricing.jpeg')) marker = '[PRICING_IMAGE: Regular Hourly Charges Sent]';
+      else if (lower.includes('month.jpeg')) marker = '[MONTH_IMAGE: Bulk Value Packages Sent]';
+      else if (lower.includes('image.png')) marker = '[INTRO_FLYER_IMAGE Sent]';
+      return content ? `${content}\n${marker}`.trim() : marker;
+    };
+
     const history = Array.isArray(data) ? data.reverse().map(m => ({
       role: m.role,
-      content: m.media_url ? `${m.content}\n[Media/Document Attached]`.trim() : m.content
+      content: formatMediaHistory(m.content, m.media_url)
     })) : [];
 
     res.json({
