@@ -514,7 +514,7 @@ VALUE PACKAGES & MULTIPLE CHILDREN / TWINS (packages/plans/bundles/monthly packa
   • THIS IS A VALUE PACKAGE INQUIRY, NOT A DISCOUNT OBJECTION! NEVER USE THE DISCOUNT REJECTION SCRIPT!
   • Step 1: Images:
     - Check if regular pricing was already shared earlier (indicated by [PRICING_IMAGE] in history).
-    - If ALREADY shared: Write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
+    - If ALREADY shared: You MUST start your response by writing [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE]. Do not add words inside brackets (write exactly [MONTH_IMAGE]).
     - If NOT shared yet: Write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
   • Step 2: Message Text (send EXACTLY this text including both paragraphs):
     "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.
@@ -524,8 +524,8 @@ We can customize the package as per your requirement once we have done the first
 
 - STANDARD VALUE PACKAGE INQUIRIES (single child or general package inquiry):
   • Step 1: Images:
-    - If regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in conversation history, or if pricing was already discussed): Do NOT resend regular prices. Only send the monthly pricing image and text.
-      You MUST write ONLY [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE].
+    - If regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in conversation history, or if pricing was already discussed): Do NOT resend regular prices.
+      You MUST start your response by writing [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE]. Do not add words inside brackets (write exactly [MONTH_IMAGE]).
     - If regular pricing was NOT shared yet anywhere in the conversation history: Send BOTH images first, then the text.
       You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
   • Step 2: Message Text (send EXACTLY this text):
@@ -583,7 +583,7 @@ TRANSPORTATION / OUTSIDE TRIPS:
 
 TOO EXPENSIVE / OUT OF BUDGET / DISCOUNTS (ONLY for explicit price complaints or bargaining):
 - CRITICAL: ONLY trigger this rule if the customer EXPLICITLY complains that the price is too high or asks for a discount/cheaper rate (e.g., "too expensive", "prices are high", "can you give discount", "any discount", "reduce price", "best price you can do", "out of my budget", "give some concession").
-- NEVER trigger this rule for standard price inquiries or questions about packages/durations/number of kids (e.g., "For 1 month two kids how much cost?", "what is the cost", "how much will it be", "pricing for 2 kids"). Those are pricing or package inquiries, NOT discount objections!
+- NEVER trigger this rule for inquiries asking about prices or package rates (e.g., "For 1 month two kids how much cost?", "what is the cost", "how much will it be", "what is the discounted rate?", "how much is the discounted rate?"). Those are inquiries asking WHAT the rates are, NOT bargaining! If they ask "what is the discounted rate?", refer them to the package image [MONTH_IMAGE] so they can see the package pricing.
 - If the user explicitly complains about price or asks for a discount:
   1. FIRST, check the conversation history. Have you already offered them Value Packages?
   2. If NO (Value Packages have NOT been offered yet): Do not use the discount rejection. Instead, pivot to Value Packages: "We also offer value packages which give you a bundle of sessions at a discounted rate!" Then proceed to use the VALUE PACKAGES rule (share the images and the exact script).
@@ -716,9 +716,9 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       if (!mediaUrl) return content;
       const lower = mediaUrl.toLowerCase();
       let marker = '[Media/Document Attached]';
-      if (lower.includes('pricing.jpeg')) marker = '[PRICING_IMAGE: Regular Hourly Charges Sent]';
-      else if (lower.includes('month.jpeg')) marker = '[MONTH_IMAGE: Bulk Value Packages Sent]';
-      else if (lower.includes('image.png')) marker = '[INTRO_FLYER_IMAGE Sent]';
+      if (lower.includes('pricing.jpeg')) marker = '[PRICING_IMAGE]';
+      else if (lower.includes('month.jpeg')) marker = '[MONTH_IMAGE]';
+      else if (lower.includes('image.png')) marker = '[INTRO_FLYER_IMAGE]';
       return content ? `${content}\n${marker}`.trim() : marker;
     };
 
@@ -1546,23 +1546,27 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
     }
 
     // Split reply on image markers and send segments in order
-    const IMAGE_MARKERS = { '[PRICING_IMAGE]': 'pricing.jpeg', '[MONTH_IMAGE]': 'month.jpeg' };
-    const MARKER_PATTERN = /\[(PRICING_IMAGE|MONTH_IMAGE)\]/g;
+    const MARKER_SPLIT_REGEX = /(\[(?:PRICING_IMAGE|MONTH_IMAGE)(?::[^\]]*)?\])/gi;
     const FEEL_FREE_PATTERN = /feel free to let us know if you have any questions\.?/i;
     const FEEL_FREE_TEXT = 'Feel free to let us know if you have any questions.';
-    const parts = aiReply.split(MARKER_PATTERN);
-    // parts alternates: text, markerName, text, markerName, text ...
+    const parts = aiReply.split(MARKER_SPLIT_REGEX);
     let pricingImageSent = false;
+    let monthImageSent = false;
     let shouldSendFeelFree = false;
     for (let i = 0; i < parts.length; i++) {
       let part = parts[i].trim();
       if (!part) continue;
-      const filename = IMAGE_MARKERS[`[${part}]`];
-      if (filename) {
-        if (filename === 'pricing.jpeg') pricingImageSent = true;
-        await sendAIImage(filename);
+      if (/^\[PRICING_IMAGE(?::[^\]]*)?\]$/i.test(part)) {
+        pricingImageSent = true;
+        await sendAIImage('pricing.jpeg');
+        await new Promise(r => setTimeout(r, 600));
+      } else if (/^\[MONTH_IMAGE(?::[^\]]*)?\]$/i.test(part)) {
+        monthImageSent = true;
+        await sendAIImage('month.jpeg');
         await new Promise(r => setTimeout(r, 600));
       } else {
+        // Strip any residual image markers that might have leaked into text
+        part = part.replace(/\[(?:PRICING_IMAGE|MONTH_IMAGE|INTRO_FLYER_IMAGE)[^\]]*\]/gi, '').trim();
         // Extract "Feel free" sentence to always send as its own final message
         if (FEEL_FREE_PATTERN.test(part)) {
           shouldSendFeelFree = true;
@@ -1572,6 +1576,12 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
         if (/please refer to.*pricing/i.test(part) && !pricingImageSent) {
           pricingImageSent = true;
           await sendAIImage('pricing.jpeg');
+          await new Promise(r => setTimeout(r, 600));
+        }
+        // If the AI mentions value packages text but forgot the image marker, send month image first
+        if (/packages offer you the flexibility/i.test(part) && !monthImageSent) {
+          monthImageSent = true;
+          await sendAIImage('month.jpeg');
           await new Promise(r => setTimeout(r, 600));
         }
         if (part) {
@@ -2950,9 +2960,9 @@ app.get('/debug-prompt', async (req, res) => {
       if (!mediaUrl) return content;
       const lower = mediaUrl.toLowerCase();
       let marker = '[Media/Document Attached]';
-      if (lower.includes('pricing.jpeg')) marker = '[PRICING_IMAGE: Regular Hourly Charges Sent]';
-      else if (lower.includes('month.jpeg')) marker = '[MONTH_IMAGE: Bulk Value Packages Sent]';
-      else if (lower.includes('image.png')) marker = '[INTRO_FLYER_IMAGE Sent]';
+      if (lower.includes('pricing.jpeg')) marker = '[PRICING_IMAGE]';
+      else if (lower.includes('month.jpeg')) marker = '[MONTH_IMAGE]';
+      else if (lower.includes('image.png')) marker = '[INTRO_FLYER_IMAGE]';
       return content ? `${content}\n${marker}`.trim() : marker;
     };
 
