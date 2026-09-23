@@ -605,10 +605,14 @@ PAYMENT POLICY:
 BUSINESS HOURS:
 - Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
 - If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- SUNDAY CLOSURE: Sunday is our ONLY closed day. If today is Sunday and the user asks for "today", or if the user explicitly asks for a session on "Sunday", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- SUNDAY CLOSURE & SUNDAY INQUIRIES:
+  • Sunday is our ONLY closed day.
+  • If the user asks if we offer service on Sunday, asks about Sundays, or asks for a session on Sunday (e.g. "Do you offer service on sunday", "are you open on sunday?", "can you come on sunday?"):
+    Respond EXACTLY: "Currently, we are operational Monday to Saturday."
+  • If today is Sunday and the user asks for "today", politely inform them: "Currently, we are operational Monday to Saturday."
+  • STRICT RULE: NEVER say "We will get back to you to confirm a session on another day." NEVER assume or promise a booking confirmation when they simply asked about our operational days.
 - TODAY REQUESTS ON WORKING DAYS (Monday–Saturday): If today is a regular working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday), any request for "today" (e.g. "can you send someone today", "how about today?", "are you free today?") is 100% VALID! NEVER reject it, and NEVER say we are only operational Monday to Saturday. If child's age is already known, ask for the missing booking details (preferred time slot and locality), e.g. "What time slot would work best for you today, and could you please share your area or locality?"
 - IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
-- If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
 - If the user asks about "weekends", clarify EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays." Do not just say "yes" to weekends.
 
 BEFORE BOOKING:
@@ -1152,7 +1156,7 @@ PAYMENT POLICY:
 BUSINESS HOURS:
 - Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
 - If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", or if the user asks about Sunday, inform them: "Currently, we are operational Monday to Saturday."
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
 - IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
@@ -1417,9 +1421,12 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
       }
     }
 
+    // Post-processing cleanup: Never send "We will get back to you to confirm a session on another day"
+    aiReply = aiReply.replace(/\s*We will get back to you to confirm a session(?: on an?other day)?\.?/gi, '').trim();
+
     // Safety net: Block false Sunday/closed rejections on working days (Monday-Saturday)
     const isSundayToday = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase() === 'sunday';
-    const SUNDAY_REJECTION_RE = /operational Monday to Saturday.*(?:another day|confirm a session)/i;
+    const SUNDAY_REJECTION_RE = /operational Monday to Saturday/i;
     if (!isSundayToday && SUNDAY_REJECTION_RE.test(aiReply)) {
       const mentionsExplicitSunday = /\bsundays?\b/i.test(combinedMessage);
       if (!mentionsExplicitSunday) {
@@ -3140,7 +3147,7 @@ PAYMENT POLICY:
 BUSINESS HOURS:
 - Our services are typically available from 9:00 AM to 7:45 PM IST, Monday to Saturday.
 - If the CURRENT TIME is before 9:00 AM or after 7:45 PM, and the user asks for something that requires human help (booking, cancellation, rescheduling, availability check, location check, or anything you would normally reply UNSURE to), politely let them know: "Our team is available between 9:00 AM and 7:45 PM. We will get back to you first thing in the morning!" (or "shortly" if it's close to 9:00 AM). Do NOT reply UNSURE in this case — send the business hours message instead.
-- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", politely inform them: "Currently we are operational Monday to Saturday. We will get back to you to confirm a session on another day."
+- If today is SUNDAY, and the user asks "how about today?" or "can we do it today?", or if the user asks about Sunday, inform them: "Currently, we are operational Monday to Saturday."
 - If today is NOT Sunday, and the user asks "how about today?" within business hours, treat it as a VALID request.
 - IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
 - If someone explicitly asks for a session on Sunday, say that we are operational Monday to Saturday currently.
