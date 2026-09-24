@@ -371,10 +371,11 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 // In-memory buffering to combine fragmented user messages per phone
-const MESSAGE_BUFFER_DELAY_MS = 100; // ← change this to adjust how long to wait before sending to AI (in milliseconds)
+const MESSAGE_BUFFER_DELAY_MS = 2000; // 2 seconds to allow multiple fragmented user lines to combine
 const messageBuffers = {};
 const messageTimers = {};
 const welcomeBackFlags = {};
+const aiProcessingPerPhone = new Set();
 
 // In-memory OTP store for agent creation: { token -> { otp, expiresAt } }
 const otpStore = {};
@@ -525,14 +526,14 @@ We can customize the package as per your requirement once we have done the first
   • Step 3: End with: "Feel free to let us know if you have any questions."
 
 - STANDARD VALUE PACKAGE INQUIRIES (single child or general package inquiry):
-  • Step 1: Images:
-    - If regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in conversation history, or if pricing was already discussed): Do NOT resend regular prices.
-      You MUST start your response by writing [MONTH_IMAGE] on its own line. DO NOT write [PRICING_IMAGE]. Do not add words inside brackets (write exactly [MONTH_IMAGE]).
-    - If regular pricing was NOT shared yet anywhere in the conversation history: Send BOTH images first, then the text.
-      You MUST write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
-  • Step 2: Message Text (send EXACTLY this text):
-    "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
-  • Step 3: End with: "Feel free to let us know if you have any questions."
+  You MUST include ALL 3 components below in your response without omitting any of them:
+  1. Image:
+     - If regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in conversation history): write [MONTH_IMAGE] on its own line.
+     - If regular pricing was NOT shared yet anywhere in the conversation history: write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
+  2. Message Text (MANDATORY — NEVER omit this text after the image):
+     Write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+  3. Closing:
+     End with: "Feel free to let us know if you have any questions."
 
 - NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
 
@@ -1539,6 +1540,24 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
     };
     const sendAIImage = async (filename) => {
       const mediaUrl = `${SERVER_URL}/static/${filename}`;
+      // Duplicate guard: don't send the same image if already sent in the last 20 seconds
+      try {
+        const twentySecondsAgo = new Date(Date.now() - 20000).toISOString();
+        const { data: recentImages } = await supabase
+          .from('messages')
+          .select('media_url')
+          .eq('phone', fullPhone)
+          .eq('role', 'assistant')
+          .gte('created_at', twentySecondsAgo)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        if (Array.isArray(recentImages) && recentImages.some(m => m.media_url === mediaUrl)) {
+          console.log('[Dedup] Skipping duplicate AI image:', mediaUrl);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Dedup] image check failed, proceeding:', e.message);
+      }
       await supabase.from("messages").insert({
         phone: fullPhone, role: "assistant", content: "", media_url: mediaUrl, sender: "ai", agent: null, ai_enabled: true
       });
@@ -1613,6 +1632,26 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
         }
       }
     }
+
+    // Safety fallback: if month image was sent, but the AI omitted the value packages text, send it now!
+    const VALUE_PACKAGES_CANONICAL_TEXT = "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.";
+    if (monthImageSent && !/packages offer you the flexibility/i.test(aiReply)) {
+      console.log('[Safety Net] month.jpeg was sent but AI omitted package text. Auto-dispatching canonical text.');
+      await sendAIText(VALUE_PACKAGES_CANONICAL_TEXT);
+      shouldSendFeelFree = true;
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Safety fallback: if pricing image was sent for the first time, but the AI omitted the intro session text, send it now!
+    const INTRO_SESSION_CANONICAL_TEXT = "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour.";
+    const pricingAlreadyInHistory = history.some(m => m.role === 'assistant' && (m.content?.includes('[PRICING_IMAGE]') || m.content?.includes('introductory session')));
+    if (pricingImageSent && !pricingAlreadyInHistory && !/introductory session/i.test(aiReply)) {
+      console.log('[Safety Net] pricing.jpeg was sent but AI omitted intro session text. Auto-dispatching canonical text.');
+      await sendAIText(INTRO_SESSION_CANONICAL_TEXT);
+      shouldSendFeelFree = true;
+      await new Promise(r => setTimeout(r, 400));
+    }
+
     // Send "Feel free" as its own final message
     if (shouldSendFeelFree) {
       await new Promise(r => setTimeout(r, 400));
@@ -2574,21 +2613,40 @@ app.post("/webhook", async (req, res) => {
       }
 
       // wait MESSAGE_BUFFER_DELAY_MS before sending combined text to AI
-      messageTimers[fullPhone] = setTimeout(async () => {
+      const triggerAiProcessing = () => {
+        if (aiProcessingPerPhone.has(fullPhone)) {
+          console.log(`[buffer] AI currently active for ${fullPhone}. Holding messages in buffer for next turn.`);
+          return;
+        }
+
         const buffered = messageBuffers[fullPhone] || [];
         const combined = buffered.join(" ").trim();
         const prependWelcomeBack = !!welcomeBackFlags[fullPhone];
         // reset buffer
         messageBuffers[fullPhone] = [];
         welcomeBackFlags[fullPhone] = false;
-        try {
-          if (combined) {
+
+        if (!combined) return;
+
+        aiProcessingPerPhone.add(fullPhone);
+
+        (async () => {
+          try {
             await handleAIResponse(fullPhone, combined, { prependWelcomeBack, contactName, bufferedCount: buffered.length });
+          } catch (e) {
+            console.error('buffered AI handler error', e?.message || e);
+          } finally {
+            aiProcessingPerPhone.delete(fullPhone);
+            // If new messages arrived while AI was responding, schedule processing for them
+            if (messageBuffers[fullPhone] && messageBuffers[fullPhone].length > 0) {
+              console.log(`[buffer] Triggering follow-up processing for ${fullPhone} (${messageBuffers[fullPhone].length} messages waiting)`);
+              setTimeout(triggerAiProcessing, 300);
+            }
           }
-        } catch (e) {
-          console.error('buffered AI handler error', e?.message || e);
-        }
-      }, MESSAGE_BUFFER_DELAY_MS);
+        })();
+      };
+
+      messageTimers[fullPhone] = setTimeout(triggerAiProcessing, MESSAGE_BUFFER_DELAY_MS);
     }
 
     // respond quickly to webhook sender
