@@ -72,9 +72,10 @@ When a brand new customer contacts KidDost for the first time:
 - Single Child:
   • If regular pricing already shared: write [MONTH_IMAGE]
   • If regular pricing not shared yet: write [PRICING_IMAGE] then [MONTH_IMAGE]
-  • Message text:
+  • Message text (single paragraph ONLY):
     "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
   • Closing: "Feel free to let us know if you have any questions."
+  • STRICT NEGATIVE CONSTRAINT: For 1 child, NEVER include the second customization paragraph ("We can customize the package as per your requirement..."). That is EXCLUSIVELY for 2 kids or twins.
 - Two Kids / Twins:
   • Send images (same logic).
   • Message text:
