@@ -515,7 +515,7 @@ VALUE PACKAGES & MULTIPLE CHILDREN / TWINS (packages/plans/bundles/monthly packa
 - ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
 - ANY INQUIRY ABOUT MONTHLY PACKAGES / VALUE PACKAGES (e.g. "how can I enquire about monthly package", "can you share monthly package", "tell me about monthly package", "packages after intro session"):
   • Always treat this as a direct request to view our value package options! Do NOT give a vague reply telling them to ask later.
-  • Send [MONTH_IMAGE] and the exact value package text below so they can see our packages immediately.
+  • CRITICAL MANDATORY INSTRUCTION: You MUST start your message with [MONTH_IMAGE] on its own line as the very first line before ANY text.
 
 - INQUIRIES FOR 2 KIDS / TWINS / MULTIPLE CHILDREN (e.g. "For 1 month two kids how much cost?", "how much for 2 kids", "value package for two kids", "monthly package for 2 kids", or mentioning twins/2 children for packages):
   • THIS IS A VALUE PACKAGE INQUIRY, NOT A DISCOUNT OBJECTION! NEVER USE THE DISCOUNT REJECTION SCRIPT!
@@ -530,12 +530,12 @@ We can customize the package as per your requirement once we have done the first
   • Step 3: End with: "Feel free to let us know if you have any questions."
 
 - STANDARD VALUE PACKAGE INQUIRIES (single child or general package inquiry):
-  You MUST include ALL 3 components below in your response without omitting any of them:
-  1. Image:
-     - If regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in conversation history): write [MONTH_IMAGE] on its own line.
+  You MUST include ALL 3 components below in this exact order without omitting any of them:
+  1. Image Marker (MANDATORY — you must output the literal bracketed tag):
+     - If regular pricing was ALREADY shared earlier (indicated by [PRICING_IMAGE] in conversation history): write [MONTH_IMAGE] on its own line as line 1.
      - If regular pricing was NOT shared yet anywhere in the conversation history: write [PRICING_IMAGE] on its own line, and then write [MONTH_IMAGE] on its own line.
-  2. Message Text (MANDATORY — NEVER omit this text after the image):
-     Write EXACTLY: "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
+  2. Message Text (MANDATORY — write EXACTLY this text after the image):
+     "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months."
   3. Closing:
      End with: "Feel free to let us know if you have any questions."
 
@@ -1140,10 +1140,11 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const allTimesWithinHours = hasTimes && timesInMessage.every(t => t >= (9 * 60) && t <= (19 * 60 + 45));
 
     if (OUT_OF_HOURS_REPLY_RE.test(aiReply)) {
-      // If current time is within business hours, this out-of-hours response is invalid.
-      // Also block false rejects when all requested times are within hours (e.g. 5-6 PM).
-      if (isWithinBusinessHours || allTimesWithinHours) {
-        aiReply = 'Sure, allow me to check the slot availability and come back to you.';
+      // ONLY block false rejects when explicit requested times in message are within working hours (e.g. 5 PM - 6 PM).
+      // NEVER trigger merely because the user messaged during daytime (isWithinBusinessHours) — that broke legitimate 8 PM rejections!
+      if (hasTimes && allTimesWithinHours) {
+        console.warn(`[SAFETY NET] Blocked false out-of-hours rejection for in-hours request (${timesInMessage.join(',')} mins)`);
+        aiReply = "Our services are available between 9:00 AM and 7:45 PM. Could you please share your child's age and your area or locality?";
       }
     }
 
@@ -1178,22 +1179,23 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     aiReply = aiReply.replace(/\s*We will get back to you to confirm a session(?: on an?other day)?\.?/gi, '').trim();
 
     // Safety net: Block false Sunday/closed rejections on working days (Monday-Saturday)
+    // ONLY trigger when the user specifically requested "today" / "tonight" on a working day,
+    // and was NOT asking about operational days, schedules, or weekends in general!
     const isSundayToday = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase() === 'sunday';
     const SUNDAY_REJECTION_RE = /operational Monday to Saturday/i;
-    if (!isSundayToday && SUNDAY_REJECTION_RE.test(aiReply)) {
-      const mentionsExplicitSunday = /\bsundays?\b/i.test(combinedMessage);
-      if (!mentionsExplicitSunday) {
-        console.warn(`[SAFETY NET] Blocked false Sunday rejection on a working day for ${fullPhone}. User message: "${combinedMessage}"`);
-        const allConvText = [
-          combinedMessage,
-          ...history.map(m => m.content)
-        ].join(' ');
-        const mentionsAge = /\b(\d{1,2}\s*(?:years?|yrs?|months?|m|yo|y\/o)|dob|born|infant|toddler)\b/i.test(allConvText);
-        if (mentionsAge) {
-          aiReply = "Sure! What time slot would work best for you today, and could you please share your area or locality?";
-        } else {
-          aiReply = "Could I please know your child's age first?";
-        }
+    const isAskingAboutDaysInGeneral = /\b(days?|schedule|weekends?|sundays?|open|operational|timings?)\b/i.test(combinedMessage);
+    const isAskingForToday = /\b(today|tonight)\b/i.test(combinedMessage);
+    if (!isSundayToday && isAskingForToday && !isAskingAboutDaysInGeneral && SUNDAY_REJECTION_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Blocked false Sunday rejection on a working day for ${fullPhone}. User message: "${combinedMessage}"`);
+      const allConvText = [
+        combinedMessage,
+        ...history.map(m => m.content)
+      ].join(' ');
+      const mentionsAge = /\b(\d{1,2}\s*(?:years?|yrs?|months?|m|yo|y\/o)|dob|born|infant|toddler)\b/i.test(allConvText);
+      if (mentionsAge) {
+        aiReply = "Sure! What time slot would work best for you today, and could you please share your area or locality?";
+      } else {
+        aiReply = "Could I please know your child's age first?";
       }
     }
 
@@ -2817,20 +2819,6 @@ app.get('/debug-prompt', async (req, res) => {
   }
 });
 
-// Debug endpoint: return recent messages (for troubleshooting frontend visibility)
-app.get('/debug-messages', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, phone, content, media_url, whatsapp_id, status, sender, role, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    return res.json({ data, error });
-  } catch (e) {
-    console.error('/debug-messages error', e?.message || e);
-    return res.status(500).json({ error: true });
-  }
-});
 
 // Proxy image endpoint for non-public media (temporary fallback)
 app.get('/proxy-image', async (req, res) => {
@@ -3327,9 +3315,9 @@ async function sendMemberSessionReminders() {
   if (reminderInProgress) return;
   reminderInProgress = true;
   try {
-    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const todayStr = nowIST.toISOString().split('T')[0];
-    const target = new Date(nowIST.getTime() + 15 * 60 * 1000);
+    const istMs = Date.now() + (5.5 * 60 * 60 * 1000);
+    const todayStr = new Date(istMs).toISOString().split('T')[0];
+    const target = new Date(istMs + 15 * 60 * 1000);
     const targetTime = `${String(target.getUTCHours()).padStart(2, '0')}:${String(target.getUTCMinutes()).padStart(2, '0')}`;
 
     const { data: events, error } = await supabase
@@ -3412,9 +3400,8 @@ const REMINDER_PHONE = process.env.REMINDER_PHONE || '919901029836';
 async function sendDailyReminder() {
   try {
     // Get tomorrow's date in IST (UTC+5:30)
-    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const tomorrow = new Date(nowIST);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const istMs = Date.now() + (5.5 * 60 * 60 * 1000);
+    const tomorrow = new Date(istMs + 24 * 60 * 60 * 1000);
     const tomorrowStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
 
     console.log(`[reminder] Checking sessions for ${tomorrowStr}`);
@@ -3432,7 +3419,7 @@ async function sendDailyReminder() {
     }
 
     // Build message
-    const dayLabel = tomorrow.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    const dayLabel = tomorrow.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
     let msg = `📅 *Sessions for tomorrow (${dayLabel}):*\n\n`;
 
     events.forEach((ev, i) => {
@@ -3481,11 +3468,11 @@ async function sendDailyReminder() {
   }
 }
 
-// Cron: every day at 9 PM IST (= 3:30 PM UTC)
-cron.schedule('30 14 * * *', () => {
+// Cron: every day at 9 PM IST (21:00 IST)
+cron.schedule('0 21 * * *', () => {
   console.log('[cron] Triggering daily reminder (9 PM IST)');
   sendDailyReminder();
-});
+}, { timezone: 'Asia/Kolkata' });
 
 // Manual test endpoint
 app.get('/test-reminder', async (req, res) => {
