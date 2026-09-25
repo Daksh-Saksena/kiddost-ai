@@ -512,6 +512,9 @@ VALUE PACKAGES & MULTIPLE CHILDREN / TWINS (packages/plans/bundles/monthly packa
 - CRITICAL: NEVER ask for the child's age if ANY age was ALREADY mentioned anywhere in the conversation history or KNOWN FACTS (including "10 months", "4 months", "1.5", "2", etc.). The customer already shared their child's age!
 - If the child's age was ALREADY mentioned: Go DIRECTLY to sending the package details below. You are STRICTLY FORBIDDEN from asking for age again.
 - ONLY ask "Could I please know the child's age first?" if the child's age was NEVER mentioned anywhere in the entire conversation history AND is absent from KNOWN FACTS.
+- ANY INQUIRY ABOUT MONTHLY PACKAGES / VALUE PACKAGES (e.g. "how can I enquire about monthly package", "can you share monthly package", "tell me about monthly package", "packages after intro session"):
+  • Always treat this as a direct request to view our value package options! Do NOT give a vague reply telling them to ask later.
+  • Send [MONTH_IMAGE] and the exact value package text below so they can see our packages immediately.
 
 - INQUIRIES FOR 2 KIDS / TWINS / MULTIPLE CHILDREN (e.g. "For 1 month two kids how much cost?", "how much for 2 kids", "value package for two kids", "monthly package for 2 kids", or mentioning twins/2 children for packages):
   • THIS IS A VALUE PACKAGE INQUIRY, NOT A DISCOUNT OBJECTION! NEVER USE THE DISCOUNT REJECTION SCRIPT!
@@ -562,8 +565,13 @@ MEMBER QUALIFICATIONS / PROFILE SHARING:
 - If the user asks to see a profile or "Will you share profile?": Respond with "Sorry, we don't share our members profile. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
 - Otherwise, if asked about qualifications: Motivated, compassionate female graduates/students passionate about teaching. Comprehensive in-house training.
 
-SAME MEMBER EVERY TIME:
-- We keep 2–3 members per account for continuity, accounting for short and long leaves.
+SAME MEMBER / SAME TEACHER INQUIRIES (e.g. "will I get the same teacher every time?", "same person every time?", "will the same tutor come?"):
+- If the user asks whether they will get the same teacher, member, or tutor every time or a different one:
+  Respond EXACTLY: "We assign 2 to 3 dedicated team members per family to ensure continuity for your child while accounting for any short or long leaves."
+  End with: "Feel free to let us know if you have any questions."
+- STRICT NEGATIVE CONSTRAINT:
+  • You are STRICTLY FORBIDDEN from saying or promising that they will have the same teacher or member every time!
+  • NEVER say: "You will have the same teacher every time" or "You will get the same person every time". We rotate across 2 to 3 members per account.
 
 SAFETY / BACKGROUND CHECKS:
 - All our members are on our salary roll and we do our internal background verification before taking them onboard.
@@ -1128,8 +1136,13 @@ MEMBER QUALIFICATIONS / PROFILE SHARING:
 - If the user asks to see a profile or "Will you share profile?": Respond with "Sorry, we don't share our members profile. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
 - Otherwise, if asked about qualifications: Motivated, compassionate female graduates/students passionate about teaching. Comprehensive in-house training.
 
-SAME MEMBER EVERY TIME:
-- We keep 2–3 members per account for continuity, accounting for short and long leaves.
+SAME MEMBER / SAME TEACHER INQUIRIES (e.g. "will I get the same teacher every time?", "same person every time?", "will the same tutor come?"):
+- If the user asks whether they will get the same teacher, member, or tutor every time or a different one:
+  Respond EXACTLY: "We assign 2 to 3 dedicated team members per family to ensure continuity for your child while accounting for any short or long leaves."
+  End with: "Feel free to let us know if you have any questions."
+- STRICT NEGATIVE CONSTRAINT:
+  • You are STRICTLY FORBIDDEN from saying or promising that they will have the same teacher or member every time!
+  • NEVER say: "You will have the same teacher every time" or "You will get the same person every time". We rotate across 2 to 3 members per account.
 
 SAFETY / BACKGROUND CHECKS:
 - All our members are on our salary roll and we do our internal background verification before taking them onboard.
@@ -1445,6 +1458,13 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
       }
     }
 
+    // Safety net: Block false promise of "same teacher/member every time"
+    const SAME_MEMBER_FALSE_PROMISE_RE = /(?:you will have the same (?:teacher|member|person)|get the same (?:teacher|member|person) every time|same teacher every time)/i;
+    if (SAME_MEMBER_FALSE_PROMISE_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Blocked false 'same member every time' promise for ${fullPhone}`);
+      aiReply = "We assign 2 to 3 dedicated team members per family to ensure continuity for your child while accounting for any short or long leaves.\n\nFeel free to let us know if you have any questions.";
+    }
+
     console.log("AI Reply (buffered):", aiReply);
 
     // ── UNSURE handling ───────────────────────────────────────────────────
@@ -1618,7 +1638,8 @@ Goal: Make the user feel like they are chatting with a real human agent. Answer 
           await sendAIImage('month.jpeg');
           await new Promise(r => setTimeout(r, 600));
         }
-        if (part) {
+        // Ignore empty parts or parts that consist purely of punctuation (e.g. stray '!')
+        if (part && !/^[!?,.:;'"\s]+$/.test(part)) {
           await sendAIText(part);
           if (part.toLowerCase().includes('allow me to check the slot availability')) {
             sendPushToAll({
@@ -3176,8 +3197,13 @@ MEMBER QUALIFICATIONS / PROFILE SHARING:
 - If the user asks to see a profile or "Will you share profile?": Respond with "Sorry, we don't share our members profile. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
 - Otherwise, if asked about qualifications: Motivated, compassionate female graduates/students passionate about teaching. Comprehensive in-house training.
 
-SAME MEMBER EVERY TIME:
-- We keep 2–3 members per account for continuity, accounting for short and long leaves.
+SAME MEMBER / SAME TEACHER INQUIRIES (e.g. "will I get the same teacher every time?", "same person every time?", "will the same tutor come?"):
+- If the user asks whether they will get the same teacher, member, or tutor every time or a different one:
+  Respond EXACTLY: "We assign 2 to 3 dedicated team members per family to ensure continuity for your child while accounting for any short or long leaves."
+  End with: "Feel free to let us know if you have any questions."
+- STRICT NEGATIVE CONSTRAINT:
+  • You are STRICTLY FORBIDDEN from saying or promising that they will have the same teacher or member every time!
+  • NEVER say: "You will have the same teacher every time" or "You will get the same person every time". We rotate across 2 to 3 members per account.
 
 SAFETY / BACKGROUND CHECKS:
 - All our members are on our salary roll and we do our internal background verification before taking them onboard.
