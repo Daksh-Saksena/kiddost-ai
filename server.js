@@ -381,6 +381,16 @@ const aiProcessingPerPhone = new Set();
 const otpStore = {};
 
 function getSystemPrompt(varsBlock = "", sessionStatusBlock = "", exampleBlock = "") {
+  const nowKolkata = new Date();
+  const dayOfWeekIST = nowKolkata.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+  const isSundayToday = dayOfWeekIST.toLowerCase() === 'sunday';
+  const isSaturdayToday = dayOfWeekIST.toLowerCase() === 'saturday';
+  const todayStatusStr = isSundayToday
+    ? 'Sunday (CLOSED — KidDost is closed on Sundays! Any request for "today" or "Sunday" must be rejected with "Currently, we are operational Monday to Saturday.")'
+    : isSaturdayToday
+    ? 'Saturday (A regular WORKING DAY — Monday to Saturday). TOMORROW IS SUNDAY (CLOSED — KidDost is closed on Sundays! Any request for "tomorrow" or "Sunday" must be rejected with "Currently, we are operational Monday to Saturday.")'
+    : `${dayOfWeekIST} (A regular WORKING DAY — Monday to Saturday)`;
+
   return `You are a WhatsApp assistant for KidDost, a child engagement and tutoring service in Bangalore for children aged 1 to 8 years (we also make exceptions for infants from 4 months).
 
 Your tone:
@@ -390,8 +400,8 @@ Your tone:
 - Never robotic or overly formal
 - NO emojis — ever
 
-CURRENT TIME: ${new Date().toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
-TODAY IS: ${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' })} ${new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase() === 'sunday' ? '(CLOSED - Sunday)' : '(A regular WORKING DAY — Monday to Saturday)'}
+CURRENT TIME: ${nowKolkata.toLocaleString('en-IN', { weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' })} IST (24-hour format)
+TODAY IS: ${todayStatusStr}
 
 CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
@@ -402,6 +412,7 @@ CRITICAL RULES:
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Do NOT repeat "Feel free to let us know if you have any questions." unnecessarily. Include it at the end of the pricing/activities info block, or when the user says they will let us know / are not ready.
 - GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
+- ACKNOWLEDGMENTS RULE: If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool") with no new question, respond with: "Feel free to let us know if you have any questions." or simply wait for their next question. You are STRICTLY FORBIDDEN from treating simple "Ok" as hesitation/rejection! NEVER send "Thank you for considering our services! If you ever need ad-hoc support..." for a simple "Ok"!
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
@@ -461,8 +472,18 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
   Reply: "All our members are educated female graduates or students who engage children with educational activities, worksheets, puzzles, and homework help. While they are not school teachers, they are thoroughly trained in child engagement and learning."
   NEVER use the special needs script for this!
 - ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
-- REJECTION / HESITATION RULE: If the user says they will let us know, will think about it, will get back to us, or says they are not interested right now (e.g. "I will get back to you", "I will let you know", "will inform you", "ok thanks I will let you know", "not right now", "no I'm not interested", "don't want it"):
+- REJECTION / HESITATION RULE: ONLY if the user explicitly says they will let us know, will think about it, will get back to us, or says they are not interested right now (e.g. "I will get back to you", "I will let you know", "will inform you", "ok thanks I will let you know", "not right now", "no I'm not interested", "don't want it"):
   Reply EXACTLY: "Thank you for considering our services! If you ever need ad-hoc support, don’t hesitate to reach out. We’re here to help."
+  STRICT NEGATIVE CONSTRAINT:
+  • NEVER trigger this rule for simple acknowledgements like "Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool"!
+  • A customer saying "Ok" is just acknowledging your previous message — they are NOT leaving or rejecting!
+  • If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Sure", "Got it"), respond with: "Feel free to let us know if you have any questions."
+- WEEKENDS INQUIRY RULE: If the user asks whether we offer sessions on weekends, come on weekends, or mentions "weekend" / "weekends" in general (e.g. "You also come over weekend for introductory session?", "Do you come on weekends?", "Do you work on weekends?", "weekend sessions available?"):
+  Reply EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays."
+  STRICT NEGATIVE CONSTRAINT:
+  • NEVER say "Yes, we can schedule on a weekend."
+  • NEVER ask "What time slot would work best for you?" when asked about weekends.
+  • You MUST ALWAYS explicitly clarify that we are open on Saturdays but closed on Sundays.
 - INSTAGRAM RULE: If the user asks for our Instagram, insta page, or social media, reply EXACTLY: "Our insta handle is @kiddostbangalore"
 - TESTIMONIALS RULE: ONLY if the user SPECIFICALLY asks for testimonials or reviews (e.g. "can I see reviews", "do you have testimonials", "what do parents say"), reply EXACTLY: "These are our 70+ 5-star reviews: https://maps.app.goo.gl/oQKgPNpPhSsavfiM9"
 - NEVER end your messages with proactive questions asking if they want to book, proceed, or schedule (e.g. NEVER say "Would you like to schedule a session?", "If you'd like to proceed with booking..."). Only answer their specific question and wait for them to ask to book.
@@ -624,6 +645,9 @@ BUSINESS HOURS:
   • If the user asks if we offer service on Sunday, asks about Sundays, or asks for a session on Sunday (e.g. "Do you offer service on sunday", "are you open on sunday?", "can you come on sunday?"):
     Respond EXACTLY: "Currently, we are operational Monday to Saturday."
   • If today is Sunday and the user asks for "today", politely inform them: "Currently, we are operational Monday to Saturday."
+  • IF TODAY IS SATURDAY AND THE USER ASKS FOR "TOMORROW" (e.g. "How about tomorrow 3 to 4 pm", "can you come tomorrow?", "tomorrow afternoon"):
+    Tomorrow is Sunday! You MUST reject with EXACTLY: "Currently, we are operational Monday to Saturday."
+    STRICT NEGATIVE CONSTRAINT: DO NOT ask for their name, locality, or proceed with booking for Sunday!
   • STRICT RULE: NEVER say "We will get back to you to confirm a session on another day." NEVER assume or promise a booking confirmation when they simply asked about our operational days.
 - TODAY REQUESTS ON WORKING DAYS (Monday–Saturday): If today is a regular working day (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday), any request for "today" (e.g. "can you send someone today", "how about today?", "are you free today?") is 100% VALID! NEVER reject it, and NEVER say we are only operational Monday to Saturday. If child's age is already known, ask for the missing booking details (preferred time slot and locality), e.g. "What time slot would work best for you today, and could you please share your area or locality?"
 - IMPORTANT: Only use the out-of-hours message when the requested time is unambiguously outside 9:00 AM-7:45 PM (examples: 7 AM, 8 PM, 9 PM, 6 AM). Treat 5 PM-6 PM as VALID and within operational hours. If the time is ambiguous (e.g., "this afternoon") or plausibly within the window, do NOT reject it; proceed normally to gather details.
@@ -645,7 +669,8 @@ BEFORE BOOKING:
 
 - WHEN USER EXPLICITLY ASKS TO BOOK:
   - Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday). Sunday is our ONLY closed day.
-    • If today is Sunday, reject "today" requests immediately. If today is Saturday, reject "tomorrow" requests (if tomorrow is Sunday).
+    • If today is Sunday, reject "today" requests immediately with "Currently, we are operational Monday to Saturday."
+    • If today is Saturday and the user asks for "tomorrow", reject immediately with "Currently, we are operational Monday to Saturday." NEVER start collecting name, time slot, or location for a Sunday session!
     • If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g. 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?"
   - Step 2: Ensure the child's age is known.
     • CRITICAL: If age is unknown, you MUST ask: "Could I please know the child's age first?" before asking for parent's name or location.
@@ -1197,6 +1222,32 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       } else {
         aiReply = "Could I please know your child's age first?";
       }
+    }
+
+    // Safety net: Block false rejection/hesitation exit on pure acknowledgments like "Ok", "Okay"
+    const PURE_ACKNOWLEDGMENT_RE = /^[\s\.\,\!\?]*\b(ok|okay|k|got it|sure|alright|cool|noted)\b[\s\.\,\!\?]*$/i;
+    const AD_HOC_REPLY_RE = /Thank you for considering our services! If you ever need ad-hoc support/i;
+    if (PURE_ACKNOWLEDGMENT_RE.test(combinedMessage) && AD_HOC_REPLY_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Blocked false hesitation exit on pure acknowledgment "${combinedMessage}" for ${fullPhone}`);
+      aiReply = "Feel free to let us know if you have any questions.";
+    }
+
+    // Safety net: Enforce weekend rule (must clarify Saturdays open, Sundays closed)
+    const isAskingAboutWeekends = /\b(weekends?)\b/i.test(combinedMessage);
+    if (isAskingAboutWeekends && !/(?:closed on sundays|operational monday to saturday)/i.test(aiReply)) {
+      console.warn(`[SAFETY NET] Enforcing weekend rule for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "We offer sessions on Saturdays, but we are closed on Sundays.";
+    }
+
+    // Safety net: Enforce Sunday closure on Sundays or Saturday "tomorrow" requests
+    const todayDayName = new Date().toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' }).toLowerCase();
+    const isSaturdayToday = todayDayName === 'saturday';
+    const isAskingForSunday = /\bsundays?\b/i.test(combinedMessage);
+    const isAskingForTomorrowOnSat = isSaturdayToday && /\btomorrow\b/i.test(combinedMessage);
+    const isAskingForTodayOnSun = isSundayToday && /\b(today|tonight)\b/i.test(combinedMessage);
+    if ((isAskingForSunday || isAskingForTomorrowOnSat || isAskingForTodayOnSun) && !SUNDAY_REJECTION_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Enforcing Sunday closure rejection for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "Currently, we are operational Monday to Saturday.";
     }
 
     // Safety net: Block false promise of "same teacher/member every time"
