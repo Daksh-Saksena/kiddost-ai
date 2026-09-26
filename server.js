@@ -477,7 +477,7 @@ PRICING / SERVICES / QUOTATION:
   • Age 1 to under 2 (including 1.5 years, 18 months): "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, playtime with toys, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, toys, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, board games, LEGO building, storybook reading etc. We can also help in reinforcing concepts like phonics, writing practice etc. Additionally our members can also take them to park for physical activity."
-  • Age 4 to 8: "For this age category we engage the child with puzzles, memory games, art and craft, board games, LEGO building, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
+  • Age 4 to 8: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity."
   • Age above 8: Apologise — services are for children aged 1 to 8 years, you are not the right fit.
 - When sharing activities for the child's age for the first time:
   1. Write the activities for their age bracket.
