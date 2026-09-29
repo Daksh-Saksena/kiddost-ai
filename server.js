@@ -588,12 +588,12 @@ MATERIALS / SUPPLIES — HIGHEST PRIORITY RULE FOR THIS TOPIC:
 
 MEMBER QUALIFICATIONS:
 - If the user asks about member qualifications, background, who our members/trainers/tutors are, or what kind of people come (e.g. "what are your member qualifications?", "who will come?", "what type of trainers get assigned?", "are they qualified?"):
-  Respond: "Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
-  STRICT NEGATIVE CONSTRAINT: You are STRICTLY FORBIDDEN from saying "Sorry, we don't share our members profile" unless they explicitly asked to see or share a profile!
+  Respond: "Our team comprises motivated and compassionate female graduates and students who are passionate about teaching and mentoring. They have all completed our comprehensive in-house training program, which equips them with the skills to deliver engaging and supportive learning experiences. All our members are on our payroll and we conduct an internal background verification before onboarding them."
+  STRICT NEGATIVE CONSTRAINT: You are STRICTLY FORBIDDEN from saying "Sorry, we don't share our members profile" unless they explicitly asked to see or share a profile, IDs, or credentials!
 
 PROFILE, ID DOCUMENTS & CREDENTIALS SHARING REQUESTS:
-- If the user explicitly asks to SEE, SHARE, or RECEIVE a team member's profile, resume, bio, photo, ID documents, identity proof, government ID, Aadhaar, verification documents, or credentials in advance (e.g. "Can I see their profile?", "Will you share their profile?", "Can you share the tutor's resume?", "Will it be possible to share the ID documents of the person when they come?", "Will it be possible to know the credentials of the person in advance?", "Can I see their Aadhaar card?"):
-  Respond EXACTLY: "Sorry, we don't share our members profile or personal ID documents. All our members are on our salary roll and undergo internal background verification before onboarding. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
+- If the user explicitly asks to SEE, SHARE, or RECEIVE a team member's profile, resume, bio, photo, ID documents, identity proof, government ID, Aadhaar, verification documents, or credentials in advance (e.g. "Can I see their profile?", "Will you share their profile?", "Can you share the tutor's resume?", "Will it be possible to share the ID documents of the person when they come?", "Will it be possible to know the credentials of the person in advance?", "Can I see their Aadhaar card?", "We don't circulate the ids"):
+  Respond EXACTLY: "Sorry, we don't share our members profile or personal ID documents. Our team comprises motivated and compassionate female graduates and students who are passionate about teaching and mentoring. They have all completed our comprehensive in-house training program, which equips them with the skills to deliver engaging and supportive learning experiences. All our members are on our payroll and we conduct an internal background verification before onboarding them."
   End with: "Feel free to let us know if you have any questions."
 - STRICT NEGATIVE CONSTRAINT:
   • You are STRICTLY FORBIDDEN from promising, agreeing to share, or saying we can provide ID documents, credentials, background check reports, or profiles in advance!
@@ -608,7 +608,7 @@ SAME MEMBER / SAME TEACHER INQUIRIES & PREFERENCES:
   • NEVER say: "We can accommodate daily service with the same person", "You will have the same teacher every time", or "You will get the same person every time". We rotate across 2 to 3 members per account.
 
 SAFETY / BACKGROUND CHECKS:
-- All our members are on our salary roll and we do our internal background verification before taking them onboard.
+- All our members are on our payroll and we conduct an internal background verification before onboarding them.
 - Parents do not need to be present during the session — our members are trained professionals and the child can be left with them comfortably.
 
 BOT / AI IDENTITY INQUIRY:
@@ -1294,7 +1294,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const ID_CREDENTIALS_PROMISE_RE = /(?:provide|share|send|give).*(?:id documents?|credentials?|identity proof|id proof).*(?:in advance|when they come|peace of mind)/i;
     if (ID_CREDENTIALS_PROMISE_RE.test(aiReply) || (ID_CREDENTIALS_REQUEST_RE.test(combinedMessage) && !/don'?t share our members?['\s]+(?:profiles?|personal ID)/i.test(aiReply))) {
       console.warn(`[SAFETY NET] Intercepting ID documents/credentials request for ${fullPhone}. User message: "${combinedMessage}"`);
-      aiReply = "Sorry, we don't share our members profile or personal ID documents. All our members are on our salary roll and undergo internal background verification before onboarding. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences.\n\nFeel free to let us know if you have any questions.";
+      aiReply = "Sorry, we don't share our members profile or personal ID documents. Our team comprises motivated and compassionate female graduates and students who are passionate about teaching and mentoring. They have all completed our comprehensive in-house training program, which equips them with the skills to deliver engaging and supportive learning experiences. All our members are on our payroll and we conduct an internal background verification before onboarding them.\n\nFeel free to let us know if you have any questions.";
     }
 
     // Safety net: Enforce location precedence over booking detail collection

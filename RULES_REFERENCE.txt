@@ -92,10 +92,10 @@ We can customize the package as per your requirement once we have done the first
 
 ## 6. TEAM, QUALIFICATIONS & OPERATIONS
 - Member Qualifications (When asked what qualifications they have, who comes, what type of trainers, or member background):
-  "Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
+  "Our team comprises motivated and compassionate female graduates and students who are passionate about teaching and mentoring. They have all completed our comprehensive in-house training program, which equips them with the skills to deliver engaging and supportive learning experiences. All our members are on our payroll and we conduct an internal background verification before onboarding them."
   STRICT RULE: Do NOT say "Sorry, we don't share our members profile" unless they explicitly asked to see or share a profile, IDs, or credentials!
 - Profile, ID Documents & Credentials Sharing (If explicitly asked to SEE or SHARE a member's profile/resume/bio, ID documents, government IDs, Aadhaar, verification documents, or credentials in advance):
-  "Sorry, we don't share our members profile or personal ID documents. All our members are on our salary roll and undergo internal background verification before onboarding. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
+  "Sorry, we don't share our members profile or personal ID documents. Our team comprises motivated and compassionate female graduates and students who are passionate about teaching and mentoring. They have all completed our comprehensive in-house training program, which equips them with the skills to deliver engaging and supportive learning experiences. All our members are on our payroll and we conduct an internal background verification before onboarding them."
   End with: "Feel free to let us know if you have any questions."
   STRICT NEGATIVE CONSTRAINT: NEVER promise or agree to share ID documents, credentials, or profiles in advance.
 - Teachers / Tutoring (When asked "do you have teachers?", "are they teachers?", "can you send a teacher?"):
@@ -107,7 +107,7 @@ We can customize the package as per your requirement once we have done the first
 - Materials / Supplies:
   "Our team brings all the necessary materials for the activities, including puzzles, flashcards, storybooks, and art & craft supplies. You don't need to arrange anything."
 - Safety / Background Checks:
-  All members are on our salary roll and undergo internal background verification before onboarding. Parents do not need to be present during sessions; child can be left comfortably with them.
+  All our members are on our payroll and we conduct an internal background verification before onboarding them. Parents do not need to be present during sessions; child can be left comfortably with them.
 - Scope of Care (Other Baby Work):
   Scope is limited to fun and learning activities. We do not handle feeding, bathing, diaper changes, or other caretaking tasks. Light snacks can be encouraged if the child is not a fussy eater.
 - Nanny Services (or "permanent basis"):
