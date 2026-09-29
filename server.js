@@ -480,6 +480,8 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
   Reply EXACTLY: "Thank you for considering our services! If you ever need ad-hoc support, don’t hesitate to reach out. We’re here to help."
   STRICT NEGATIVE CONSTRAINT:
   • NEVER trigger this rule for simple acknowledgements like "Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool"!
+  • NEVER trigger this rule for job inquiries, applicants, hiring questions, or anyone asking about vacancies/work (e.g. "if you have vacancy let me know", "looking for job", "let me know if any opening"). A job applicant is NOT a customer!
+  • ONLY trigger this rule when the customer says THEY will let us know (e.g. "I will let you know", "I will get back to you"). Do NOT trigger when the user asks US to let THEM know ("let me know")!
   • A customer saying "Ok" is just acknowledging your previous message — they are NOT leaving or rejecting!
   • If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Sure", "Got it"), respond with: "Feel free to let us know if you have any questions."
 - WEEKENDS INQUIRY RULE: If the user asks whether we offer sessions on weekends, come on weekends, or mentions "weekend" / "weekends" in general (e.g. "You also come over weekend for introductory session?", "Do you come on weekends?", "Do you work on weekends?", "weekend sessions available?"):
@@ -498,7 +500,7 @@ PRICING / SERVICES / QUOTATION:
 - Once age is known, calculate the child's age based on Today's Date (if a DOB is provided). Give the appropriate activities response for their EXACT age bracket ONLY. NEVER output multiple contradictory age scripts (e.g. do not say they are 2 years old and also under 4 months).
 - CRITICAL: If activities were ALREADY shared earlier in the conversation history, DO NOT repeat or re-send the activities! Jump straight to answering their pricing question.
   • Under 4 months (e.g. 1 month, 2 months, 3 months): Use this EXACT script: "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time." NEVER use the special needs script for this.
-  • 4 months to under 1 year (infants aged 4 to 11 months, e.g. 4m, 6 months, 9 months, 10 months): DO NOT reject them! Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English." NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
+  • 4 months to under 1 year (infants aged 4 to 11 months, e.g. 4m, 6 months, 9 months, 10 months): DO NOT reject them! Use this EXACT script: "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English.\n\nFeel free to let us know if you have any questions." NEVER combine this message with any other rules (like checking locations or booking). Just send this script alone.
   • Age 1 to under 2 (including 1.5 years, 18 months): "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, playtime with toys, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play."
   • Age 2: "For this age category we engage the child with verbal interaction, age appropriate puzzles, toys, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity."
   • Age 3: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing etc. Additionally our members can also take them to park for physical activity."
@@ -569,14 +571,25 @@ We can customize the package as per your requirement once we have done the first
 JOB INQUIRIES / HIRING:
 - If a user asks about job openings, hiring, "job available hai", "vacancy", "is there any vacancy", careers, working at KidDost, or submitting a resume:
 
-  • If the current message ALREADY contains a document/file attachment (resume/CV), respond with EXACTLY:
-  "Could you please tell your location in Bangalore? We will get back to you."
+  • If the current message ALREADY contains a document/file attachment (resume/CV):
+    - If location is unknown: "Could you please tell your location in Bangalore? We will get back to you."
+    - If location is already known: "Thank you! We will review your profile and get back to you."
 
-  • If NO resume/document is attached yet, respond with EXACTLY:
-  "Could you please tell your location in Bangalore and share your resume? We will get back to you."
+  • If NO resume/document is attached yet:
+    - If location in Bangalore is NOT known yet:
+      "Could you please tell your location in Bangalore and share your resume? We will get back to you."
+    - If location in Bangalore was ALREADY shared earlier:
+      "Thank you for sharing your location! Please share your resume, and we will get back to you."
 
-- IMPORTANT:
-  • If the user already shared a resume earlier in the conversation, NEVER ask for the resume again.
+  • If the user acknowledges or follows up without attaching a resume (e.g. "if you have vacancy let me know", "looking for job", "let me know", "okay"):
+    Respond EXACTLY: "Please share your resume, and we will get back to you."
+
+  • If the user already shared a resume earlier in the conversation:
+    Respond EXACTLY: "Thank you! We will review your profile and get back to you."
+
+- STRICT NEGATIVE CONSTRAINT:
+  • You are STRICTLY FORBIDDEN from sending the customer hesitation / ad-hoc support message ("Thank you for considering our services! If you ever need ad-hoc support...") to a job applicant or in any hiring/vacancy conversation!
+  • A job applicant saying "if you have vacancy let me know" is asking us to contact them about jobs — they are NOT a customer hesitating or rejecting services!
   SESSION LENGTH / DURATION:
 - If the user asks about session length, duration, or a specific amount of time (e.g. "how long are the sessions", "For 2 hrs?", "1 hour?", "2 hours"), answer EXACTLY: "You can book as per your requirement."
 - NEVER say "Our sessions are typically booked for one hour." This is incorrect and you must not say it.
@@ -635,11 +648,20 @@ VALUE PACKAGE USAGE / VALIDITY / 11 SESSIONS INQUIRIES (e.g. "11 sessions for a 
 TOO EXPENSIVE / OUT OF BUDGET / DISCOUNTS (ONLY for explicit price complaints or bargaining):
 - CRITICAL: ONLY trigger this rule if the customer EXPLICITLY complains that the price is too high or asks for a discount/cheaper rate (e.g., "too expensive", "prices are high", "can you give discount", "any discount", "reduce price", "best price you can do", "out of my budget", "give some concession").
 - NEVER trigger this rule for inquiries asking about prices, monthly packages, packages after intro session, how to enquire about packages, session counts, package usage, validity, or package rates (e.g., "After the introductory session how can I enquire about monthly package", "how can I enquire about monthly package", "11 sessions for a month?", "For 1 month two kids how much cost?", "what is the cost", "how much will it be", "what is the discounted rate?", "how much is the discounted rate?"). Those are package inquiries, NOT price complaints or bargaining! Treat them under the VALUE PACKAGES rule directly.
-- If the user explicitly complains about price or asks for a discount:
-  1. FIRST, check the conversation history. Have you already offered them Value Packages?
-  2. If NO (Value Packages have NOT been offered yet): Do not use the discount rejection. Instead, pivot to Value Packages: "We also offer value packages which give you a bundle of sessions at a discounted rate!" Then proceed to use the VALUE PACKAGES rule (share the images and the exact script).
-  3. If YES (Value Packages have already been offered) AND they explicitly say the package is still too expensive or demand further discounts: Reply EXACTLY: "Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
-- If the user repeats the objection again, do NOT repeat the same message. Instead, move to: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out." Then reply UNSURE to any further conversation until a human agent takes over.
+- If the user explicitly complains about price or asks for a discount, follow these 3 steps in strict sequence:
+  • STEP 1 (1st price complaint / complaint before packages shown):
+    If Value Packages have NOT been shown yet, pivot to Value Packages: "We also offer value packages which give you a bundle of sessions at a discounted rate!" Then proceed to use the VALUE PACKAGES rule (share the images and the exact script).
+  • STEP 2 (2nd price complaint / complaint AFTER Value Packages were already shared):
+    If Value Packages were already shown and the customer still complains about price or says it's expensive (e.g. "500rs per hour looks expensive", "Thank you this is expensive", "still too costly", "any further discount"):
+    You MUST reply with the competitive pricing script EXACTLY:
+    "Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding."
+    STRICT NEGATIVE CONSTRAINT:
+    - You are STRICTLY FORBIDDEN from jumping straight to the ad-hoc support exit on the 2nd complaint!
+    - Even if the user message contains "Thank you" (e.g. "Thank you this is expensive"), you MUST send this competitive pricing script!
+  • STEP 3 (3rd price complaint / customer repeats objection AFTER receiving the competitive pricing script above):
+    ONLY after the user has ALREADY received the "Regarding discounts, we've already offered our most competitive pricing..." message and STILL objects again:
+    Reply EXACTLY: "Thank you for considering our services. If you ever need ad-hoc support in the future, feel free to reach out."
+    Then reply UNSURE to any further conversation until a human agent takes over.
 
 PAYMENT POLICY:
 - If the user asks to pay on delivery, at doorstep, after session, or "I would like to pay when tutor reaches my doorstep":
@@ -1254,6 +1276,31 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       aiReply = "Feel free to let us know if you have any questions.";
     }
 
+    // Safety net: Block false customer hesitation / ad-hoc message in hiring/job inquiry conversations
+    const allConvTextForJob = [
+      combinedMessage,
+      ...history.map(m => m.content)
+    ].join(' ');
+    const isJobContext = /\b(job|jobs|vacancy|vacancies|hiring|work|career|internship|resume|cv)\b/i.test(allConvTextForJob);
+    if (isJobContext && (AD_HOC_REPLY_RE.test(aiReply) || /Thank you for considering our services/i.test(aiReply))) {
+      console.warn(`[SAFETY NET] Blocked false hesitation exit in job inquiry for ${fullPhone}. User message: "${combinedMessage}"`);
+      const hasLocation = /\b(bangalore|bengaluru|koramangala|btm|whitefield|hsr|indiranagar|jp nagar|marathahalli|electronic city|jayanagar|malleshwaram|hebbal|yelahanka|sarjapur|bellandur)\b/i.test(allConvTextForJob);
+      if (hasLocation) {
+        aiReply = "Please share your resume, and we will get back to you.";
+      } else {
+        aiReply = "Could you please tell your location in Bangalore and share your resume? We will get back to you.";
+      }
+    }
+
+    // Safety net: Enforce 2nd-step competitive pricing script before ad-hoc exit
+    const allHistoryText = history.map(m => m.content).join(' ');
+    const COMPETITIVE_PRICING_RE = /most competitive pricing/i;
+    const isPriceComplaint = /\b(expensive|costly|price|pricing|discount|budget)\b/i.test(combinedMessage);
+    if (isPriceComplaint && AD_HOC_REPLY_RE.test(aiReply) && !COMPETITIVE_PRICING_RE.test(allHistoryText)) {
+      console.warn(`[SAFETY NET] Enforcing competitive pricing script before exit for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "Regarding discounts, we've already offered our most competitive pricing. Our pricing structure remains consistent for all clients, including long-term renewals. We are doing our annual adjustments in near future and the current pricing is available for limited time period. We appreciate your understanding.";
+    }
+
     // Safety net: Enforce weekend rule (must clarify Saturdays open, Sundays closed)
     const isAskingAboutWeekends = /\b(weekends?)\b/i.test(combinedMessage);
     if (isAskingAboutWeekends && !/(?:closed on sundays|operational monday to saturday)/i.test(aiReply)) {
@@ -1675,9 +1722,23 @@ async function sendWelcome(fullPhone) {
     const sentFollowUp = await sendText('Feel free to let us know if you have any questions.');
     if (!sentFollowUp) return;
 
-    await new Promise(r => setTimeout(r, 800));
+    // 4. Ask age — only if age is not already provided, AI hasn't answered, and it's not a job inquiry
+    const { data: convNow } = await supabase.from('conversations').select('vars').eq('phone', fullPhone).maybeSingle();
+    const hasAgeInVars = convNow?.vars?.children?.some(c => c.age);
 
-    // 4. Ask age
+    const { data: allUserMsgs } = await supabase.from('messages').select('content').eq('phone', fullPhone).eq('sender', 'user');
+    const allUserText = (allUserMsgs || []).map(m => m.content).join(' ');
+    const mentionsAge = /\b(\d{1,2}\s*(?:years?|yrs?|months?|m|yo|y\/o)|dob|born|infant|toddler)\b/i.test(allUserText);
+    const isJobInquiry = /\b(job|jobs|vacancy|vacancies|hiring|work|career|internship|resume|cv)\b/i.test(allUserText);
+
+    const { data: aiMsgs } = await supabase.from('messages').select('id, content').eq('phone', fullPhone).eq('role', 'assistant').neq('content', '');
+    const hasSubstantiveAiReply = (aiMsgs || []).some(m => !m.content.includes('thank you for contacting') && !m.content.includes('questions'));
+
+    if (hasAgeInVars || mentionsAge || isJobInquiry || hasSubstantiveAiReply || aiProcessingPerPhone.has(fullPhone)) {
+      console.log(`[welcome] Skipping age prompt for ${fullPhone} (ageKnown=${hasAgeInVars || mentionsAge}, job=${isJobInquiry}, aiReplied=${hasSubstantiveAiReply})`);
+      return;
+    }
+
     await sendText('Could you please share your child’s age with us?');
     console.log('[welcome] sent to', fullPhone);
   } catch (e) {
@@ -2323,8 +2384,11 @@ app.post("/webhook", async (req, res) => {
       await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
     }
 
-    if (isNewUser && !isAiPaused && !dbCheckFailed) {
-      // Trigger welcome sequence for brand-new users (don't await — fire and forget)
+    const GENERIC_OPENING_RE = /^[\s\.\,\!\?]*\b(hi|hello|hey|good\s+(?:morning|afternoon|evening)|can i get more info(?: on this)?|get more info|more info|info|details|kiddost)\b[\s\.\,\!\?]*$/i;
+    const isGenericGreeting = !message || GENERIC_OPENING_RE.test(message.trim());
+
+    if (isNewUser && !isAiPaused && !dbCheckFailed && isGenericGreeting) {
+      // Trigger welcome sequence for brand-new users sending generic greetings (don't await — fire and forget)
       sendWelcome(fullPhone).catch(e => console.error('[welcome] error', e.message));
     }
 
@@ -2470,8 +2534,8 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ success: true, ai_skipped: true });
     }
 
-    // Only buffer text messages for AI (ignore pure media for AI, and skip for brand-new users)
-    if (message && !isNewUser) {
+    // Only buffer text messages for AI (ignore pure media for AI, and skip for brand-new users ONLY if they sent a pure generic greeting)
+    if (message && (!isNewUser || !isGenericGreeting)) {
       if (!messageBuffers[fullPhone]) messageBuffers[fullPhone] = [];
       messageBuffers[fullPhone].push(message);
       if (shouldWelcomeBack) welcomeBackFlags[fullPhone] = true;

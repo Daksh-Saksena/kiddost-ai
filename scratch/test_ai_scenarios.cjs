@@ -253,8 +253,59 @@ async function runAll() {
   console.log("Test 14 Result:", pass14 ? "PASS ✅" : "FAIL ❌");
   console.log();
 
-  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14;
-  console.log("OVERALL RESULT:", allPassed ? "ALL 14 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
+  // Test 15: Job applicant follow-up (Must NOT send ad-hoc exit, must ask for resume)
+  console.log("--- Test 15: Job Applicant Follow-up ---");
+  const reply15 = await callAI(
+    [
+      { role: "user", content: "Any vacancies, hiring?" },
+      { role: "assistant", content: "Could you please tell your location in Bangalore and share your resume? We will get back to you." },
+      { role: "user", content: "Malleshwaram" },
+      { role: "assistant", content: "Thank you for sharing your location! Please share your resume, and we will get back to you." }
+    ],
+    "Maam im looking for job if you have any vacancy let me know\nOkay"
+  );
+  console.log("User: Maam im looking for job if you have any vacancy let me know\\nOkay");
+  console.log("AI:", reply15);
+  const pass15 = /share your resume/i.test(reply15) &&
+    !/considering our services/i.test(reply15) &&
+    !/ad-hoc support/i.test(reply15);
+  console.log("Test 15 Result:", pass15 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 16: 2nd Price complaint after value packages (Must send competitive pricing, NOT exit)
+  console.log("--- Test 16: 2nd Price Complaint After Value Packages ---");
+  const reply16 = await callAI(
+    [
+      { role: "user", content: "She is 3 yrs old" },
+      { role: "assistant", content: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing etc. Additionally our members can also take them to park for physical activity.\n\n[PRICING_IMAGE]\nWe suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." },
+      { role: "user", content: "500rs per hour for this age looks expensive" },
+      { role: "assistant", content: "We also offer value packages which give you a bundle of sessions at a discounted rate!\n\n[MONTH_IMAGE]\nOur KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.\n\nFeel free to let us know if you have any questions." }
+    ],
+    "Thank you this is expensive"
+  );
+  console.log("User: Thank you this is expensive");
+  console.log("AI:", reply16);
+  const pass16 = /most competitive pricing/i.test(reply16) &&
+    !/ad-hoc support/i.test(reply16);
+  console.log("Test 16 Result:", pass16 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 17: User opening message mentioning age (Must NOT ask for child's age)
+  console.log("--- Test 17: Opening Message Mentioning Age ---");
+  const reply17 = await callAI(
+    [],
+    "Cost for teaching craft for 3 yr old\nOr painting"
+  );
+  console.log("User: Cost for teaching craft for 3 yr old\\nOr painting");
+  console.log("AI:", reply17);
+  const pass17 = /puzzles|memory games|art and craft/i.test(reply17) &&
+    !/Could I please know the child'?s age/i.test(reply17) &&
+    !/share your child'?s age/i.test(reply17);
+  console.log("Test 17 Result:", pass17 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17;
+  console.log("OVERALL RESULT:", allPassed ? "ALL 17 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
 }
 
 runAll().catch(console.error);
