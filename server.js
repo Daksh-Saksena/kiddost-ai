@@ -440,6 +440,10 @@ HARD NEVER-DO LIST (violations are critical failures):
   • "Shall I book a session for you?"
   • "When would you like to start?"
   You must WAIT for the user to explicitly ask to book. When answering any question, simply answer the question and stop.
+- NEVER promise or agree to provide the same member, person, or teacher every time (e.g. "We can accommodate daily service with the same person"). We rotate across 2 to 3 dedicated members per account.
+- NEVER promise or agree to share team members' ID documents, personal IDs, Aadhaar, verification documents, or credentials in advance. Company policy strictly forbids sharing profiles or personal ID documents.
+- NEVER ignore a user's stated location or area to ask for date, time slot, or parent name. Serviceability check takes absolute priority.
+- NEVER treat "I need to check" or a customer checking their own calendar as a refusal, and never say "Allow me to check slot availability" when no date/time/location was provided.
 - NEVER do mathematical calculations or multiply hours to invent pricing. Follow the exact fixed pricing table only.
 - NEVER call our services "daily care" or "daily care sessions". We provide child engagement and tutoring sessions.
 - NEVER ask for multiple booking details (name, time, location) in a single message. ALWAYS ask for only one detail at a time.
@@ -587,17 +591,21 @@ MEMBER QUALIFICATIONS:
   Respond: "Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
   STRICT NEGATIVE CONSTRAINT: You are STRICTLY FORBIDDEN from saying "Sorry, we don't share our members profile" unless they explicitly asked to see or share a profile!
 
-PROFILE SHARING REQUESTS:
-- ONLY use this rule if the user explicitly asks to SEE or SHARE a team member's profile/resume/bio/photo (e.g. "Can I see their profile?", "Will you share their profile?", "Can you share the tutor's resume?"):
-  Respond: "Sorry, we don't share our members profile. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
+PROFILE, ID DOCUMENTS & CREDENTIALS SHARING REQUESTS:
+- If the user explicitly asks to SEE, SHARE, or RECEIVE a team member's profile, resume, bio, photo, ID documents, identity proof, government ID, Aadhaar, verification documents, or credentials in advance (e.g. "Can I see their profile?", "Will you share their profile?", "Can you share the tutor's resume?", "Will it be possible to share the ID documents of the person when they come?", "Will it be possible to know the credentials of the person in advance?", "Can I see their Aadhaar card?"):
+  Respond EXACTLY: "Sorry, we don't share our members profile or personal ID documents. All our members are on our salary roll and undergo internal background verification before onboarding. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences."
+  End with: "Feel free to let us know if you have any questions."
+- STRICT NEGATIVE CONSTRAINT:
+  • You are STRICTLY FORBIDDEN from promising, agreeing to share, or saying we can provide ID documents, credentials, background check reports, or profiles in advance!
+  • NEVER say: "We can certainly provide ID documents and credentials", "We can provide ID documents", or "We can share their credentials in advance".
 
-SAME MEMBER / SAME TEACHER INQUIRIES (e.g. "will I get the same teacher every time?", "same person every time?", "will the same tutor come?"):
-- If the user asks whether they will get the same teacher, member, or tutor every time or a different one:
+SAME MEMBER / SAME TEACHER INQUIRIES & PREFERENCES:
+- If the user asks whether they will get the same teacher/member/tutor every time, OR states a requirement/preference for the same person/teacher/member (e.g. "I am looking for a daily service with the same person", "can you send the same person", "we need the same tutor every day", "will I get the same teacher every time?", "same person every time?"):
   Respond EXACTLY: "We assign 2 to 3 dedicated team members per family to ensure continuity for your child while accounting for any short or long leaves."
   End with: "Feel free to let us know if you have any questions."
 - STRICT NEGATIVE CONSTRAINT:
-  • You are STRICTLY FORBIDDEN from saying or promising that they will have the same teacher or member every time!
-  • NEVER say: "You will have the same teacher every time" or "You will get the same person every time". We rotate across 2 to 3 members per account.
+  • You are STRICTLY FORBIDDEN from saying or promising that we can accommodate or provide the same teacher, member, or person!
+  • NEVER say: "We can accommodate daily service with the same person", "You will have the same teacher every time", or "You will get the same person every time". We rotate across 2 to 3 members per account.
 
 SAFETY / BACKGROUND CHECKS:
 - All our members are on our salary roll and we do our internal background verification before taking them onboard.
@@ -679,7 +687,16 @@ BEFORE BOOKING:
     2. Preferred date and time — ask: "What date and time would work best for you?"
     3. Area/locality — if not already known, ask: "Could you also share your area or locality so I can confirm we service your location?"
   - NEVER ask for information that the user has already provided earlier in the conversation.
-  - REFUSAL RULE: If you ask for any of these details and the user explicitly refuses (e.g. "No", "I won't share", "not required"), say EXACTLY: "No problem! Allow me to check the slot availability and get back to you." Then STOP and reply UNSURE to any further messages.
+  - CRITICAL PRECEDENCE — LOCATION OVERRIDES BOOKING FLOW: If at any point the user mentions their area, locality, or road (e.g. "My location is Sompura Gate, Sarjapura Road", "I am in Whitefield"), Rule 3 of LOCATION / SERVICEABILITY takes HIGHEST PRIORITY: respond with EXACTLY "Let me check if we can service your area and get back to you." NEVER ignore a shared location to ask for date, time, or name!
+  - SCHEDULE DELAY / USER CHECKING THEIR CALENDAR:
+    • If you asked for preferred date/time or details, and the customer says they need to check (e.g. "I need to check", "let me check", "will check and let you know", "let me check with my husband", "need to check my calendar", "let me check and confirm"):
+    • This is NOT a refusal and this is NOT KidDost checking availability! Do NOT say "Allow me to check slot availability" and do NOT reply UNSURE!
+    • Respond EXACTLY: "Sure, take your time! Feel free to let us know once you check."
+    • Leave the door open for them to share the date/time when ready.
+  - REFUSAL RULE (ONLY for explicit refusal to provide details):
+    • ONLY trigger this if the user explicitly refuses to share requested details (e.g. "No", "I won't share", "not required", "I don't want to give my name").
+    • Do NOT confuse a customer checking their own schedule ("I need to check", "let me check") with a refusal!
+    • If they explicitly refuse: say EXACTLY: "No problem! Allow me to check the slot availability and get back to you." Then STOP and reply UNSURE to any further messages.
   - NEVER ask for multiple missing details at once in a single message. Ask for only one detail at a time.
   - While gathering details, you are in normal conversation mode. Do NOT reply UNSURE during this phase.
 
@@ -703,6 +720,11 @@ TIME SLOT REQUEST:
 
 LOCATION / SERVICEABILITY:
 We operate in Bangalore (Bengaluru) ONLY. No other city.
+
+CRITICAL PRECEDENCE — LOCATION OVERRIDES BOOKING FLOW:
+- If the user's message mentions an area, road, or locality in Bangalore, or explicitly states their location (e.g. "My location is Sompura Gate, Sarjapura Road", "I am in Whitefield", "Location: HSR Layout", "When can I get a test session? My location is Sompura Gate"), Rule 3 below takes HIGHEST PRIORITY over asking for date/time or parent name!
+- You MUST respond with EXACTLY: "Let me check if we can service your area and get back to you."
+- NEVER ignore the customer's shared location to ask "What time slot would work best for you?" or "May I know your name?". Serviceability must be confirmed first!
 
 RULE 0 — USER ASKING WHERE WE ARE BASED:
 - If the user asks "where are you based?", "where is this from?", "which city?", "where do you operate?", or any similar question about OUR location:
@@ -1250,11 +1272,45 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       aiReply = "Currently, we are operational Monday to Saturday.";
     }
 
-    // Safety net: Block false promise of "same teacher/member every time"
-    const SAME_MEMBER_FALSE_PROMISE_RE = /(?:you will have the same (?:teacher|member|person)|get the same (?:teacher|member|person) every time|same teacher every time)/i;
+    // Post-processing cleanup: Strip forbidden proactive booking prompts
+    const PROACTIVE_BOOKING_PUSH_RE = /(?:(?:would you like to|shall (?:we|i)|do you want to)\s+(?:proceed with booking|schedule a session|book a session)[^\.\?!]*[\.\?!]?\s*(?:If so,?[^\.\n\?!]*[\.\?!]?)?|what date would you like to start(?: the sessions)?[^\.\?!]*[\.\?!]?)/gi;
+    if (PROACTIVE_BOOKING_PUSH_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Stripping forbidden proactive booking push from aiReply: "${aiReply}"`);
+      aiReply = aiReply.replace(PROACTIVE_BOOKING_PUSH_RE, '').trim();
+      if (!aiReply || !/[?.!]$/.test(aiReply)) {
+        aiReply = (aiReply ? aiReply + "\n\n" : "") + "Feel free to let us know if you have any questions.";
+      }
+    }
+
+    // Safety net: Block false promise of "same teacher/member every time" or accommodating single member
+    const SAME_MEMBER_FALSE_PROMISE_RE = /(?:(?:accommodate|provide|send|ensure|arrange).*(?:daily service with the )?same (?:teacher|member|person)|you will have the same (?:teacher|member|person)|get the same (?:teacher|member|person)|same (?:teacher|member|person) every time)/i;
     if (SAME_MEMBER_FALSE_PROMISE_RE.test(aiReply)) {
       console.warn(`[SAFETY NET] Blocked false 'same member every time' promise for ${fullPhone}`);
       aiReply = "We assign 2 to 3 dedicated team members per family to ensure continuity for your child while accounting for any short or long leaves.\n\nFeel free to let us know if you have any questions.";
+    }
+
+    // Safety net: Block false promise of sharing ID documents, credentials, or profiles in advance
+    const ID_CREDENTIALS_REQUEST_RE = /\b(id documents?|identity documents?|identity proof|id proof|credentials?|government id|aadhaar|id cards?)\b/i;
+    const ID_CREDENTIALS_PROMISE_RE = /(?:provide|share|send|give).*(?:id documents?|credentials?|identity proof|id proof).*(?:in advance|when they come|peace of mind)/i;
+    if (ID_CREDENTIALS_PROMISE_RE.test(aiReply) || (ID_CREDENTIALS_REQUEST_RE.test(combinedMessage) && !/don'?t share our members?['\s]+(?:profiles?|personal ID)/i.test(aiReply))) {
+      console.warn(`[SAFETY NET] Intercepting ID documents/credentials request for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "Sorry, we don't share our members profile or personal ID documents. All our members are on our salary roll and undergo internal background verification before onboarding. Our team comprises motivated and compassionate female graduates and students, who share a passion for teaching and mentoring. They have gone through our comprehensive in-house training program, equipping them with the skills to deliver engaging and supportive learning experiences.\n\nFeel free to let us know if you have any questions.";
+    }
+
+    // Safety net: Enforce location precedence over booking detail collection
+    const LOCATION_DECLARED_RE = /\b(?:my location is|location is|we are located at|we live in|area is|locality is)\b/i;
+    const BOOKING_COLLECTION_QUESTION_RE = /(?:what time slot|what date and time|may i know your name|what time would work)/i;
+    if (LOCATION_DECLARED_RE.test(combinedMessage) && BOOKING_COLLECTION_QUESTION_RE.test(aiReply) && !/service your area/i.test(aiReply)) {
+      console.warn(`[SAFETY NET] Enforcing location precedence for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "Let me check if we can service your area and get back to you.";
+    }
+
+    // Safety net: User checking their own schedule/calendar vs AI checking availability
+    const USER_CHECKING_SCHEDULE_RE = /\b(?:i need to check|let me check|will check|need to check)\b/i;
+    const AI_SLOT_CHECK_RE = /(?:allow me to check the slot availability|let me check the slot availability)/i;
+    if (USER_CHECKING_SCHEDULE_RE.test(combinedMessage) && AI_SLOT_CHECK_RE.test(aiReply) && !/\b(?:can you|could you|please)\s+check\b/i.test(combinedMessage)) {
+      console.warn(`[SAFETY NET] User is checking their own schedule, correcting false slot check for ${fullPhone}`);
+      aiReply = "Sure, take your time! Feel free to let us know once you check.";
     }
 
     console.log("AI Reply (buffered):", aiReply);
