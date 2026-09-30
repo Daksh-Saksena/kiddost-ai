@@ -407,7 +407,7 @@ CRITICAL RULES:
 - Always base your answer on the CURRENT conversation context
 - If the user asks about availability (dates/tomorrow/etc), respond generally or ask for confirmation instead of assuming
 - DO NOT use emojis in any response
-- NEVER ask for the child's age if it was ALREADY mentioned earlier in the conversation or in KNOWN FACTS. Read the FULL conversation history VERY CAREFULLY before responding. Look for digits (e.g. "6", "3.5", "10") AND words (e.g. "six years old"). If the user mentions multiple numbers in a sentence (e.g. "6 years old for 4 hours"), use logic to identify the age! (e.g. do NOT confuse "3 hours" with "3 years old"). If found ANYWHERE in history, use it. DO NOT ask again. This is especially important for monthly package / value package questions.
+- NEVER ask for the child's age if it is mentioned in the CURRENT USER MESSAGE, earlier in the conversation, or in KNOWN FACTS. Read the user's message and the FULL conversation history VERY CAREFULLY before responding. Look for digits (e.g. "2.5", "6", "3.5", "10") AND words (e.g. "six years old", "two and a half"). If the current message already has the age (e.g. "Need a Nanny for a 2.5 year old", "Cost for teaching craft for 3 yr old"), USE IT IMMEDIATELY! DO NOT ask for age! If the user mentions multiple numbers in a sentence (e.g. "6 years old for 4 hours"), use logic to identify the age! (e.g. do NOT confuse "3 hours" with "3 years old"). DO NOT ask again.
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Do NOT repeat "Feel free to let us know if you have any questions." unnecessarily. Include it at the end of the pricing/activities info block, or when the user says they will let us know / are not ready.
@@ -419,10 +419,10 @@ CRITICAL RULES:
 - When in doubt, ALWAYS err on the side of saying UNSURE. A wrong answer is far worse than deferring to a human agent.
 
 AGE FIRST POLICY (CRITICAL):
-- **STEP 1 ALWAYS**: Before doing ANYTHING else, scan the ENTIRE conversation history VERY CAREFULLY for the child's age. Look for digits (e.g. "6", "3.5", "18 months") and words (e.g. "six years old"). If the user mentions multiple numbers in one sentence (e.g., "6 years old for 4 hours a day"), use basic logic to identify which number is the age! Also check KNOWN FACTS.
-- **IF AGE IS FOUND ANYWHERE IN HISTORY OR KNOWN FACTS**: Use that age. NEVER ask for age again. This applies to ALL question types including monthly packages, pricing, activities, booking, nanny services.
-- **ONLY IF AGE IS TRULY NOT FOUND**: Ask "Could I please know the child's age first?" — but ONLY after genuinely checking the full history. Do NOT provide pricing, packages, or activities until you have their age.
-- **FOR MONTHLY PACKAGES / VALUE PACKAGES SPECIFICALLY**: If ANY age (e.g. "10 months", "4 months", "2 years") was mentioned anywhere earlier in history or KNOWN FACTS, NEVER ask for the child's age! Jump straight to showing the packages. You are STRICTLY FORBIDDEN from asking for age again if it was already mentioned.
+- **STEP 1 ALWAYS**: Before doing ANYTHING else, scan the CURRENT USER MESSAGE AND the entire conversation history VERY CAREFULLY for the child's age. Look for digits (e.g. "2.5", "6", "3.5", "18 months") and words (e.g. "six years old", "two and a half"). If the user's message contains the age (e.g. "Need a Nanny for a 2.5 year old"), you already have their age! Also check KNOWN FACTS.
+- **IF AGE IS FOUND IN CURRENT MESSAGE, HISTORY OR KNOWN FACTS**: Use that age immediately. NEVER ask for age. This applies to ALL question types including monthly packages, pricing, activities, booking, nanny services.
+- **ONLY IF AGE IS TRULY NOT FOUND IN EITHER CURRENT MESSAGE OR HISTORY**: Ask "Could I please know the child's age first?". Do NOT provide pricing, packages, or activities until you have their age.
+- **FOR MONTHLY PACKAGES / VALUE PACKAGES SPECIFICALLY**: If ANY age (e.g. "10 months", "4 months", "2 years") was mentioned anywhere in current message, history, or KNOWN FACTS, NEVER ask for the child's age! Jump straight to showing the packages. You are STRICTLY FORBIDDEN from asking for age again if it was already mentioned.
 - **BREAK MESSAGES FOR CLARITY**: Send each response component in a SEPARATE WhatsApp message:
   - Age question: One message
   - Activities explanation: Separate message
@@ -474,8 +474,15 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
   • Exact script when explicitly triggered: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services."
 - TEACHERS / TUTORING RULE: If the user asks "do you have teachers?", "are they teachers?", or "can you send a teacher?":
   Reply: "All our members are educated female graduates or students who engage children with educational activities, worksheets, puzzles, and homework help. While they are not school teachers, they are thoroughly trained in child engagement and learning."
-  NEVER use the special needs script for this!
-- ABSOLUTE PRIORITY 2: SPAM / B2B MARKETING RULE - If the user sends a marketing message, advertisement, SEO/website offer, job application, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), you MUST immediately STOP and reply EXACTLY with ONLY the word: UNSURE
+- ABSOLUTE PRIORITY 2: OUT-OF-SCOPE TOPICS, RANDOM NONSENSE, PERSONAL ADVICE & SPAM RULE:
+  • You are an automated assistant EXCLUSIVELY for KidDost child engagement and tutoring services in Bangalore. You are NOT a general AI, NOT a relationship counselor, NOT a friend, and NOT an advice columnist.
+  • If the user's message is about ANY topic unrelated to KidDost services (e.g. personal advice, romance, crushes, dating, how to impress someone, best friends, gift ideas, homework solving, trivia, jokes, storytelling, songs, weather, tech/computers, buying products, or any random non-KidDost chat):
+    You MUST immediately STOP and reply EXACTLY with ONLY the single word: UNSURE
+  • STRICT NEGATIVE CONSTRAINT:
+    - You are STRICTLY FORBIDDEN from entertaining, answering, or giving advice on crushes, love, friends, gifts, or personal life!
+    - NEVER say "It's great to have feelings for someone special", "It's sweet to have a crush", "For a thoughtful gift...", or give friendly conversational advice.
+    - If a question is not explicitly covered in this KidDost playbook, your ONLY response must be: UNSURE
+  • If the user sends a marketing message, advertisement, SEO/website offer, or any unrelated business proposal (e.g., "Web Innovations", "Interested"), reply EXACTLY with ONLY the word: UNSURE
 - REJECTION / HESITATION RULE: ONLY if the user explicitly says they will let us know, will think about it, will get back to us, or says they are not interested right now (e.g. "I will get back to you", "I will let you know", "will inform you", "ok thanks I will let you know", "not right now", "no I'm not interested", "don't want it"):
   Reply EXACTLY: "Thank you for considering our services! If you ever need ad-hoc support, don’t hesitate to reach out. We’re here to help."
   STRICT NEGATIVE CONSTRAINT:
@@ -996,6 +1003,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
               content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
 Return ONLY valid JSON with these fields:
 - "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
+- "isOutOfScope": true if the user's message is asking about personal advice (such as crushes, dating, romance, how to impress someone, best friends, gift ideas), homework, trivia, jokes, storytelling, general AI conversation, or ANY topic completely unrelated to KidDost child engagement, babysitting, tutoring, or service booking in Bangalore
 - "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": string or number or null }. CRITICAL: If the child's age is in months (e.g. "10 months", "4 months", "18 months"), keep it as a string with "months" (e.g. "10 months"). Example: [{"name":"Ram","age":4},{"name":null,"age":"10 months"}]
 - "notes": an object of important facts/details about the customer mentioned ANYWHERE in the conversation. Extract things like:
   • "parentName": mother's/father's name if mentioned
@@ -1019,6 +1027,9 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         { headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" } }
       );
       intent = JSON.parse(intentRes.data.choices[0].message.content);
+      if (intent.isOutOfScope === true) {
+        console.log(`[Intent] Message identified as out-of-scope for ${fullPhone}: "${combinedMessage}"`);
+      }
       if (!Array.isArray(intent.children)) intent.children = [];
       if (!intent.notes || typeof intent.notes !== 'object') intent.notes = {};
       console.log("[Intent]", intent);
@@ -1205,6 +1216,10 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     if (detectedNonBangaloreCity) {
       console.log(`[Location Check] Non-Bangalore city detected: "${detectedNonBangaloreCity}" — injecting rejection`);
       messagesForAI.splice(-1, 0, { role: "system", content: `NON-BANGALORE CITY DETECTED: The user mentioned "${detectedNonBangaloreCity}". This is NOT in Bangalore. You MUST reject: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?" Do NOT proceed with booking. Do NOT ask for more details.` });
+    }
+    if (intent.isOutOfScope === true) {
+      console.log(`[Out-of-Scope Check] Out-of-scope query detected for ${fullPhone}: "${combinedMessage}" — injecting UNSURE instruction`);
+      messagesForAI.splice(-1, 0, { role: "system", content: `OUT-OF-SCOPE INQUIRY DETECTED: The user's query is about a topic completely unrelated to KidDost child engagement services (e.g. personal advice, crushes, romance, friendship, gifts, general chat). You MUST reply with ONLY the single word: UNSURE.` });
     }
 
     const aiResponse = await axios.post(
@@ -1488,6 +1503,15 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     if (USER_CHECKING_SCHEDULE_RE.test(combinedMessage) && AI_SLOT_CHECK_RE.test(aiReply) && !/\b(?:can you|could you|please)\s+check\b/i.test(combinedMessage)) {
       console.warn(`[SAFETY NET] User is checking their own schedule, correcting false slot check for ${fullPhone}`);
       aiReply = "Sure, take your time! Feel free to let us know once you check.";
+    }
+
+    // Safety net: Block out-of-scope personal advice, romance, crushes, friendship, gift ideas, random non-KidDost nonsense
+    const OUT_OF_SCOPE_KEYWORDS_RE = /\b(crush|crushing|impress (?:her|she|him|he|girl|boy)|girlfriend|boyfriend|propose|love advice|dating|best friend|make friends|handmade gift|gift idea|gift to she|gift for (?:her|him|girl|boy)|give (?:her|him|she) (?:a )?gift|what gift|which gift|special gift)\b/i;
+    const RANDOM_ADVICE_REPLY_RE = /(?:sweet to have a crush|normal to have crushes|feelings for someone special|impress (?:her|him)|handmade gifts are a wonderful idea|for a thoughtful gift|custom bracelet with her initials|your best friend can be someone|great to have feelings)/i;
+
+    if (intent.isOutOfScope === true || OUT_OF_SCOPE_KEYWORDS_RE.test(combinedMessage) || RANDOM_ADVICE_REPLY_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Intercepted out-of-scope random nonsense / personal advice for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = 'UNSURE';
     }
 
     console.log("AI Reply (buffered):", aiReply);

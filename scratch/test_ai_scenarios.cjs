@@ -350,8 +350,32 @@ async function runAll() {
   console.log("Test 20 Result:", pass20 ? "PASS ✅" : "FAIL ❌");
   console.log();
 
-  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20;
-  console.log("OVERALL RESULT:", allPassed ? "ALL 20 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
+  // Test 21: Out-of-scope personal advice / crush (Must reply UNSURE, NOT entertain)
+  console.log("--- Test 21: Out-of-Scope Personal Advice (Crush) ---");
+  const reply21 = await callAI(
+    [],
+    "I am crushing on girl  how can I impress she"
+  );
+  console.log("User: I am crushing on girl  how can I impress she");
+  console.log("AI:", reply21);
+  const pass21 = /^UNSURE$/i.test(reply21.trim());
+  console.log("Test 21 Result:", pass21 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 22: Out-of-scope gift advice (Must reply UNSURE, NOT entertain)
+  console.log("--- Test 22: Out-of-Scope Gift Advice ---");
+  const reply22 = await callAI(
+    [],
+    "What type to give me gift to she"
+  );
+  console.log("User: What type to give me gift to she");
+  console.log("AI:", reply22);
+  const pass22 = /^UNSURE$/i.test(reply22.trim());
+  console.log("Test 22 Result:", pass22 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20 && pass21 && pass22;
+  console.log("OVERALL RESULT:", allPassed ? "ALL 22 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
 }
 
 runAll().catch(console.error);
