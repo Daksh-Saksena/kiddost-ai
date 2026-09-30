@@ -304,8 +304,54 @@ async function runAll() {
   console.log("Test 17 Result:", pass17 ? "PASS ✅" : "FAIL ❌");
   console.log();
 
-  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17;
-  console.log("OVERALL RESULT:", allPassed ? "ALL 17 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
+  // Test 18: Nanny inquiry with age in same message (Must give activities + pricing + nanny disclaimer, must NOT ask for age)
+  console.log("--- Test 18: Nanny Inquiry With Age In Message ---");
+  const reply18 = await callAI(
+    [],
+    "Need a Nanny for a 2.5 year old"
+  );
+  console.log("User: Need a Nanny for a 2.5 year old");
+  console.log("AI:", reply18);
+  const pass18 = /verbal interaction|age appropriate puzzles|toys|rhymes/i.test(reply18) &&
+    /don'?t provide nanny services/i.test(reply18) &&
+    !/Could I please know the child'?s age/i.test(reply18);
+  console.log("Test 18 Result:", pass18 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 19: Nanny disclaimer on subsequent age message (Must give activities + pricing + nanny disclaimer)
+  console.log("--- Test 19: Nanny Disclaimer On Subsequent Age Reply ---");
+  const reply19 = await callAI(
+    [
+      { role: "user", content: "Need a nanny" },
+      { role: "assistant", content: "Could I please know the child's age first?" }
+    ],
+    "2.5"
+  );
+  console.log("User: 2.5");
+  console.log("AI:", reply19);
+  const pass19 = /verbal interaction|age appropriate puzzles/i.test(reply19) &&
+    /don'?t provide nanny services/i.test(reply19);
+  console.log("Test 19 Result:", pass19 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 20: Booking request without location (Must ask for locality, must NOT say 'check if we can service your area')
+  console.log("--- Test 20: Booking Request Without Location ---");
+  const reply20 = await callAI(
+    [
+      { role: "user", content: "Need service for a 3 year old" },
+      { role: "assistant", content: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing etc. Additionally our members can also take them to park for physical activity.\n\n[PRICING_IMAGE]\nWe suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour.\n\nFeel free to let us know if you have any questions." }
+    ],
+    "Can you send tomorrow at 5PM\nFor 1 hr"
+  );
+  console.log("User: Can you send tomorrow at 5PM\\nFor 1 hr");
+  console.log("AI:", reply20);
+  const pass20 = !/service your area/i.test(reply20) &&
+    /(?:share your (?:name and )?(?:area|locality)|area or locality|where (?:do you live|are you located))/i.test(reply20);
+  console.log("Test 20 Result:", pass20 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20;
+  console.log("OVERALL RESULT:", allPassed ? "ALL 20 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
 }
 
 runAll().catch(console.error);

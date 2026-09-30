@@ -530,9 +530,18 @@ PRICING / SERVICES / QUOTATION:
 
 NANNY SERVICES (only when user asks about nanny/caretaker/babysitter or 'permanent basis' / 'permanent'):
 - CRITICAL TRIGGER: If the user asks for services on a 'permanent basis' or 'permanent', immediately use this nanny services rule.
-- Step 1: CHECK CONVERSATION HISTORY. If the child's age is NOT known, you MUST ask EXACTLY "Could I please know the child's age first?". Do NOT say anything else in that message. Do NOT mention the nanny disclaimer yet. Stop and wait for their reply.
-- Step 2: Once the age is known (or if they just provided it), FIRST give the standard activity and pricing details exactly as you would for a normal inquiry (write the activities based on age, then write [PRICING_IMAGE]). 
-- Step 3: ONLY AFTER giving the activities and pricing, add this exact disclaimer at the very end of your response: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+- CHECK FOR AGE FIRST:
+  • CASE A — Child's age IS ALREADY mentioned in the message or conversation history (e.g. "Need a Nanny for a 2.5 year old", "2.5", "six years old", digits or words):
+    You are STRICTLY FORBIDDEN from asking for the child's age!
+    Immediately output:
+    1. Activities for their age bracket
+    2. [PRICING_IMAGE]
+    3. Introductory session offer: "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour."
+    4. Exact nanny disclaimer at the very end: "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English."
+    5. End with: "Feel free to let us know if you have any questions."
+  • CASE B — Child's age is NOT mentioned anywhere in the message or conversation history:
+    Ask EXACTLY: "Could I please know the child's age first?"
+    Do NOT say anything else. Do NOT mention the nanny disclaimer yet. Stop and wait for their reply.
 - IMPORTANT: Never start your response with the disclaimer. The disclaimer must ALWAYS be the final part of your response after pitching activities and pricing. If the disclaimer was already given earlier, do not repeat it.
 
 VALUE PACKAGES & MULTIPLE CHILDREN / TWINS (packages/plans/bundles/monthly packages/1 month/two kids/twins):
@@ -710,6 +719,7 @@ BEFORE BOOKING:
     3. Area/locality — if not already known, ask: "Could you also share your area or locality so I can confirm we service your location?"
   - NEVER ask for information that the user has already provided earlier in the conversation.
   - CRITICAL PRECEDENCE — LOCATION OVERRIDES BOOKING FLOW: If at any point the user mentions their area, locality, or road (e.g. "My location is Sompura Gate, Sarjapura Road", "I am in Whitefield"), Rule 3 of LOCATION / SERVICEABILITY takes HIGHEST PRIORITY: respond with EXACTLY "Let me check if we can service your area and get back to you." NEVER ignore a shared location to ask for date, time, or name!
+  - STRICT NEGATIVE CONSTRAINT FOR AREA CHECK: You are STRICTLY FORBIDDEN from saying "Let me check if we can service your area and get back to you" if the customer has NOT shared an area, locality, or address! If the customer asks to book (e.g. "Can you send tomorrow at 5PM\nFor 1 hr") but has NOT provided an area, you MUST ASK for their area: "Could you also share your area or locality so I can confirm we service your location?" (or ask for their name and area). NEVER claim to check their area when they haven't told you where they live!
   - SCHEDULE DELAY / USER CHECKING THEIR CALENDAR:
     • If you asked for preferred date/time or details, and the customer says they need to check (e.g. "I need to check", "let me check", "will check and let you know", "let me check with my husband", "need to check my calendar", "let me check and confirm"):
     • This is NOT a refusal and this is NOT KidDost checking availability! Do NOT say "Allow me to check slot availability" and do NOT reply UNSURE!
@@ -747,6 +757,7 @@ CRITICAL PRECEDENCE — LOCATION OVERRIDES BOOKING FLOW:
 - If the user's message mentions an area, road, or locality in Bangalore, or explicitly states their location (e.g. "My location is Sompura Gate, Sarjapura Road", "I am in Whitefield", "Location: HSR Layout", "When can I get a test session? My location is Sompura Gate"), Rule 3 below takes HIGHEST PRIORITY over asking for date/time or parent name!
 - You MUST respond with EXACTLY: "Let me check if we can service your area and get back to you."
 - NEVER ignore the customer's shared location to ask "What time slot would work best for you?" or "May I know your name?". Serviceability must be confirmed first!
+- STRICT NEGATIVE CONSTRAINT: This rule ONLY applies when the customer has ACTUALLY stated an area, locality, or address. If NO location has been shared yet, NEVER say "Let me check if we can service your area"! You must ask for their area first: "Could you also share your area or locality so I can confirm we service your location?"
 
 RULE 0 — USER ASKING WHERE WE ARE BASED:
 - If the user asks "where are you based?", "where is this from?", "which city?", "where do you operate?", or any similar question about OUR location:
@@ -789,9 +800,90 @@ function hashPin(pin) {
   return crypto.createHash('sha256').update(String(pin)).digest('hex');
 }
 
+// ── Deterministic helpers for AI chat invariants ─────────────────────────────
+function normalizeMessageTypos(text) {
+  if (!text) return text;
+  return text
+    .replace(/\b(\d+(?:\.\d+)?)\s*years?\s*ild\b/gi, '$1 years old')
+    .replace(/\b(\d+(?:\.\d+)?)\s*yrs?\s*ild\b/gi, '$1 years old')
+    .replace(/\b(\d+(?:\.\d+)?)\s*m(?:on)?ths?\s*ild\b/gi, '$1 months old')
+    .replace(/\b(\d+(?:\.\d+)?)\s*y(?:ea)?rs?\s*old\b/gi, '$1 years old')
+    .replace(/\bpee\s+hour\b/gi, 'per hour')
+    .replace(/\bpe\s+hour\b/gi, 'per hour');
+}
+
+const BANGALORE_AREAS_RE = /\b(?:koramangala|btm(?:\s*layout)?|whitefield|hsr(?:\s*layout)?|indiranagar|jp\s*nagar|marathahalli|electronic\s*city(?:\s*phase\s*[12])?|ecity|jayanagar|malleshwaram|hebbal|yelahanka|sarjapur(?:a)?(?:\s*road)?|bellandur|banashankari|rajajinagar|sadashivanagar|frazer\s*town|cooke\s*town|kalyan\s*nagar|kammanahalli|richmond\s*town|ulsoor|hal|kadugodi|hoodi|varthur|panathur|kundalahalli|domlur|ejipura|shanthi\s*nagar|basavanagudi|padmanabhanagar|uttarahalli|rr\s*nagar|rajarajeshwari\s*nagar|kengeri|nagavara|hennur|thanisandra|jakkur|sahakara\s*nagar|rt\s*nagar|yeshwanthpur|peenya|vidyaranyapura|sompura(?:\s*gate)?|haralur(?:\s*road)?|kasavanahalli|green\s*glen|hosa\s*road|singasandra|begur|kudlu|aecs\s*layout|cv\s*raman\s*nagar|mahadevapura|kr\s*puram|brookefield|brookfield|bannerghatta(?:\s*road)?|gottigere|hulimavu|arekere|bilekahalli|bommanahalli|kumaraswamy\s*layout|konanakunte|kanakapura(?:\s*road)?|mathikere|sanjaynagar|new\s*bel\s*road|bellary\s*road|old\s*airport\s*road|outer\s*ring\s*road)\b/i;
+const LOCATION_KEYWORDS_RE = /\b(?:my location is|location is|we are located at|we live in|our area is|area is|locality is|address is|living in|staying in)\b/i;
+const PINCODE_RE = /\b560\d{3}\b/;
+const MAPS_URL_RE = /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)\S*/i;
+
+function hasUserSharedLocation(text) {
+  if (!text) return false;
+  return BANGALORE_AREAS_RE.test(text) ||
+    LOCATION_KEYWORDS_RE.test(text) ||
+    PINCODE_RE.test(text) ||
+    MAPS_URL_RE.test(text);
+}
+
+function extractChildAgeFromText(text) {
+  if (!text) return null;
+  const ageMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:years?|yrs?|yr|y\/o|yo|years?\s*ild|yrs?\s*ild)\b/i);
+  if (ageMatch) return parseFloat(ageMatch[1]);
+  const mMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:months?|mths?)\b/i);
+  if (mMatch) return `${mMatch[1]} months`;
+  const standalone = text.trim().match(/^(\d+(?:\.\d+)?)$/);
+  if (standalone) return parseFloat(standalone[1]);
+  return null;
+}
+
+function getActivityPitchForAge(age) {
+  let numAge = null;
+  let isMonths = false;
+
+  if (typeof age === 'string') {
+    const trimmed = age.trim().toLowerCase();
+    if (trimmed.includes('month') || trimmed.includes('mth')) {
+      isMonths = true;
+      numAge = parseFloat(trimmed);
+    } else {
+      numAge = parseFloat(trimmed);
+    }
+  } else if (typeof age === 'number') {
+    numAge = age;
+  }
+
+  const introPricing = "[PRICING_IMAGE]\nWe suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour.\n\nFeel free to let us know if you have any questions.";
+
+  if (isMonths) {
+    if (numAge < 4) {
+      return "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. Since your child is under 4 months, we are not the right fit at this time.";
+    }
+    return "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English.\n\nFeel free to let us know if you have any questions.";
+  }
+
+  if (numAge == null || isNaN(numAge)) {
+    return "Could I please know the child's age first?";
+  }
+
+  if (numAge < 1) {
+    return "Our age category starts from 1 year old. But on the request of parents, we have provided service for infants as young as four months old. Our team can assist by engaging your child through verbal interaction, rhymes, flashcards, etc. The aim is to provide parents little free time. Would like to inform that they won’t be able to help with massage, bathing etc. All our members are female graduates or pursuing graduation. The mode of interaction is English.\n\nFeel free to let us know if you have any questions.";
+  } else if (numAge >= 1 && numAge < 2) {
+    return "For our 1-year-olds, we engage children with activities like verbal interaction, age-appropriate puzzles, flashcards, playtime with toys, rhymes, and storybook reading. We also offer park outings for physical activity and outdoor play.\n\n" + introPricing;
+  } else if (numAge >= 2 && numAge < 3) {
+    return "For this age category we engage the child with verbal interaction, age appropriate puzzles, toys, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity.\n\n" + introPricing;
+  } else if (numAge >= 3 && numAge < 4) {
+    return "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading etc. We can also help in introducing concepts like phonics, writing etc. Additionally our members can also take them to park for physical activity.\n\n" + introPricing;
+  } else if (numAge >= 4 && numAge <= 8) {
+    return "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity.\n\n" + introPricing;
+  } else {
+    return "Thank you for reaching out! However, our services are specifically designed for children aged 1 to 8 years. We are not the right fit at this time.";
+  }
+}
+
 // Helper: generate AI response for a combined user message
 async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
   try {
+    combinedMessage = normalizeMessageTypos(combinedMessage);
     const { prependWelcomeBack = false, contactName = '' } = options;
     const displayContact = String(contactName || '').trim() || fullPhone;
     // Fetch last 10 messages for conversation memory
@@ -1187,7 +1279,11 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const isWithinBusinessHours = nowMins >= (9 * 60) && nowMins <= (19 * 60 + 45);
 
     const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9(?:\:?00)?\s*am\s*(?:and|-)\s*7(?:\:?45)?\s*pm|first thing in the morning|could we find a slot within that window|would you like to schedule for another time)/i;
-    const mentionsNanny = /\b(nanny|babysitter|caretaker|caregiver)\b/i.test(combinedMessage || '');
+    const allCustomerText = [
+      combinedMessage,
+      ...history.filter(m => m.role === 'user').map(m => m.content)
+    ].join(' ');
+    const mentionsNanny = /\b(nanny|babysitter|caretaker|caregiver)\b/i.test(allCustomerText);
 
     const extractTimesToMinutes = (text) => {
       const times = [];
@@ -1344,10 +1440,44 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       aiReply = "Sorry, we don't share our members profile or personal ID documents. Our team comprises motivated and compassionate female graduates and students who are passionate about teaching and mentoring. They have all completed our comprehensive in-house training program, which equips them with the skills to deliver engaging and supportive learning experiences. All our members are on our payroll and we conduct an internal background verification before onboarding them.\n\nFeel free to let us know if you have any questions.";
     }
 
+    // Safety net: Block false age ask when age is already known or present in current message/history
+    const AGE_ASK_RE = /(?:Could I please know the child'?s age first|share (?:your|the) child'?s age|what is the (?:child'?s )?age)/i;
+    const detectedAge = activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText);
+    const userAskedForNanny = /\b(nanny|babysitter|caretaker|caregiver|permanent\s+basis)\b/i.test(allCustomerText);
+    const NANNY_DISCLAIMER_TEXT = "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English.";
+    const NANNY_DISCLAIMER_RE = /we don'?t provide nanny services/i;
+    const alreadyGaveNannyDisclaimer = NANNY_DISCLAIMER_RE.test(aiReply) || history.some(m => m.role === 'assistant' && NANNY_DISCLAIMER_RE.test(m.content));
+
+    if (AGE_ASK_RE.test(aiReply) && detectedAge != null) {
+      console.warn(`[SAFETY NET] Intercepted false age ask when age is already known (${detectedAge}) for ${fullPhone}`);
+      if (/\b(?:monthly|value|package|packages)\b/i.test(combinedMessage)) {
+        aiReply = "[MONTH_IMAGE]\nOur KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.\n\nFeel free to let us know if you have any questions.";
+      } else {
+        aiReply = getActivityPitchForAge(detectedAge);
+        if (userAskedForNanny && !alreadyGaveNannyDisclaimer) {
+          aiReply = aiReply.trim() + "\n\n" + NANNY_DISCLAIMER_TEXT;
+        }
+      }
+    }
+
+    // Safety net: Enforce Nanny disclaimer if user asked for a nanny/permanent basis anywhere in conversation
+    const isPitchingActivitiesOrPricing = /\[PRICING_IMAGE\]|introductory session|we engage (?:the child|children)|for this age category|verbal interaction|brain boosting/i.test(aiReply);
+    if (userAskedForNanny && !alreadyGaveNannyDisclaimer && isPitchingActivitiesOrPricing) {
+      console.warn(`[SAFETY NET] Enforcing nanny disclaimer for ${fullPhone}`);
+      aiReply = aiReply.trim() + "\n\n" + NANNY_DISCLAIMER_TEXT;
+    }
+
+    // Safety net: Block false "Let me check if we can service your area" when NO location was shared!
+    const SERVICE_AREA_CHECK_RE = /(?:check if we can service your area|service your area and get back to you)/i;
+    if (SERVICE_AREA_CHECK_RE.test(aiReply) && !hasUserSharedLocation(allCustomerText)) {
+      console.warn(`[SAFETY NET] Intercepted false area check when no location was shared for ${fullPhone}. Asking for locality instead.`);
+      aiReply = "Could you also share your area or locality so I can confirm we service your location?";
+    }
+
     // Safety net: Enforce location precedence over booking detail collection
     const LOCATION_DECLARED_RE = /\b(?:my location is|location is|we are located at|we live in|area is|locality is)\b/i;
     const BOOKING_COLLECTION_QUESTION_RE = /(?:what time slot|what date and time|may i know your name|what time would work)/i;
-    if (LOCATION_DECLARED_RE.test(combinedMessage) && BOOKING_COLLECTION_QUESTION_RE.test(aiReply) && !/service your area/i.test(aiReply)) {
+    if ((LOCATION_DECLARED_RE.test(combinedMessage) || hasUserSharedLocation(combinedMessage)) && BOOKING_COLLECTION_QUESTION_RE.test(aiReply) && !/service your area/i.test(aiReply)) {
       console.warn(`[SAFETY NET] Enforcing location precedence for ${fullPhone}. User message: "${combinedMessage}"`);
       aiReply = "Let me check if we can service your area and get back to you.";
     }
