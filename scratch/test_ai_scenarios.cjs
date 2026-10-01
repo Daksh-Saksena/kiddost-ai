@@ -374,8 +374,38 @@ async function runAll() {
   console.log("Test 22 Result:", pass22 ? "PASS ✅" : "FAIL ❌");
   console.log();
 
-  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20 && pass21 && pass22;
-  console.log("OVERALL RESULT:", allPassed ? "ALL 22 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
+  // Test 23: Detailed opening inquiry starting with 'Hi' (Must NOT send bare 'Hello! How can I help you today?')
+  console.log("--- Test 23: Detailed Inquiry Starting With 'Hi' ---");
+  const reply23 = await callAI(
+    [],
+    "Hi, I am interested in hiring a supervisor to engage with my child (play games, puzzles etc)"
+  );
+  console.log("User: Hi, I am interested in hiring a supervisor to engage with my child (play games, puzzles etc)");
+  console.log("AI:", reply23);
+  const pass23 = !/^Hello!\s+How can I help you today\??$/i.test(reply23.trim()) &&
+    /(?:child'?s age|share your child'?s age|how old is your child)/i.test(reply23);
+  console.log("Test 23 Result:", pass23 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 24: Single child duration inquiry (Must NOT ask "Would you like both children in the same session...")
+  console.log("--- Test 24: Single Child Duration Inquiry ---");
+  const reply24 = await callAI(
+    [
+      { role: "user", content: "Hi, I am interested in hiring a supervisor to engage with my child (play games, puzzles etc)" },
+      { role: "assistant", content: "Could I please know the child's age first?" },
+      { role: "user", content: "6 years" },
+      { role: "assistant", content: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity.\n\n[PRICING_IMAGE]\nWe suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour.\n\nFeel free to let us know if you have any questions." }
+    ],
+    "I need the engagement for 4 hours in the evening"
+  );
+  console.log("User: I need the engagement for 4 hours in the evening");
+  console.log("AI:", reply24);
+  const pass24 = !/both children|separate sessions for each child/i.test(reply24);
+  console.log("Test 24 Result:", pass24 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20 && pass21 && pass22 && pass23 && pass24;
+  console.log("OVERALL RESULT:", allPassed ? "ALL 24 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
 }
 
 runAll().catch(console.error);

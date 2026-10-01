@@ -411,7 +411,13 @@ CRITICAL RULES:
 - NEVER repeat information you have already given. If you already shared activities, pricing, or introductory session details earlier in the conversation, do NOT repeat them. Just answer the new question directly.
 - If the child's name is shared voluntarily, remember it and use it naturally later.
 - Do NOT repeat "Feel free to let us know if you have any questions." unnecessarily. Include it at the end of the pricing/activities info block, or when the user says they will let us know / are not ready.
-- GREETINGS RULE: If the user sends ONLY a greeting ("Hi", "Hello", "Hey", "Hii", "Helo", etc.) with no other question, respond with a short friendly greeting such as "Hello! How can I help you today?" or "Hi! How can I assist you?" Do NOT respond with "Feel free to let us know if you have any questions." Do NOT ask for age or give pricing unprompted.
+- GREETINGS RULE:
+  • TRIGGER ONLY IF the user sends ONLY a pure standalone greeting (e.g. "Hi", "Hello", "Hey", "Hii", "Helo", "Good morning") with NO other question or inquiry in the message. Respond with: "Hello! How can I help you today?" or "Hi! How can I assist you?". Do NOT ask for age or give pricing unprompted.
+  • STRICT NEGATIVE CONSTRAINT:
+    - If the user sends a greeting FOLLOWED BY a question, service request, or statement of interest (e.g. "Hi, I am interested in hiring a supervisor to engage with my child", "Hello, do you provide tutoring?", "Hi what are your charges?"):
+      THIS IS A SERVICE INQUIRY, NOT A BARE GREETING!
+      You are STRICTLY FORBIDDEN from replying with just "Hello! How can I help you today?".
+      Treat it immediately as a service inquiry! If child's age is not known yet, ask: "Could I please know the child's age first?"
 - ACKNOWLEDGMENTS RULE: If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool") with no new question, respond with: "Feel free to let us know if you have any questions." or simply wait for their next question. You are STRICTLY FORBIDDEN from treating simple "Ok" as hesitation/rejection! NEVER send "Thank you for considering our services! If you ever need ad-hoc support..." for a simple "Ok"!
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
@@ -743,6 +749,10 @@ GROUP / SIBLING SESSIONS:
 - Do NOT ask about same-or-separate sessions the moment the customer mentions multiple children. Continue the normal conversation (ages, interests, activities, pricing, etc.) first.
 - Only ask the same-or-separate question when the customer is READY TO BOOK (i.e. they express booking intent like "I want to book", "let's schedule", "book sessions", etc.) AND you already know they have multiple children.
 - At that point, as part of the BEFORE BOOKING flow, include the question: "Would you like both children in the same session, or would you prefer separate sessions for each child?"
+- STRICT NEGATIVE CONSTRAINT FOR SINGLE CHILD:
+  • If the customer has only mentioned ONE child (e.g. "my child", "6 years", "just one child", or a single age/name):
+    YOU ARE STRICTLY FORBIDDEN from asking about "both children", "same or separate sessions", or multiple children!
+    NEVER ask "Would you like both children in the same session, or would you prefer separate sessions for each child?" unless the customer EXPLICITLY stated they have 2 or more children!
 - You can ask this alongside at most ONE other question (e.g. date/time) to avoid overwhelming the customer.
 - Once you have the same-or-separate answer AND all the standard booking info (parent name, date/time), say EXACTLY: "Great, allow me to check the slot availability and the best options for your children and come back to you."
 - After saying this, you must STOP. If the user replies with ANYTHING after that, respond with ONLY the word: UNSURE
@@ -1511,6 +1521,42 @@ Consider the FULL conversation history carefully — do not confuse one child's 
 
     if (intent.isOutOfScope === true || OUT_OF_SCOPE_KEYWORDS_RE.test(combinedMessage) || RANDOM_ADVICE_REPLY_RE.test(aiReply)) {
       console.warn(`[SAFETY NET] Intercepted out-of-scope random nonsense / personal advice for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = 'UNSURE';
+    }
+
+    // Safety net: Block false greeting reply when user sent a detailed inquiry starting with "Hi" or "Hello"
+    const PURE_GREETING_INPUT_RE = /^[\s\.\,\!\?]*\b(hi|hello|hey|hii|helo|good morning|good afternoon|good evening|namaste)\b[\s\.\,\!\?]*$/i;
+    const GREETING_REPLY_RE = /^[\s\n]*\b(?:hello|hi|hey)!\s+(?:how can i (?:help|assist) you today\??|how may i help you\??)[\s\n]*$/i;
+    if (GREETING_REPLY_RE.test(aiReply.trim()) && !PURE_GREETING_INPUT_RE.test(combinedMessage)) {
+      console.warn(`[SAFETY NET] Intercepted false greeting on detailed user message for ${fullPhone}. User message: "${combinedMessage}"`);
+      const detectedAgeForGreeting = activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText);
+      if (detectedAgeForGreeting != null) {
+        aiReply = getActivityPitchForAge(detectedAgeForGreeting);
+      } else {
+        aiReply = "Could I please know the child's age first?";
+      }
+    }
+
+    // Safety net: Block false "both children" / "separate sessions" question for single-child families
+    const BOTH_CHILDREN_QUESTION_RE = /(?:both children|separate sessions for each child)/i;
+    if (BOTH_CHILDREN_QUESTION_RE.test(aiReply)) {
+      const mentionsMultipleKids = /\b(two kids|2 kids|both kids|twins|two children|2 children|both children|siblings|two sons|two daughters|brother and sister)\b/i.test(allCustomerText);
+      const hasMultipleChildrenVars = allChildren && allChildren.length > 1;
+      if (!mentionsMultipleKids && !hasMultipleChildrenVars) {
+        console.warn(`[SAFETY NET] Stripping false multiple-children question for single-child family ${fullPhone}`);
+        aiReply = aiReply.replace(/[\.\,\s]*Would you like both children in the same session[^\.\?!]*[\.\?!]?[\s\S]*?(?:separate sessions for each child\??)/gi, '').trim();
+        if (!aiReply) {
+          aiReply = "You can book as per your requirement.";
+        } else if (!/[.?!\"]$/.test(aiReply)) {
+          aiReply += ".";
+        }
+      }
+    }
+
+    // Safety net: Intercept phone call requests and trigger agent handoff
+    const CALL_REQUEST_RE = /\b(?:can (?:you|someone|u) call|please call|give me a call|call me|talk on (?:the )?phone|talk on call|speak on call|voice call)\b/i;
+    if (CALL_REQUEST_RE.test(combinedMessage)) {
+      console.warn(`[SAFETY NET] Intercepted call request for ${fullPhone}. Alerting human agent.`);
       aiReply = 'UNSURE';
     }
 
