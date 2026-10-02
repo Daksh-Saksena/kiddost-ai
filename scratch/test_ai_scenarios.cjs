@@ -32,21 +32,34 @@ async function callAI(history, userMessage) {
     ...history,
     { role: "user", content: userMessage }
   ];
-  const res = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-4o-mini",
-      messages,
-      temperature: 0
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const res = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-4o-mini",
+          messages,
+          temperature: 0
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      return res.data.choices[0].message.content.trim();
+    } catch (err) {
+      if (err.response?.status === 429 && attempt < 4) {
+        const delay = (attempt + 1) * 2000;
+        console.warn(`[429 Rate Limit] Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw err;
       }
     }
-  );
-  return res.data.choices[0].message.content.trim();
+  }
 }
 
 async function runAll() {
@@ -404,8 +417,36 @@ async function runAll() {
   console.log("Test 24 Result:", pass24 ? "PASS ✅" : "FAIL ❌");
   console.log();
 
-  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20 && pass21 && pass22 && pass23 && pass24;
-  console.log("OVERALL RESULT:", allPassed ? "ALL 24 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
+  // Test 25: Inquiry with typo/informal 'Hi, could iHi know more?' (Must ask for child's age, must NOT reply UNSURE or bare greeting)
+  console.log("--- Test 25: Inquiry 'Hi, could iHi know more?' ---");
+  const reply25 = await callAI(
+    [],
+    "Hi, could iHi know more?"
+  );
+  console.log("User: Hi, could iHi know more?");
+  console.log("AI:", reply25);
+  const pass25 = !/^UNSURE$/i.test(reply25.trim()) &&
+    !/^Hello!\s+How can I help you today\??$/i.test(reply25.trim()) &&
+    /(?:child'?s age|share your child'?s age|how old is your child)/i.test(reply25);
+  console.log("Test 25 Result:", pass25 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  // Test 26: General inquiry 'Could I know more?' (Must ask for child's age, must NOT reply UNSURE)
+  console.log("--- Test 26: General Inquiry 'Could I know more?' ---");
+  const reply26 = await callAI(
+    [],
+    "Could I know more?"
+  );
+  console.log("User: Could I know more?");
+  console.log("AI:", reply26);
+  const pass26 = !/^UNSURE$/i.test(reply26.trim()) &&
+    !/^Hello!\s+How can I help you today\??$/i.test(reply26.trim()) &&
+    /(?:child'?s age|share your child'?s age|how old is your child)/i.test(reply26);
+  console.log("Test 26 Result:", pass26 ? "PASS ✅" : "FAIL ❌");
+  console.log();
+
+  const allPassed = pass1 && pass2 && pass3 && pass4 && pass5a && pass5b && pass6 && pass7 && pass8 && pass9 && pass10 && pass11 && pass12 && pass13 && pass14 && pass15 && pass16 && pass17 && pass18 && pass19 && pass20 && pass21 && pass22 && pass23 && pass24 && pass25 && pass26;
+  console.log("OVERALL RESULT:", allPassed ? "ALL 26 TESTS PASSED ✅" : "SOME TESTS FAILED ❌");
 }
 
 runAll().catch(console.error);

@@ -414,9 +414,9 @@ CRITICAL RULES:
 - GREETINGS RULE:
   • TRIGGER ONLY IF the user sends ONLY a pure standalone greeting (e.g. "Hi", "Hello", "Hey", "Hii", "Helo", "Good morning") with NO other question or inquiry in the message. Respond with: "Hello! How can I help you today?" or "Hi! How can I assist you?". Do NOT ask for age or give pricing unprompted.
   • STRICT NEGATIVE CONSTRAINT:
-    - If the user sends a greeting FOLLOWED BY a question, service request, or statement of interest (e.g. "Hi, I am interested in hiring a supervisor to engage with my child", "Hello, do you provide tutoring?", "Hi what are your charges?"):
+    - If the user sends ANY words beyond a pure greeting (e.g. "Hi, could I know more?", "Hi, could iHi know more?", "Could I know more?", "Want to know more", "Tell me more about your service", "Hi, I am interested in hiring a supervisor to engage with my child", "Hello, do you provide tutoring?", "Hi what are your charges?"):
       THIS IS A SERVICE INQUIRY, NOT A BARE GREETING!
-      You are STRICTLY FORBIDDEN from replying with just "Hello! How can I help you today?".
+      You are STRICTLY FORBIDDEN from replying with just "Hello! How can I help you today?" or "Hi! How can I assist you?".
       Treat it immediately as a service inquiry! If child's age is not known yet, ask: "Could I please know the child's age first?"
 - ACKNOWLEDGMENTS RULE: If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool") with no new question, respond with: "Feel free to let us know if you have any questions." or simply wait for their next question. You are STRICTLY FORBIDDEN from treating simple "Ok" as hesitation/rejection! NEVER send "Thank you for considering our services! If you ever need ad-hoc support..." for a simple "Ok"!
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
@@ -1012,8 +1012,8 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
               role: "system",
               content: `You are a query classifier for a childcare service chatbot. Given a conversation, extract what the user is currently asking.
 Return ONLY valid JSON with these fields:
-- "isAskingAboutActivities": true if the user is asking what programs or activities are offered (including follow-up questions like "For 4?" after a prior activities question)
-- "isOutOfScope": true if the user's message is asking about personal advice (such as crushes, dating, romance, how to impress someone, best friends, gift ideas), homework, trivia, jokes, storytelling, general AI conversation, or ANY topic completely unrelated to KidDost child engagement, babysitting, tutoring, or service booking in Bangalore
+- "isOutOfScope": true ONLY if the user's message is asking about personal advice (such as crushes, dating, romance, how to impress someone, best friends, gift ideas), homework solving, trivia, jokes, storytelling, buying products/computers/electronics, or random general chat completely unrelated to a childcare/tutoring business.
+CRITICAL: NEVER mark greetings, general interest, or requests to know more about our service (e.g. "could I know more?", "tell me more", "how does this work?", "what is KidDost?", "need info", "share details", "interested", "how can you help?") as out of scope! These are 100% valid inquiries for our services.
 - "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": string or number or null }. CRITICAL: If the child's age is in months (e.g. "10 months", "4 months", "18 months"), keep it as a string with "months" (e.g. "10 months"). Example: [{"name":"Ram","age":4},{"name":null,"age":"10 months"}]
 - "notes": an object of important facts/details about the customer mentioned ANYWHERE in the conversation. Extract things like:
   • "parentName": mother's/father's name if mentioned
@@ -1227,7 +1227,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       console.log(`[Location Check] Non-Bangalore city detected: "${detectedNonBangaloreCity}" — injecting rejection`);
       messagesForAI.splice(-1, 0, { role: "system", content: `NON-BANGALORE CITY DETECTED: The user mentioned "${detectedNonBangaloreCity}". This is NOT in Bangalore. You MUST reject: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?" Do NOT proceed with booking. Do NOT ask for more details.` });
     }
-    if (intent.isOutOfScope === true) {
+    const IN_SCOPE_INQUIRY_RE = /\b(know more|tell me more|more info|more details|how (?:does this|it) work|what is kiddost|about your service|about kiddost|details|charges|fees|cost|rate|pricing|activities|tutoring|care|child|children|kid|kids|baby|infant|toddler|session|booking|hours|nanny|supervisor|play|puzzle)\b/i;
+    if (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage)) {
       console.log(`[Out-of-Scope Check] Out-of-scope query detected for ${fullPhone}: "${combinedMessage}" — injecting UNSURE instruction`);
       messagesForAI.splice(-1, 0, { role: "system", content: `OUT-OF-SCOPE INQUIRY DETECTED: The user's query is about a topic completely unrelated to KidDost child engagement services (e.g. personal advice, crushes, romance, friendship, gifts, general chat). You MUST reply with ONLY the single word: UNSURE.` });
     }
@@ -1519,7 +1520,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const OUT_OF_SCOPE_KEYWORDS_RE = /\b(crush|crushing|impress (?:her|she|him|he|girl|boy)|girlfriend|boyfriend|propose|love advice|dating|best friend|make friends|handmade gift|gift idea|gift to she|gift for (?:her|him|girl|boy)|give (?:her|him|she) (?:a )?gift|what gift|which gift|special gift)\b/i;
     const RANDOM_ADVICE_REPLY_RE = /(?:sweet to have a crush|normal to have crushes|feelings for someone special|impress (?:her|him)|handmade gifts are a wonderful idea|for a thoughtful gift|custom bracelet with her initials|your best friend can be someone|great to have feelings)/i;
 
-    if (intent.isOutOfScope === true || OUT_OF_SCOPE_KEYWORDS_RE.test(combinedMessage) || RANDOM_ADVICE_REPLY_RE.test(aiReply)) {
+    const isDefinitelyOutOfScope = (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage)) || OUT_OF_SCOPE_KEYWORDS_RE.test(combinedMessage) || RANDOM_ADVICE_REPLY_RE.test(aiReply);
+    if (isDefinitelyOutOfScope) {
       console.warn(`[SAFETY NET] Intercepted out-of-scope random nonsense / personal advice for ${fullPhone}. User message: "${combinedMessage}"`);
       aiReply = 'UNSURE';
     }
@@ -2584,8 +2586,12 @@ app.post("/webhook", async (req, res) => {
       await supabase.from("conversations").update({ conversation_id: botspaceConversationId }).eq("phone", fullPhone);
     }
 
-    const GENERIC_OPENING_RE = /^[\s\.\,\!\?]*\b(hi|hello|hey|good\s+(?:morning|afternoon|evening)|can i get more info(?: on this)?|get more info|more info|info|details|kiddost)\b[\s\.\,\!\?]*$/i;
-    const isGenericGreeting = !message || GENERIC_OPENING_RE.test(message.trim());
+    const GENERIC_GREETING_START_RE = /^[\s\.\,\!\?]*\b(?:hi|hello|hey|hii|helo|good\s+(?:morning|afternoon|evening)|namaste)\b/i;
+    const GENERAL_INFO_QUERY_RE = /\b(?:know more|more info|more details|get info|need info|tell me more|how (?:does this|it) work|what is kiddost|details please|share details|can you help)\b/i;
+    const openingHasAge = !!(message && extractChildAgeFromText(message));
+    const openingIsJob = !!(message && /\b(?:resume|cv|job|vacancy|internship|hiring)\b/i.test(message));
+    const openingIsCall = !!(message && /\b(?:call|phone)\b/i.test(message));
+    const isGenericGreeting = !message || (!openingHasAge && !openingIsJob && !openingIsCall && (GENERIC_GREETING_START_RE.test(message.trim()) || GENERAL_INFO_QUERY_RE.test(message.trim())));
 
     if (isNewUser && !isAiPaused && !dbCheckFailed && isGenericGreeting) {
       // Trigger welcome sequence for brand-new users sending generic greetings (don't await — fire and forget)
