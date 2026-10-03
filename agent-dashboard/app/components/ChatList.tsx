@@ -145,17 +145,9 @@ export function ChatList({
           : "bg-[#008069] text-white"
       }`}>
         <div className="flex items-center justify-between gap-2">
-          {/* Left: Brand & title */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center font-bold text-sm shrink-0">
-              KD
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight leading-tight truncate">KidDost</h1>
-              <p className={`text-xs font-semibold leading-none ${isDarkMode ? "text-emerald-400" : "text-emerald-100"}`}>
-                Support Agent Hub
-              </p>
-            </div>
+          {/* Left: Clean title */}
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-xl font-bold tracking-tight">Chats</h1>
           </div>
 
           {/* Right: Actions */}
@@ -204,16 +196,6 @@ export function ChatList({
             >
               <LogOut className="w-4 h-4" />
             </button>
-
-            {onDeleteAccount && (
-              <button
-                onClick={onDeleteAccount}
-                title="Delete Account"
-                className="p-2 rounded-full transition-all text-red-400 hover:bg-red-500/20 active:scale-95"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -289,7 +271,7 @@ export function ChatList({
             }`}
           >
             {needsHumanCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
             )}
             Needs Attention
             {needsHumanCount > 0 && (
@@ -318,6 +300,9 @@ export function ChatList({
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
+            {unreadCount > 0 && (
+              <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] shrink-0" />
+            )}
             Unread
             {unreadCount > 0 && (
               <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
@@ -424,12 +409,13 @@ export function ChatList({
                     alt={chat.name}
                     className="w-13 h-13 rounded-full object-cover shadow-sm"
                   />
-                  {chat.needsHuman && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500 border-2 border-white dark:border-[#111b21]" />
-                    </span>
-                  )}
+                  {chat.needsHuman ? (
+                    /* Solid static red dot (no glowing animation) */
+                    <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white dark:border-[#111b21]" />
+                  ) : Boolean(chat.unread) ? (
+                    /* Solid green dot on avatar for chats with unread notifications */
+                    <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111b21]" />
+                  ) : null}
                 </div>
 
                 {/* Content */}
@@ -462,23 +448,27 @@ export function ChatList({
                     </p>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Needs Human Badge */}
-                      {chat.needsHuman && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-500 text-white shrink-0 tracking-wide">
-                          ATTENTION
-                        </span>
+                      {/* Green dot indicator for unread notifications */}
+                      {Boolean(chat.unread) && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] shrink-0" />
                       )}
 
-                      {/* Agent Tag */}
-                      {chat.agent && !chat.needsHuman && (
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                          isDarkMode
-                            ? "bg-[#202c33] text-slate-300 border border-[#2a3942]"
-                            : "bg-slate-100 text-slate-700 border border-slate-200"
-                        }`}>
-                          {chat.agent}
-                        </span>
-                      )}
+                      {/* Always present uniform handler badge: Admin / Agent Name / AI */}
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full min-w-[36px] text-center tracking-wide ${
+                        chat.agent
+                          ? isDarkMode
+                            ? "bg-[#202c33] text-blue-300 border border-blue-900/40"
+                            : "bg-blue-50 text-blue-700 border border-blue-200"
+                          : chat.needsHuman
+                          ? isDarkMode
+                            ? "bg-amber-950/60 text-amber-300 border border-amber-800/40"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                          : isDarkMode
+                          ? "bg-[#202c33] text-slate-300 border border-[#2a3942]"
+                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                      }`}>
+                        {chat.agent || (chat.needsHuman ? "Admin" : "AI")}
+                      </span>
 
                       {/* Unread Counter Pill */}
                       {Boolean(chat.unread) && (

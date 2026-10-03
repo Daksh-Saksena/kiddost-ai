@@ -497,14 +497,44 @@ export default function AppClient() {
 
     // Lightweight query: recent messages and recent conversations only (no full table scans)
     const [convsRes, msgsRes] = await Promise.all([
-      supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(100),
-      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(250)
+      supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(150),
+      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(1000)
     ]);
 
     const conversationsData = convsRes.data || [];
-    const messagesData = msgsRes.data || [];
+    let messagesData = msgsRes.data || [];
 
     if (msgsRes.error && conversationsData.length === 0) return;
+
+    // Map each phone number to its latest message row
+    const latestMsgMap = new Map();
+    for (const row of messagesData) {
+      if (!latestMsgMap.has(row.phone)) {
+        latestMsgMap.set(row.phone, row);
+      }
+    }
+
+    // Backfill any conversation phone numbers not present in the top 1000 messages (e.g. Geeta, Maggi)
+    const missingPhones = conversationsData.map(c => c.phone).filter(p => !latestMsgMap.has(p));
+    if (missingPhones.length > 0) {
+      try {
+        const { data: missingMsgs } = await supabase
+          .from("messages")
+          .select("phone, content, role, sender, agent, media_url, created_at")
+          .in("phone", missingPhones)
+          .order("created_at", { ascending: false });
+        if (missingMsgs && missingMsgs.length > 0) {
+          for (const row of missingMsgs) {
+            if (!latestMsgMap.has(row.phone)) {
+              latestMsgMap.set(row.phone, row);
+            }
+          }
+          messagesData = [...messagesData, ...missingMsgs];
+        }
+      } catch (err) {
+        console.warn('Error fetching missing conversation messages:', err);
+      }
+    }
 
     // Save messages to allRecentMessages for global search
     setAllRecentMessages(messagesData);
@@ -516,14 +546,6 @@ export default function AppClient() {
       const lastSeen = lastSeenRef.current[row.phone];
       if (!lastSeen || row.created_at > lastSeen) {
         unreadCount[row.phone] = (unreadCount[row.phone] || 0) + 1;
-      }
-    }
-
-    // Map each phone number to its latest message row
-    const latestMsgMap = new Map();
-    for (const row of messagesData) {
-      if (!latestMsgMap.has(row.phone)) {
-        latestMsgMap.set(row.phone, row);
       }
     }
 
