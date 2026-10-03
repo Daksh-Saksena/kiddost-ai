@@ -36,6 +36,7 @@ interface ChatListProps {
   onOpenCalendar: () => void;
   allRecentMessages?: any[];
   loading?: boolean;
+  pinnedOrder?: string[];
 }
 
 export function ChatList({
@@ -49,9 +50,10 @@ export function ChatList({
   onOpenCalendar,
   allRecentMessages = [],
   loading = false,
+  pinnedOrder = [],
 }: ChatListProps) {
   const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<'all' | 'needsHuman' | 'unread' | 'pinned'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'needsHuman' | 'unread'>('all');
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [newPhone, setNewPhone] = useState('');
   const [newTemplateSending, setNewTemplateSending] = useState(false);
@@ -94,13 +96,11 @@ export function ChatList({
   // Pre-calculate filter counts with useMemo for zero-lag updates
   const needsHumanCount = useMemo(() => chats.filter(c => c.needsHuman).length, [chats]);
   const unreadCount = useMemo(() => chats.filter(c => (c.unread || 0) > 0).length, [chats]);
-  const pinnedCount = useMemo(() => chats.filter(c => c.pinned).length, [chats]);
 
   // 1. Filter chats by active tab
   const filterApplied = useMemo(() => {
     if (activeFilter === 'needsHuman') return chats.filter(c => c.needsHuman);
     if (activeFilter === 'unread') return chats.filter(c => (c.unread || 0) > 0);
-    if (activeFilter === 'pinned') return chats.filter(c => c.pinned);
     return chats;
   }, [chats, activeFilter]);
 
@@ -117,14 +117,24 @@ export function ChatList({
     });
   }, [filterApplied, query, allRecentMessages]);
 
-  // 3. Sort chats strictly by latest message (no pin prioritization)
+  // 3. Sort chats: pinned first (in pinned order, so newly pinned goes to the bottom of the pinned list at the top), then latest message timestamp
   const sorted = useMemo(() => {
     return [...searchResults].sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return Number(!!b.pinned) - Number(!!a.pinned);
+      }
+      if (a.pinned && b.pinned && pinnedOrder && pinnedOrder.length > 0) {
+        const indexA = pinnedOrder.indexOf(a.id);
+        const indexB = pinnedOrder.indexOf(b.id);
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+      }
       const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
       const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [searchResults]);
+  }, [searchResults, pinnedOrder]);
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-[#0b141a] text-slate-100" : "bg-white text-slate-900"}`}>
@@ -297,30 +307,6 @@ export function ChatList({
               </span>
             )}
           </button>
-
-          {/* PINNED */}
-          <button
-            onClick={() => setActiveFilter('pinned')}
-            className={`text-[14px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
-              activeFilter === 'pinned'
-                ? isDarkMode
-                  ? "bg-amber-500 text-slate-900 font-semibold shadow-sm"
-                  : "bg-amber-500 text-white font-semibold shadow-sm"
-                : isDarkMode
-                ? "bg-[#202c33] text-slate-300 hover:bg-[#26353d]"
-                : "bg-[#f0f2f5] text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <Pin className="w-3.5 h-3.5" fill={pinnedCount > 0 ? "currentColor" : "none"} />
-            Pinned
-            {pinnedCount > 0 && (
-              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
-                activeFilter === 'pinned' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
-              }`}>
-                {pinnedCount}
-              </span>
-            )}
-          </button>
         </div>
       </div>
 
@@ -359,12 +345,12 @@ export function ChatList({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-transparent">
+          <div>
             {sorted.map((chat) => (
               <div
                 key={chat.id}
                 onClick={() => onSelectChat(chat.id)}
-                className={`flex items-center px-4 py-3 cursor-pointer transition-colors select-none ${
+                className={`flex items-center px-4 py-2.5 cursor-pointer transition-colors select-none ${
                   isDarkMode
                     ? "hover:bg-[#202c33]/50 active:bg-[#202c33]"
                     : "hover:bg-[#f5f6f6] active:bg-[#eaebeb]"
@@ -383,8 +369,8 @@ export function ChatList({
                   )}
                 </div>
 
-                {/* Content with indented WhatsApp divider */}
-                <div className="flex-1 min-w-0 border-b border-slate-100 dark:border-[#202c33]/70 pb-3 pt-0.5">
+                {/* Content */}
+                <div className="flex-1 min-w-0 py-0.5">
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
                     <h3 className={`font-semibold text-[17.5px] truncate leading-tight ${
                       isDarkMode ? "text-slate-100" : "text-[#111b21]"

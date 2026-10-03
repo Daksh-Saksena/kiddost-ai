@@ -982,6 +982,7 @@ export default function AppClient() {
                 chats={chats}
                 allRecentMessages={allRecentMessages}
                 loading={loadingChats}
+                pinnedOrder={pinnedChatIds}
               />
             )}
           </div>
