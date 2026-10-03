@@ -63,17 +63,6 @@ const KNOWN_TEMPLATES = [
   { id: 'slots_available', name: 'Slots Available', body: 'Hi! We have slots available {{1}} . Would you like to try a session and see how it works for you?', language: 'en' }
 ];
 
-// Quick response suggestions for agents on mobile (1-tap to insert into textarea)
-const QUICK_RESPONSES = [
-  { label: "Child's Age?", text: "Could I please know the child's age first?" },
-  { label: "Intro ₹500", text: "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." },
-  { label: "Standard Rates", text: "Our standard pricing is: ₹700 for 1 hour, ₹1200 for 2 hours, and ₹1700 for 3 hours. Feel free to let us know if you have any questions." },
-  { label: "Check Area", text: "Let me check if we can service your area and get back to you." },
-  { label: "Slot Availability", text: "Sure, allow me to check the slot availability and come back to you." },
-  { label: "4-8 Yrs Activities", text: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity." },
-  { label: "2-3 Yrs Activities", text: "For this age category we engage the child with verbal interaction, age appropriate puzzles, toys, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity." },
-  { label: "Call Scheduled", text: "Hi! Our team will give you a call shortly to discuss all details and answer any questions." }
-];
 
 export function ChatDetail({
   chatId,
@@ -708,57 +697,28 @@ export function ChatDetail({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Action Suggestion Chips Bar */}
-      <div className={`px-2.5 py-1.5 overflow-x-auto no-scrollbar flex items-center gap-1.5 border-t select-none ${
-        isDarkMode
-          ? "bg-[#111b21] border-[#202c33]"
-          : "bg-[#f8f9fa] border-slate-200"
-      }`}>
-        <span className={`text-[10px] uppercase font-bold tracking-wider px-1 shrink-0 ${
-          isDarkMode ? "text-slate-500" : "text-slate-400"
-        }`}>
-          Quick:
-        </span>
-        {QUICK_RESPONSES.map((qr) => (
-          <button
-            key={qr.label}
-            onClick={() => {
-              setInputValue(qr.text);
-              if (textareaRef.current) textareaRef.current.focus();
-            }}
-            className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap shrink-0 transition-all active:scale-95 border ${
-              isDarkMode
-                ? "bg-[#202c33] border-[#2a3942] text-slate-300 hover:text-white hover:border-emerald-500/50"
-                : "bg-white border-slate-200 text-slate-700 hover:text-[#008069] hover:border-[#008069]"
-            }`}
-          >
-            {qr.label}
-          </button>
-        ))}
-      </div>
-
       {/* Input Composer Bar (Safe Area Protected on iOS) */}
-      <footer className={`px-3 py-2.5 pb-safe border-t sticky bottom-0 z-30 transition-colors ${
+      <footer className={`px-3.5 pt-3 pb-4 pb-safe border-t sticky bottom-0 z-30 transition-colors ${
         isDarkMode
           ? "bg-[#111b21] border-[#202c33]"
           : "bg-white border-slate-200 shadow-md"
       }`}>
         {is24hWindowClosed ? (
-          <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500">
-            <p className="text-xs font-medium flex-1">
+          <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500">
+            <p className="text-sm font-medium flex-1">
               24-hour WhatsApp messaging window closed. Send a template message to reopen.
             </p>
             <button
               onClick={openTemplateModal}
-              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 text-white shrink-0 hover:bg-amber-600 active:scale-95 transition-all"
+              className="text-xs font-bold px-3.5 py-2 rounded-lg bg-amber-500 text-white shrink-0 hover:bg-amber-600 active:scale-95 transition-all"
             >
               Send Template
             </button>
           </div>
         ) : (
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2.5">
             {/* Attachment Button */}
-            <label className={`p-2.5 rounded-full cursor-pointer transition-all active:scale-95 shrink-0 mb-0.5 ${
+            <label className={`p-3 rounded-full cursor-pointer transition-all active:scale-95 shrink-0 mb-0.5 min-w-[44px] min-h-[44px] flex items-center justify-center ${
               isDarkMode
                 ? "text-slate-400 hover:text-slate-200 hover:bg-[#202c33]"
                 : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
@@ -771,7 +731,7 @@ export function ChatDetail({
             <button
               onClick={openTemplateModal}
               title="Send Template"
-              className={`p-2.5 rounded-full transition-all active:scale-95 shrink-0 mb-0.5 ${
+              className={`p-3 rounded-full transition-all active:scale-95 shrink-0 mb-0.5 min-w-[44px] min-h-[44px] flex items-center justify-center ${
                 isDarkMode
                   ? "text-slate-400 hover:text-slate-200 hover:bg-[#202c33]"
                   : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
@@ -788,19 +748,19 @@ export function ChatDetail({
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder="Type message..."
-              className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-[15px] resize-none overflow-y-auto leading-snug transition-all ${
+              className={`flex-1 rounded-2xl px-4 py-3 outline-none text-base resize-none overflow-y-auto leading-snug transition-all ${
                 isDarkMode
                   ? "bg-[#202c33] text-slate-100 placeholder:text-slate-500 border border-[#2a3942] focus:border-emerald-500"
                   : "bg-slate-100 text-slate-900 placeholder:text-slate-400 border border-slate-200 focus:border-[#008069]"
               }`}
-              style={{ minHeight: '40px', maxHeight: '120px' }}
+              style={{ minHeight: '48px', maxHeight: '130px' }}
             />
 
             {/* Send Button */}
             <button
               onClick={handleSend}
               disabled={sendCooldown || !inputValue.trim()}
-              className={`p-3 rounded-full shrink-0 mb-0.5 active:scale-95 transition-all shadow-sm ${
+              className={`p-3.5 rounded-full shrink-0 mb-0.5 min-w-[48px] min-h-[48px] flex items-center justify-center active:scale-95 transition-all shadow-sm ${
                 inputValue.trim()
                   ? isDarkMode
                     ? "bg-emerald-600 text-white hover:bg-emerald-500"
@@ -810,7 +770,7 @@ export function ChatDetail({
                   : "bg-slate-200 text-slate-400 cursor-not-allowed"
               }`}
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             </button>
           </div>
         )}

@@ -147,12 +147,12 @@ export function ChatList({
         <div className="flex items-center justify-between gap-2">
           {/* Left: Brand & title */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center font-bold text-sm shrink-0">
               KD
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold tracking-tight leading-tight truncate">KidDost</h1>
-              <p className={`text-[11px] font-medium leading-none ${isDarkMode ? "text-emerald-400" : "text-emerald-100"}`}>
+              <h1 className="text-xl font-bold tracking-tight leading-tight truncate">KidDost</h1>
+              <p className={`text-xs font-semibold leading-none ${isDarkMode ? "text-emerald-400" : "text-emerald-100"}`}>
                 Support Agent Hub
               </p>
             </div>
@@ -225,7 +225,7 @@ export function ChatList({
           : "bg-white/95 backdrop-blur-md border-slate-100"
       }`}>
         {/* Search Bar Input */}
-        <div className={`flex items-center rounded-xl px-3.5 py-2 transition-all ${
+        <div className={`flex items-center rounded-xl px-3.5 py-2.5 transition-all ${
           isDarkMode
             ? "bg-[#202c33] text-slate-100 focus-within:ring-2 focus-within:ring-emerald-500/30"
             : "bg-slate-100 text-slate-900 focus-within:ring-2 focus-within:ring-[#008069]/20"
@@ -236,7 +236,7 @@ export function ChatList({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, phone or message..."
-            className="flex-1 ml-2.5 bg-transparent outline-none text-sm placeholder:text-slate-400"
+            className="flex-1 ml-2.5 bg-transparent outline-none text-[15px] placeholder:text-slate-400"
           />
           {query && (
             <button
@@ -249,22 +249,22 @@ export function ChatList({
         </div>
 
         {/* Filter Chips Bar (Mobile Horizontal Scrolling) */}
-        <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-0.5">
+        <div className="flex items-center gap-2 mt-2.5 overflow-x-auto no-scrollbar pb-0.5">
           {/* ALL */}
           <button
             onClick={() => setActiveFilter('all')}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[13px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'all'
                 ? isDarkMode
-                  ? "bg-slate-100 text-slate-900 shadow-sm"
-                  : "bg-[#008069] text-white shadow-sm"
+                  ? "bg-slate-100 text-slate-900 shadow-sm font-semibold"
+                  : "bg-[#008069] text-white shadow-sm font-semibold"
                 : isDarkMode
                 ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
             All
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
               activeFilter === 'all'
                 ? isDarkMode ? "bg-slate-300 text-slate-900" : "bg-emerald-800 text-white"
                 : isDarkMode ? "bg-[#111b21] text-slate-400" : "bg-slate-200 text-slate-600"
@@ -276,7 +276,7 @@ export function ChatList({
           {/* NEEDS HUMAN */}
           <button
             onClick={() => setActiveFilter('needsHuman')}
-            className={`text-xs px-3 py-1.5 rounded-full font-semibold shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[13px] px-3.5 py-1.5 rounded-full font-semibold shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'needsHuman'
                 ? "bg-rose-600 text-white shadow-sm"
                 : needsHumanCount > 0
@@ -293,7 +293,7 @@ export function ChatList({
             )}
             Needs Attention
             {needsHumanCount > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                 activeFilter === 'needsHuman' ? "bg-rose-800 text-white" : "bg-rose-500 text-white"
               }`}>
                 {needsHumanCount}
@@ -304,15 +304,15 @@ export function ChatList({
           {/* UNREAD */}
           <button
             onClick={() => setActiveFilter('unread')}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[13px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'unread'
                 ? isDarkMode
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "bg-[#008069] text-white shadow-sm"
+                  ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                  : "bg-[#008069] text-white shadow-sm font-semibold"
                 : unreadCount > 0
                 ? isDarkMode
-                  ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/40"
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/40 font-semibold"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold"
                 : isDarkMode
                 ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -320,7 +320,7 @@ export function ChatList({
           >
             Unread
             {unreadCount > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                 activeFilter === 'unread' ? "bg-emerald-800 text-white" : "bg-[#25D366] text-white"
               }`}>
                 {unreadCount}
@@ -331,7 +331,7 @@ export function ChatList({
           {/* PINNED */}
           <button
             onClick={() => setActiveFilter('pinned')}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[13px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'pinned'
                 ? isDarkMode
                   ? "bg-amber-500 text-slate-900 font-semibold shadow-sm"
@@ -341,10 +341,10 @@ export function ChatList({
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            <Pin className="w-3 h-3" fill={pinnedCount > 0 ? "currentColor" : "none"} />
+            <Pin className="w-3.5 h-3.5" fill={pinnedCount > 0 ? "currentColor" : "none"} />
             Pinned
             {pinnedCount > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                 activeFilter === 'pinned' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
               }`}>
                 {pinnedCount}
@@ -357,10 +357,10 @@ export function ChatList({
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as any)}
-              className={`text-xs px-2.5 py-1.5 rounded-full border outline-none cursor-pointer font-medium ${
+              className={`text-xs px-3 py-1.5 rounded-full border outline-none cursor-pointer font-semibold ${
                 isDarkMode
-                  ? "bg-[#202c33] border-[#2a3942] text-slate-300"
-                  : "bg-slate-50 border-slate-200 text-slate-700"
+                  ? "bg-[#202c33] border-[#2a3942] text-slate-200"
+                  : "bg-slate-50 border-slate-200 text-slate-800"
               }`}
             >
               <option value="latest">Latest</option>
@@ -436,16 +436,16 @@ export function ChatList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <h3 className={`font-semibold text-[15px] truncate leading-tight ${
+                      <h3 className={`font-bold text-[17px] truncate leading-tight ${
                         isDarkMode ? "text-slate-100" : "text-slate-900"
                       }`}>
                         {chat.name}
                       </h3>
                       {chat.pinned && (
-                        <Pin className="w-3 h-3 text-amber-500 shrink-0" fill="currentColor" />
+                        <Pin className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="currentColor" />
                       )}
                     </div>
-                    <span className={`text-[11px] font-medium shrink-0 ${
+                    <span className={`text-xs font-semibold shrink-0 ${
                       chat.unread ? (isDarkMode ? "text-emerald-400" : "text-[#008069]") : (isDarkMode ? "text-slate-500" : "text-slate-400")
                     }`}>
                       {chat.time}
@@ -453,10 +453,10 @@ export function ChatList({
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`text-xs truncate flex-1 leading-snug ${
+                    <p className={`text-[14px] truncate flex-1 leading-snug ${
                       chat.unread
-                        ? (isDarkMode ? "font-semibold text-slate-200" : "font-semibold text-slate-800")
-                        : (isDarkMode ? "text-slate-400" : "text-slate-500")
+                        ? (isDarkMode ? "font-semibold text-slate-100" : "font-semibold text-slate-900")
+                        : (isDarkMode ? "text-slate-400" : "text-slate-600")
                     }`}>
                       {chat.lastMessage || "No messages yet"}
                     </p>
@@ -464,17 +464,17 @@ export function ChatList({
                     <div className="flex items-center gap-1.5 shrink-0">
                       {/* Needs Human Badge */}
                       {chat.needsHuman && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500 text-white shrink-0">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-500 text-white shrink-0 tracking-wide">
                           ATTENTION
                         </span>
                       )}
 
                       {/* Agent Tag */}
                       {chat.agent && !chat.needsHuman && (
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                           isDarkMode
-                            ? "bg-[#202c33] text-slate-400 border border-[#2a3942]"
-                            : "bg-slate-100 text-slate-600 border border-slate-200"
+                            ? "bg-[#202c33] text-slate-300 border border-[#2a3942]"
+                            : "bg-slate-100 text-slate-700 border border-slate-200"
                         }`}>
                           {chat.agent}
                         </span>
@@ -482,7 +482,7 @@ export function ChatList({
 
                       {/* Unread Counter Pill */}
                       {Boolean(chat.unread) && (
-                        <span className="text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-[#25D366] shadow-sm">
+                        <span className="text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center bg-[#25D366] shadow-sm">
                           {chat.unread}
                         </span>
                       )}
@@ -503,7 +503,7 @@ export function ChatList({
                             : "text-slate-300 hover:text-slate-600 hover:bg-slate-100"
                         }`}
                       >
-                        <Pin className="w-3.5 h-3.5" fill={chat.pinned ? "currentColor" : "none"} />
+                        <Pin className="w-4 h-4" fill={chat.pinned ? "currentColor" : "none"} />
                       </button>
                     </div>
                   </div>
@@ -514,7 +514,7 @@ export function ChatList({
                       {chat.labels.map((l) => (
                         <span
                           key={l}
-                          className={`text-[9px] font-medium px-1.5 py-0.2 rounded ${
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
                             isDarkMode
                               ? "bg-slate-800 text-emerald-300 border border-emerald-900/40"
                               : "bg-emerald-50 text-emerald-700 border border-emerald-200"
