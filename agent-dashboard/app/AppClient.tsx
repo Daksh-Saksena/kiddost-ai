@@ -531,7 +531,8 @@ export default function AppClient() {
           .from("messages")
           .select("phone, content, role, sender, agent, media_url, created_at")
           .in("phone", missingPhones)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })
+          .limit(300);
         if (missingMsgs && missingMsgs.length > 0) {
           for (const row of missingMsgs) {
             if (!latestMsgMap.has(row.phone)) {
@@ -621,33 +622,6 @@ export default function AppClient() {
           pinned: scopedPinned.includes(phone),
           needsHuman: needsHumanPhones.has(phone),
         });
-      }
-    }
-
-    // Pre-seed message cache for conversations using recent messages
-    for (const row of messagesData) {
-      if (!messagesCacheRef.current[row.phone]) {
-        const phoneMsgs = messagesData
-          .filter((m: any) => m.phone === row.phone)
-          .slice()
-          .reverse()
-          .map((m: any) => {
-            const isOther = m.sender === 'user' || m.role === 'user';
-            const isSystem = m.sender === 'system' || m.role === 'system';
-            return {
-              id: String(m.id || m.created_at),
-              text: m.content || m.text || '',
-              sender: isSystem ? 'system' : (isOther ? 'other' : 'me'),
-              time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-              created_at: m.created_at,
-              agent: m.agent ?? null,
-              ai_enabled: typeof m.ai_enabled !== 'undefined' ? !!m.ai_enabled : true,
-              status: m.status ?? null,
-              media_url: m.media_url ?? null,
-              whatsapp_id: m.whatsapp_id ?? null,
-            } as Message;
-          });
-        messagesCacheRef.current[row.phone] = phoneMsgs;
       }
     }
 
