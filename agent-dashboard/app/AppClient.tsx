@@ -347,12 +347,21 @@ export default function AppClient() {
       lastTouchEnd = now;
     };
 
+    const handleFocusOut = (e: FocusEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        window.scrollTo({ left: 0 });
+      }
+    };
+
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: false });
+    document.addEventListener('focusout', handleFocusOut);
 
     return () => {
       document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('focusout', handleFocusOut);
     };
   }, []);
 

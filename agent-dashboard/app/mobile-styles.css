@@ -1,6 +1,9 @@
 /* Modern Mobile Dashboard Styles */
 
 html, body, #__next {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   height: 100%;
   height: 100dvh;
   margin: 0;
@@ -10,7 +13,14 @@ html, body, #__next {
   overscroll-behavior-y: none;
 }
 
-/* Prevent double-tap zoom & remove 300ms tap delay */
+/* Bulletproof iOS auto-zoom prevention: iOS zooms whenever input font-size < 16px */
+@media screen and (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Prevent double-tap zoom & remove tap delay */
 button, a, input, textarea, select {
   touch-action: manipulation;
 }

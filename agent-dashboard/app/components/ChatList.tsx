@@ -52,7 +52,6 @@ export function ChatList({
 }: ChatListProps) {
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<'all' | 'needsHuman' | 'unread' | 'pinned'>('all');
-  const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [newPhone, setNewPhone] = useState('');
   const [newTemplateSending, setNewTemplateSending] = useState(false);
@@ -118,23 +117,15 @@ export function ChatList({
     });
   }, [filterApplied, query, allRecentMessages]);
 
-  // 3. Sort chats
+  // 3. Sort chats: pinned first, then latest message by default
   const sorted = useMemo(() => {
-    const list = [...searchResults];
-    if (sort === 'az') {
-      return list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    if (sort === 'agent') {
-      return list.sort((a, b) => (a.agent || 'AI').localeCompare(b.agent || 'AI'));
-    }
-    // Default 'latest': pinned first, then chronological
-    return list.sort((a, b) => {
+    return [...searchResults].sort((a, b) => {
       if (a.pinned !== b.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
       const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
       const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [searchResults, sort]);
+  }, [searchResults]);
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-[#0b141a] text-slate-100" : "bg-white text-slate-900"}`}>
@@ -144,11 +135,9 @@ export function ChatList({
           ? "bg-[#111b21] border-b border-[#202c33]"
           : "bg-[#008069] text-white"
       }`}>
-        <div className="flex items-center justify-between gap-2">
-          {/* Left: Clean title */}
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-xl font-bold tracking-tight">Chats</h1>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          {/* Left: WhatsApp Chats heading */}
+          <h1 className="text-[22px] font-bold tracking-tight">Chats</h1>
 
           {/* Right: Actions */}
           <div className="flex items-center gap-1 shrink-0">
@@ -200,24 +189,24 @@ export function ChatList({
         </div>
       </header>
 
-      {/* Sticky Search & Filter Control Bar */}
-      <div className={`px-3 py-2.5 sticky top-[57px] z-20 transition-colors border-b ${
+      {/* Sticky Search & WhatsApp Filter Chips */}
+      <div className={`px-4 pt-2.5 pb-2.5 sticky top-[57px] z-20 transition-colors border-b ${
         isDarkMode
-          ? "bg-[#111b21]/95 backdrop-blur-md border-[#202c33]"
-          : "bg-white/95 backdrop-blur-md border-slate-100"
+          ? "bg-[#111b21] border-[#202c33]"
+          : "bg-white border-slate-100"
       }`}>
         {/* Search Bar Input */}
-        <div className={`flex items-center rounded-xl px-3.5 py-2.5 transition-all ${
+        <div className={`flex items-center rounded-xl px-3.5 py-2 transition-all ${
           isDarkMode
             ? "bg-[#202c33] text-slate-100 focus-within:ring-2 focus-within:ring-emerald-500/30"
-            : "bg-slate-100 text-slate-900 focus-within:ring-2 focus-within:ring-[#008069]/20"
+            : "bg-[#f0f2f5] text-slate-900 focus-within:ring-2 focus-within:ring-[#008069]/20"
         }`}>
           <Search className={`w-4 h-4 shrink-0 ${isDarkMode ? "text-slate-400" : "text-slate-500"}`} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, phone or message..."
+            placeholder="Search..."
             className="flex-1 ml-2.5 bg-transparent outline-none text-[15px] placeholder:text-slate-400"
           />
           {query && (
@@ -230,52 +219,52 @@ export function ChatList({
           )}
         </div>
 
-        {/* Filter Chips Bar (Mobile Horizontal Scrolling) */}
+        {/* Filter Chips Bar (WhatsApp native style) */}
         <div className="flex items-center gap-2 mt-2.5 overflow-x-auto no-scrollbar pb-0.5">
           {/* ALL */}
           <button
             onClick={() => setActiveFilter('all')}
-            className={`text-[13px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[14px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'all'
                 ? isDarkMode
-                  ? "bg-slate-100 text-slate-900 shadow-sm font-semibold"
-                  : "bg-[#008069] text-white shadow-sm font-semibold"
+                  ? "bg-[#103629] text-[#25d366] border border-[#1b5e47] font-semibold"
+                  : "bg-[#d9fdd3] text-[#008069] border border-[#aaeac0] font-semibold"
                 : isDarkMode
-                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#202c33] text-slate-300 hover:bg-[#26353d]"
+                : "bg-[#f0f2f5] text-slate-600 hover:bg-slate-200"
             }`}
           >
             All
-            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+            <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
               activeFilter === 'all'
-                ? isDarkMode ? "bg-slate-300 text-slate-900" : "bg-emerald-800 text-white"
+                ? isDarkMode ? "bg-[#25d366]/20 text-[#25d366]" : "bg-[#008069]/15 text-[#008069]"
                 : isDarkMode ? "bg-[#111b21] text-slate-400" : "bg-slate-200 text-slate-600"
             }`}>
               {chats.length}
             </span>
           </button>
 
-          {/* NEEDS HUMAN */}
+          {/* ATTENTION */}
           <button
             onClick={() => setActiveFilter('needsHuman')}
-            className={`text-[13px] px-3.5 py-1.5 rounded-full font-semibold shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[14px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'needsHuman'
-                ? "bg-rose-600 text-white shadow-sm"
+                ? "bg-rose-600 text-white font-semibold shadow-sm"
                 : needsHumanCount > 0
                 ? isDarkMode
-                  ? "bg-rose-950/60 text-rose-300 border border-rose-800/40 hover:bg-rose-900/60"
-                  : "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                  ? "bg-rose-950/60 text-rose-300 border border-rose-800/40 hover:bg-rose-900/60 font-semibold"
+                  : "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-semibold"
                 : isDarkMode
-                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#202c33] text-slate-300 hover:bg-[#26353d]"
+                : "bg-[#f0f2f5] text-slate-600 hover:bg-slate-200"
             }`}
           >
             {needsHumanCount > 0 && (
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
             )}
-            Needs Attention
+            Attention
             {needsHumanCount > 0 && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeFilter === 'needsHuman' ? "bg-rose-800 text-white" : "bg-rose-500 text-white"
               }`}>
                 {needsHumanCount}
@@ -286,27 +275,24 @@ export function ChatList({
           {/* UNREAD */}
           <button
             onClick={() => setActiveFilter('unread')}
-            className={`text-[13px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[14px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'unread'
                 ? isDarkMode
-                  ? "bg-emerald-600 text-white shadow-sm font-semibold"
-                  : "bg-[#008069] text-white shadow-sm font-semibold"
+                  ? "bg-[#103629] text-[#25d366] border border-[#1b5e47] font-semibold"
+                  : "bg-[#d9fdd3] text-[#008069] border border-[#aaeac0] font-semibold"
                 : unreadCount > 0
                 ? isDarkMode
                   ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/40 font-semibold"
                   : "bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold"
                 : isDarkMode
-                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#202c33] text-slate-300 hover:bg-[#26353d]"
+                : "bg-[#f0f2f5] text-slate-600 hover:bg-slate-200"
             }`}
           >
-            {unreadCount > 0 && (
-              <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] shrink-0" />
-            )}
             Unread
             {unreadCount > 0 && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                activeFilter === 'unread' ? "bg-emerald-800 text-white" : "bg-[#25D366] text-white"
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeFilter === 'unread' ? "bg-[#25d366]/20 text-[#25d366]" : "bg-[#25D366] text-white"
               }`}>
                 {unreadCount}
               </span>
@@ -316,43 +302,26 @@ export function ChatList({
           {/* PINNED */}
           <button
             onClick={() => setActiveFilter('pinned')}
-            className={`text-[13px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+            className={`text-[14px] px-3.5 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
               activeFilter === 'pinned'
                 ? isDarkMode
                   ? "bg-amber-500 text-slate-900 font-semibold shadow-sm"
                   : "bg-amber-500 text-white font-semibold shadow-sm"
                 : isDarkMode
-                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                ? "bg-[#202c33] text-slate-300 hover:bg-[#26353d]"
+                : "bg-[#f0f2f5] text-slate-600 hover:bg-slate-200"
             }`}
           >
             <Pin className="w-3.5 h-3.5" fill={pinnedCount > 0 ? "currentColor" : "none"} />
             Pinned
             {pinnedCount > 0 && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                 activeFilter === 'pinned' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
               }`}>
                 {pinnedCount}
               </span>
             )}
           </button>
-
-          {/* Sort Switcher (Latest / A-Z / Agent) */}
-          <div className="ml-auto flex items-center pl-1 shrink-0">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as any)}
-              className={`text-xs px-3 py-1.5 rounded-full border outline-none cursor-pointer font-semibold ${
-                isDarkMode
-                  ? "bg-[#202c33] border-[#2a3942] text-slate-200"
-                  : "bg-slate-50 border-slate-200 text-slate-800"
-              }`}
-            >
-              <option value="latest">Latest</option>
-              <option value="az">A – Z</option>
-              <option value="agent">Agent</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -391,23 +360,23 @@ export function ChatList({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-[#202c33]/50">
+          <div className="divide-y divide-transparent">
             {sorted.map((chat) => (
               <div
                 key={chat.id}
                 onClick={() => onSelectChat(chat.id)}
-                className={`flex items-center px-4 py-3.5 cursor-pointer transition-all active:scale-[0.99] select-none ${
+                className={`flex items-center px-4 py-3 cursor-pointer transition-colors select-none ${
                   isDarkMode
-                    ? "hover:bg-[#202c33]/40 active:bg-[#202c33]/80"
-                    : "hover:bg-slate-50 active:bg-slate-100"
-                } ${chat.needsHuman ? (isDarkMode ? "bg-rose-950/15" : "bg-rose-50/40") : ""}`}
+                    ? "hover:bg-[#202c33]/50 active:bg-[#202c33]"
+                    : "hover:bg-[#f5f6f6] active:bg-[#eaebeb]"
+                } ${chat.needsHuman ? (isDarkMode ? "bg-rose-950/20" : "bg-rose-50/50") : ""}`}
               >
                 {/* Avatar with Status Badge */}
                 <div className="relative shrink-0 mr-3.5">
                   <img
                     src={chat.avatar}
                     alt={chat.name}
-                    className="w-13 h-13 rounded-full object-cover shadow-sm"
+                    className="w-[50px] h-[50px] rounded-full object-cover shadow-xs"
                   />
                   {chat.needsHuman && (
                     /* Solid static red dot */
@@ -415,44 +384,46 @@ export function ChatList({
                   )}
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2 mb-1">
-                    <h3 className={`font-bold text-[17px] truncate leading-tight ${
-                      isDarkMode ? "text-slate-100" : "text-slate-900"
+                {/* Content with indented WhatsApp divider */}
+                <div className="flex-1 min-w-0 border-b border-slate-100 dark:border-[#202c33]/70 pb-3 pt-0.5">
+                  <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                    <h3 className={`font-semibold text-[17.5px] truncate leading-tight ${
+                      isDarkMode ? "text-slate-100" : "text-[#111b21]"
                     }`}>
                       {chat.name}
                     </h3>
-                    <span className={`text-xs font-semibold shrink-0 ${
-                      chat.unread ? (isDarkMode ? "text-emerald-400" : "text-[#008069]") : (isDarkMode ? "text-slate-500" : "text-slate-400")
+                    <span className={`text-[12px] font-normal shrink-0 ${
+                      chat.unread
+                        ? (isDarkMode ? "text-[#25d366] font-semibold" : "text-[#008069] font-semibold")
+                        : (isDarkMode ? "text-slate-400" : "text-slate-500")
                     }`}>
                       {chat.time}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`text-[14px] truncate flex-1 leading-snug ${
+                    <p className={`text-[15px] truncate flex-1 leading-snug ${
                       chat.unread
                         ? (isDarkMode ? "font-semibold text-slate-100" : "font-semibold text-slate-900")
-                        : (isDarkMode ? "text-slate-400" : "text-slate-600")
+                        : (isDarkMode ? "text-slate-400" : "text-slate-500")
                     }`}>
                       {chat.lastMessage || "No messages yet"}
                     </p>
 
                     {/* Uniform Right Action Group: [Number of Notifications] -> [AI or Admin] -> [Pin] */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 ml-1">
                       {/* Number of notifications pill (left of AI/Admin) */}
                       {Boolean(chat.unread) && (
-                        <span className="text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center bg-[#25D366] shadow-sm">
+                        <span className="text-white text-[12px] font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center bg-[#25D366] shadow-xs">
                           {chat.unread}
                         </span>
                       )}
 
                       {/* AI or Admin / Agent badge (middle: left of Pin, right of Notifications) */}
-                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full min-w-[34px] text-center tracking-wide ${
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full min-w-[34px] text-center tracking-tight ${
                         chat.agent
                           ? isDarkMode
-                            ? "bg-[#202c33] text-blue-300 border border-blue-900/40"
+                            ? "bg-blue-950/60 text-blue-300 border border-blue-900/40"
                             : "bg-blue-50 text-blue-700 border border-blue-200"
                           : chat.needsHuman
                           ? isDarkMode
@@ -473,12 +444,12 @@ export function ChatList({
                           onTogglePin(chat.id);
                         }}
                         title={chat.pinned ? "Unpin chat" : "Pin chat"}
-                        className={`p-1 rounded-full transition-colors ${
+                        className={`p-1 rounded-full transition-colors active:scale-90 ${
                           chat.pinned
-                            ? "text-amber-500 hover:text-amber-600"
+                            ? "text-amber-500"
                             : isDarkMode
                             ? "text-slate-600 hover:text-slate-400"
-                            : "text-slate-300 hover:text-slate-600"
+                            : "text-slate-300 hover:text-slate-500"
                         }`}
                       >
                         <Pin className="w-4 h-4" fill={chat.pinned ? "currentColor" : "none"} />
