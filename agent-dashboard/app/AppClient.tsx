@@ -160,7 +160,7 @@ function LoginScreen({
 
   return (
     <div
-      className={`relative h-screen max-w-md mx-auto flex flex-col items-center justify-center transition-colors ${
+      className={`relative app-container flex flex-col items-center justify-center transition-colors ${
         isDarkMode ? "bg-black text-white" : "bg-white text-gray-900"
       }`}
       style={isDarkMode ? { boxShadow: "0 0 100px rgba(59,130,246,0.3)" } : { boxShadow: "0 0 50px rgba(0,0,0,0.06)" }}
@@ -396,10 +396,10 @@ export default function AppClient() {
   useEffect(() => {
     if (typeof document !== 'undefined') {
       if (isDarkMode) {
-        document.body.style.backgroundColor = '#0a0a0a';
-        document.body.style.color = '#ededed';
+        document.body.style.backgroundColor = '#0b141a';
+        document.body.style.color = '#f1f5f9';
       } else {
-        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.backgroundColor = '#f0f2f5';
         document.body.style.color = '#0f172a';
       }
     }
@@ -417,11 +417,14 @@ export default function AppClient() {
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
+  const [loadingChats, setLoadingChats] = useState<boolean>(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [allRecentMessages, setAllRecentMessages] = useState<any[]>([]);
   const [pinnedChatIds, setPinnedChatIds] = useState<string[]>([]);
   const [needsHumanPhones, setNeedsHumanPhones] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // High-performance message cache: phone -> Message[] for 0ms chat transitions
+  const messagesCacheRef = useRef<Record<string, Message[]>>({});
   // Track last-seen message timestamp per phone to calculate unread counts
   const lastSeenRef = useRef<Record<string, string>>({});
 
@@ -590,7 +593,35 @@ export default function AppClient() {
       }
     }
 
+    // Pre-seed message cache for conversations using recent messages
+    for (const row of messagesData) {
+      if (!messagesCacheRef.current[row.phone]) {
+        const phoneMsgs = messagesData
+          .filter((m: any) => m.phone === row.phone)
+          .slice()
+          .reverse()
+          .map((m: any) => {
+            const isOther = m.sender === 'user' || m.role === 'user';
+            const isSystem = m.sender === 'system' || m.role === 'system';
+            return {
+              id: String(m.id || m.created_at),
+              text: m.content || m.text || '',
+              sender: isSystem ? 'system' : (isOther ? 'other' : 'me'),
+              time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+              created_at: m.created_at,
+              agent: m.agent ?? null,
+              ai_enabled: typeof m.ai_enabled !== 'undefined' ? !!m.ai_enabled : true,
+              status: m.status ?? null,
+              media_url: m.media_url ?? null,
+              whatsapp_id: m.whatsapp_id ?? null,
+            } as Message;
+          });
+        messagesCacheRef.current[row.phone] = phoneMsgs;
+      }
+    }
+
     setChats(result);
+    setLoadingChats(false);
   };
 
   const selectedChatRef = useRef<string | null>(null);
@@ -610,7 +641,13 @@ export default function AppClient() {
       media_url: null,
       whatsapp_id: null,
     };
-    setMessages(prev => [...prev, optimistic]);
+    setMessages(prev => {
+      const next = [...prev, optimistic];
+      if (selectedChat) {
+        messagesCacheRef.current[selectedChat] = next;
+      }
+      return next;
+    });
     setTimeout(scrollToBottom, 100);
     try {
       await fetch(`${SERVER}/agent-send`, {
@@ -624,11 +661,22 @@ export default function AppClient() {
   };
 
   const loadMessages = async (phone: string) => {
-    setMessages([]);
+    // 1. Instant Cache Hit: render previous history with 0ms latency
+    if (messagesCacheRef.current[phone] && messagesCacheRef.current[phone].length > 0) {
+      setMessages(messagesCacheRef.current[phone]);
+      setTimeout(scrollToBottom, 20);
+    } else {
+      setMessages([]);
+    }
+
+    // 2. Background sync to fetch fresh messages
     const { data, error } = await supabase.from("messages").select("*").eq("phone", phone).order("created_at", { ascending: true });
-    if (error) return;
-    if (selectedChatRef.current !== phone) return;
-    if (!data) return setMessages([]);
+    if (error || selectedChatRef.current !== phone) return;
+    if (!data) {
+      setMessages([]);
+      messagesCacheRef.current[phone] = [];
+      return;
+    }
     const msgs: Message[] = data.map((m: any) => {
       // prefer explicit sender column when present
       const isOther = m.sender === 'user' || m.role === 'user';
@@ -646,6 +694,7 @@ export default function AppClient() {
         whatsapp_id: m.whatsapp_id ?? null,
       });
     });
+    messagesCacheRef.current[phone] = msgs;
     setMessages(msgs);
     setTimeout(scrollToBottom, 50);
   };
@@ -903,7 +952,7 @@ export default function AppClient() {
 
   return (
     <div
-      className={`h-screen max-w-md mx-auto shadow-2xl ${isDarkMode ? "bg-black" : "bg-white"}`}
+      className={`app-container shadow-2xl ${isDarkMode ? "bg-black" : "bg-white"}`}
       style={isDarkMode ? { boxShadow: "0 0 100px rgba(59, 130, 246, 0.3)" } : { boxShadow: "0 0 50px rgba(0, 0, 0, 0.1)" }}
     >
       {showCalendar ? (
@@ -912,7 +961,7 @@ export default function AppClient() {
         <div className="h-full flex flex-col overflow-hidden">
           {/* Chat List: preserved in DOM to maintain scroll position perfectly */}
           <div className={selectedChat ? "hidden" : "h-full flex flex-col"}>
-            {chats.length === 0 ? (
+            {chats.length === 0 && !loadingChats ? (
               <div style={{ padding: 40, color: isDarkMode ? '#fff' : '#000', textAlign: 'center' }}>
                 No chats yet — check DevTools console for errors.
               </div>
@@ -927,6 +976,7 @@ export default function AppClient() {
                 onDeleteAccount={agentId && agentId !== 'admin' ? () => { setDeletePin(''); setDeleteError(''); setShowDeleteModal(true); } : undefined}
                 chats={chats}
                 allRecentMessages={allRecentMessages}
+                loading={loadingChats}
               />
             )}
           </div>

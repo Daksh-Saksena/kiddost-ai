@@ -9,7 +9,12 @@ function hashColor(seed: string): string {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
+const avatarCache = new Map<string, string>();
+
 export function avatarDataUrl(displayName: string, phone = '', color = '#ffffff') {
+  const cacheKey = `${displayName}__${phone}__${color}`;
+  const cached = avatarCache.get(cacheKey);
+  if (cached) return cached;
   const seed = phone || displayName;
   const bg = hashColor(seed);
 
@@ -41,10 +46,15 @@ export function avatarDataUrl(displayName: string, phone = '', color = '#ffffff'
 
   try {
     const safeSvg = svg.toWellFormed ? svg.toWellFormed() : svg.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|([^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/g, "$1\uFFFD");
-    return `data:image/svg+xml;utf8,${encodeURIComponent(safeSvg)}`;
+    const result = `data:image/svg+xml;utf8,${encodeURIComponent(safeSvg)}`;
+    if (avatarCache.size > 1000) avatarCache.clear();
+    avatarCache.set(cacheKey, result);
+    return result;
   } catch (err) {
     console.error('Failed to encode avatar SVG:', err, { displayName, phone, svg });
     const fallbackSvg = `<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}'><rect width='100%' height='100%' fill='${bg}' rx='20'/></svg>`;
-    return `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
+    const fallbackResult = `data:image/svg+xml;utf8,${encodeURIComponent(fallbackSvg)}`;
+    avatarCache.set(cacheKey, fallbackResult);
+    return fallbackResult;
   }
 }

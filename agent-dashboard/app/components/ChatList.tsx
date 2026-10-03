@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X, Pin, CalendarDays } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Search, Moon, Sun, LogOut, Trash2, PenSquare, X, Pin, CalendarDays, AlertCircle, MessageSquare, Sparkles, Filter } from "lucide-react";
 
 const SERVER = 'https://kiddost-ai.onrender.com';
 
@@ -35,10 +35,23 @@ interface ChatListProps {
   onTogglePin: (chatId: string) => void;
   onOpenCalendar: () => void;
   allRecentMessages?: any[];
+  loading?: boolean;
 }
 
-export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, onDeleteAccount, chats, onTogglePin, onOpenCalendar, allRecentMessages = [] }: ChatListProps) {
+export function ChatList({
+  onSelectChat,
+  isDarkMode,
+  onToggleTheme,
+  onLogout,
+  onDeleteAccount,
+  chats,
+  onTogglePin,
+  onOpenCalendar,
+  allRecentMessages = [],
+  loading = false,
+}: ChatListProps) {
   const [query, setQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<'all' | 'needsHuman' | 'unread' | 'pinned'>('all');
   const [sort, setSort] = useState<'latest' | 'az' | 'agent'>('latest');
   const [showNewConvo, setShowNewConvo] = useState(false);
   const [newPhone, setNewPhone] = useState('');
@@ -67,7 +80,11 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed');
       setNewConvoSuccess(true);
-      setTimeout(() => { setShowNewConvo(false); setNewPhone(''); setNewConvoSuccess(false); }, 1500);
+      setTimeout(() => {
+        setShowNewConvo(false);
+        setNewPhone('');
+        setNewConvoSuccess(false);
+      }, 1500);
     } catch (e: any) {
       setNewConvoError(e.message || 'Could not send');
     } finally {
@@ -75,246 +92,491 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
     }
   };
 
-  const filtered = query.trim()
-    ? chats.filter((c) => {
-        const queryLower = query.toLowerCase();
-        // 1. Search contact name
-        if (c.name.toLowerCase().includes(queryLower)) return true;
-        // 2. Search last message
-        if (c.lastMessage.toLowerCase().includes(queryLower)) return true;
-        // 3. Search past messages in allRecentMessages history
-        const hasPastMatch = allRecentMessages.some(
-          (m) =>
-            m.phone === c.id &&
-            m.content &&
-            m.content.toLowerCase().includes(queryLower)
-        );
-        return hasPastMatch;
-      })
-    : chats;
+  // Pre-calculate filter counts with useMemo for zero-lag updates
+  const needsHumanCount = useMemo(() => chats.filter(c => c.needsHuman).length, [chats]);
+  const unreadCount = useMemo(() => chats.filter(c => (c.unread || 0) > 0).length, [chats]);
+  const pinnedCount = useMemo(() => chats.filter(c => c.pinned).length, [chats]);
 
-  const baseSorted = sort === 'az'
-    ? [...filtered].sort((a, b) => a.name.localeCompare(b.name))
-    : sort === 'agent'
-    ? [...filtered].sort((a, b) => (a.agent || 'AI').localeCompare(b.agent || 'AI'))
-    : filtered;
+  // 1. Filter chats by active tab
+  const filterApplied = useMemo(() => {
+    if (activeFilter === 'needsHuman') return chats.filter(c => c.needsHuman);
+    if (activeFilter === 'unread') return chats.filter(c => (c.unread || 0) > 0);
+    if (activeFilter === 'pinned') return chats.filter(c => c.pinned);
+    return chats;
+  }, [chats, activeFilter]);
 
-  const sorted = [...baseSorted].sort((a, b) => {
-    // 1. Pinned chats always go to the top
-    if (a.pinned !== b.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
-    
-    // 2. Otherwise sort strictly by latest message time (most recent first)
-    const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
-    const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
-    
-    return timeB - timeA;
-  });
+  // 2. Filter chats by search query (instant memoized search)
+  const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return filterApplied;
+    return filterApplied.filter((c) => {
+      if (c.name.toLowerCase().includes(q)) return true;
+      if (c.lastMessage.toLowerCase().includes(q)) return true;
+      return allRecentMessages.some(
+        (m) => m.phone === c.id && m.content && m.content.toLowerCase().includes(q)
+      );
+    });
+  }, [filterApplied, query, allRecentMessages]);
+
+  // 3. Sort chats
+  const sorted = useMemo(() => {
+    const list = [...searchResults];
+    if (sort === 'az') {
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (sort === 'agent') {
+      return list.sort((a, b) => (a.agent || 'AI').localeCompare(b.agent || 'AI'));
+    }
+    // Default 'latest': pinned first, then chronological
+    return list.sort((a, b) => {
+      if (a.pinned !== b.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
+      const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
+      const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [searchResults, sort]);
 
   return (
-    <div className={`flex flex-col h-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
-      {/* Header */}
-      <div className={`text-white px-4 py-4 relative overflow-hidden ${
+    <div className={`flex flex-col h-full ${isDarkMode ? "bg-[#0b141a] text-slate-100" : "bg-white text-slate-900"}`}>
+      {/* Sleek Mobile Header */}
+      <header className={`px-4 pt-3.5 pb-3 sticky top-0 z-30 transition-colors shadow-sm ${
         isDarkMode
-          ? "bg-gray-950 border-b border-blue-900/30"
-          : "bg-[#008069]"
+          ? "bg-[#111b21] border-b border-[#202c33]"
+          : "bg-[#008069] text-white"
       }`}>
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onLogout}
-            title="Logout"
-            className={`p-2 rounded-full transition-all ${
-              isDarkMode ? "hover:bg-blue-900/30 text-gray-400 hover:text-white" : "hover:bg-white/10"
-            }`}
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-          {onDeleteAccount && (
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: Brand & title */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center font-bold text-sm shrink-0">
+              KD
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight leading-tight truncate">KidDost</h1>
+              <p className={`text-[11px] font-medium leading-none ${isDarkMode ? "text-emerald-400" : "text-emerald-100"}`}>
+                Support Agent Hub
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
-              onClick={onDeleteAccount}
-              title="Delete Account"
-              className={`p-2 rounded-full transition-all ${
-                isDarkMode ? "hover:bg-red-900/30 text-red-500/70 hover:text-red-400" : "hover:bg-red-500/10 text-red-300 hover:text-red-200"
+              onClick={onOpenCalendar}
+              title="Calendar"
+              className={`p-2 rounded-full transition-all active:scale-95 ${
+                isDarkMode ? "text-slate-300 hover:text-white hover:bg-[#202c33]" : "text-white/90 hover:text-white hover:bg-white/10"
               }`}
             >
-              <Trash2 className="w-4 h-4" />
+              <CalendarDays className="w-5 h-5" />
             </button>
-          )}
-          <h1 className="text-xl flex-1 text-center">Chats</h1>
-          <button
-            onClick={onOpenCalendar}
-            title="Calendar"
-            className={`p-2 rounded-full transition-all ${
-              isDarkMode ? "hover:bg-blue-900/30 text-gray-400 hover:text-white" : "hover:bg-white/10"
-            }`}
-          >
-            <CalendarDays className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => { setShowNewConvo(true); setNewPhone(''); setNewConvoError(''); setNewConvoSuccess(false); }}
-            title="New conversation"
-            className={`p-2 rounded-full transition-all ${
-              isDarkMode ? "hover:bg-blue-900/30 text-gray-400 hover:text-white" : "hover:bg-white/10"
-            }`}
-          >
-            <PenSquare className="w-5 h-5" />
-          </button>
-          <button
-            onClick={onToggleTheme}
-            className={`p-2 rounded-full transition-all ${
-              isDarkMode ? "hover:bg-blue-900/30" : "hover:bg-white/10"
-            }`}
-          >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className={`px-4 py-3 ${
+            <button
+              onClick={() => {
+                setShowNewConvo(true);
+                setNewPhone('');
+                setNewConvoError('');
+                setNewConvoSuccess(false);
+              }}
+              title="New Conversation"
+              className={`p-2 rounded-full transition-all active:scale-95 ${
+                isDarkMode ? "text-slate-300 hover:text-white hover:bg-[#202c33]" : "text-white/90 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <PenSquare className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={onToggleTheme}
+              title={isDarkMode ? "Light Mode" : "Dark Mode"}
+              className={`p-2 rounded-full transition-all active:scale-95 ${
+                isDarkMode ? "text-amber-400 hover:bg-[#202c33]" : "text-white/90 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+
+            <button
+              onClick={onLogout}
+              title="Logout"
+              className={`p-2 rounded-full transition-all active:scale-95 ${
+                isDarkMode ? "text-slate-400 hover:text-white hover:bg-[#202c33]" : "text-white/80 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+
+            {onDeleteAccount && (
+              <button
+                onClick={onDeleteAccount}
+                title="Delete Account"
+                className="p-2 rounded-full transition-all text-red-400 hover:bg-red-500/20 active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Sticky Search & Filter Control Bar */}
+      <div className={`px-3 py-2.5 sticky top-[57px] z-20 transition-colors border-b ${
         isDarkMode
-          ? "bg-gradient-to-b from-gray-900 to-black border-b border-blue-900/30"
-          : "bg-white border-b border-gray-200"
+          ? "bg-[#111b21]/95 backdrop-blur-md border-[#202c33]"
+          : "bg-white/95 backdrop-blur-md border-slate-100"
       }`}>
-        <div className={`flex items-center rounded-xl px-4 py-2.5 ${
+        {/* Search Bar Input */}
+        <div className={`flex items-center rounded-xl px-3.5 py-2 transition-all ${
           isDarkMode
-            ? "bg-gray-900/50 border border-blue-500/20 backdrop-blur-sm"
-            : "bg-gray-100"
+            ? "bg-[#202c33] text-slate-100 focus-within:ring-2 focus-within:ring-emerald-500/30"
+            : "bg-slate-100 text-slate-900 focus-within:ring-2 focus-within:ring-[#008069]/20"
         }`}>
-          <Search className={`w-5 h-5 ${isDarkMode ? "text-blue-400" : "text-gray-500"}`} />
+          <Search className={`w-4 h-4 shrink-0 ${isDarkMode ? "text-slate-400" : "text-slate-500"}`} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={isDarkMode ? "Search transmissions..." : "Search or start new chat"}
-            className={`flex-1 ml-3 bg-transparent outline-none text-sm ${
-              isDarkMode ? "text-gray-300 placeholder:text-gray-600" : "text-gray-900 placeholder:text-gray-500"
-            }`}
+            placeholder="Search name, phone or message..."
+            className="flex-1 ml-2.5 bg-transparent outline-none text-sm placeholder:text-slate-400"
           />
           {query && (
-            <button onClick={() => setQuery("")} className="text-gray-500 hover:text-gray-300 text-xs ml-2">✕</button>
+            <button
+              onClick={() => setQuery("")}
+              className="p-1 rounded-full text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
-        {/* Sort pills */}
-        <div className="flex gap-2 mt-2">
-          {(['latest', 'az', 'agent'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setSort(s)}
-              className={`text-xs px-3 py-1 rounded-full transition-all ${
-                sort === s
-                  ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white'
-                  : isDarkMode ? 'bg-gray-800 text-gray-400 hover:text-white' : 'bg-gray-200 text-gray-600'
+
+        {/* Filter Chips Bar (Mobile Horizontal Scrolling) */}
+        <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar pb-0.5">
+          {/* ALL */}
+          <button
+            onClick={() => setActiveFilter('all')}
+            className={`text-xs px-3 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+              activeFilter === 'all'
+                ? isDarkMode
+                  ? "bg-slate-100 text-slate-900 shadow-sm"
+                  : "bg-[#008069] text-white shadow-sm"
+                : isDarkMode
+                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            All
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+              activeFilter === 'all'
+                ? isDarkMode ? "bg-slate-300 text-slate-900" : "bg-emerald-800 text-white"
+                : isDarkMode ? "bg-[#111b21] text-slate-400" : "bg-slate-200 text-slate-600"
+            }`}>
+              {chats.length}
+            </span>
+          </button>
+
+          {/* NEEDS HUMAN */}
+          <button
+            onClick={() => setActiveFilter('needsHuman')}
+            className={`text-xs px-3 py-1.5 rounded-full font-semibold shrink-0 transition-all flex items-center gap-1.5 ${
+              activeFilter === 'needsHuman'
+                ? "bg-rose-600 text-white shadow-sm"
+                : needsHumanCount > 0
+                ? isDarkMode
+                  ? "bg-rose-950/60 text-rose-300 border border-rose-800/40 hover:bg-rose-900/60"
+                  : "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                : isDarkMode
+                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            {needsHumanCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+            )}
+            Needs Attention
+            {needsHumanCount > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeFilter === 'needsHuman' ? "bg-rose-800 text-white" : "bg-rose-500 text-white"
+              }`}>
+                {needsHumanCount}
+              </span>
+            )}
+          </button>
+
+          {/* UNREAD */}
+          <button
+            onClick={() => setActiveFilter('unread')}
+            className={`text-xs px-3 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+              activeFilter === 'unread'
+                ? isDarkMode
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "bg-[#008069] text-white shadow-sm"
+                : unreadCount > 0
+                ? isDarkMode
+                  ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/40"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : isDarkMode
+                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Unread
+            {unreadCount > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                activeFilter === 'unread' ? "bg-emerald-800 text-white" : "bg-[#25D366] text-white"
+              }`}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* PINNED */}
+          <button
+            onClick={() => setActiveFilter('pinned')}
+            className={`text-xs px-3 py-1.5 rounded-full font-medium shrink-0 transition-all flex items-center gap-1.5 ${
+              activeFilter === 'pinned'
+                ? isDarkMode
+                  ? "bg-amber-500 text-slate-900 font-semibold shadow-sm"
+                  : "bg-amber-500 text-white font-semibold shadow-sm"
+                : isDarkMode
+                ? "bg-[#202c33] text-slate-400 hover:text-slate-200"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Pin className="w-3 h-3" fill={pinnedCount > 0 ? "currentColor" : "none"} />
+            Pinned
+            {pinnedCount > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                activeFilter === 'pinned' ? "bg-amber-700 text-white" : "bg-amber-100 text-amber-800"
+              }`}>
+                {pinnedCount}
+              </span>
+            )}
+          </button>
+
+          {/* Sort Switcher (Latest / A-Z / Agent) */}
+          <div className="ml-auto flex items-center pl-1 shrink-0">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as any)}
+              className={`text-xs px-2.5 py-1.5 rounded-full border outline-none cursor-pointer font-medium ${
+                isDarkMode
+                  ? "bg-[#202c33] border-[#2a3942] text-slate-300"
+                  : "bg-slate-50 border-slate-200 text-slate-700"
               }`}
             >
-              {s === 'latest' ? 'Latest' : s === 'az' ? 'A – Z' : 'Agent'}
-            </button>
-          ))}
+              <option value="latest">Latest</option>
+              <option value="az">A – Z</option>
+              <option value="agent">Agent</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Chat List */}
-      <div className={`flex-1 overflow-y-auto ${isDarkMode ? "bg-black" : "bg-white"}`}>
-        {sorted.length === 0 && (
-          <p className={`text-center text-sm mt-10 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
-            {query ? "No chats match your search." : "No chats yet."}
-          </p>
-        )}
-        {sorted.slice(0, 75).map((chat) => (
-          <div
-            key={chat.id}
-            onClick={() => onSelectChat(chat.id)}
-            className={`flex items-center px-4 py-4 cursor-pointer transition-all duration-200 ${
-              isDarkMode
-                ? "border-b border-blue-900/20 hover:bg-gradient-to-r hover:from-blue-950/50 hover:to-transparent active:from-blue-900/50"
-                : "border-b border-gray-100 hover:bg-gray-50 active:bg-gray-100"
-            }`}
-          >
-            <div className="relative">
-              <img src={chat.avatar} alt={chat.name} className="w-14 h-14 rounded-full object-cover" />
-              {chat.needsHuman && (
-                <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-current"
-                  style={{ borderColor: isDarkMode ? '#000' : '#fff', boxShadow: '0 0 8px rgba(239,68,68,0.7)' }} />
-              )}
-            </div>
-            <div className="flex-1 ml-4 min-w-0">
-              <div className="flex justify-between items-baseline">
-                <div className="flex items-center gap-2 min-w-0">
-                  <h3 className={`font-bold text-lg truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{chat.name}</h3>
-                  {chat.pinned && <Pin className={`w-3.5 h-3.5 flex-shrink-0 ${isDarkMode ? 'text-yellow-300' : 'text-amber-500'}`} fill="currentColor" />}
+      {/* Chat List View */}
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        {loading && chats.length === 0 ? (
+          /* Sleek Skeleton Loading state */
+          <div className="divide-y divide-slate-100 dark:divide-[#202c33]/50">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="flex items-center px-4 py-3.5 animate-pulse gap-3.5">
+                <div className="w-13 h-13 rounded-full bg-slate-200 dark:bg-[#202c33] shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="h-4 bg-slate-200 dark:bg-[#202c33] rounded w-2/5" />
+                  <div className="h-3.5 bg-slate-100 dark:bg-[#202c33]/70 rounded w-4/5" />
                 </div>
-                <span className={`text-xs ml-2 flex-shrink-0 ${isDarkMode ? "text-blue-400" : "text-gray-500"}`}>{chat.time}</span>
+                <div className="h-3 bg-slate-100 dark:bg-[#202c33]/70 rounded w-10 shrink-0" />
               </div>
-              <div className="flex justify-between items-center mt-1.5">
-                <p className={`text-base truncate ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>{chat.lastMessage}</p>
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                  <button
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); onTogglePin(chat.id); }}
-                    title={chat.pinned ? "Unpin chat" : "Pin chat"}
-                    className={`p-1.5 rounded-full transition-all ${
-                      chat.pinned
-                        ? isDarkMode ? 'bg-yellow-500/20 text-yellow-300' : 'bg-amber-100 text-amber-600'
-                        : isDarkMode ? 'text-gray-500 hover:text-yellow-300 hover:bg-yellow-500/10' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                    }`}
-                  >
-                    <Pin className="w-3.5 h-3.5" fill={chat.pinned ? 'currentColor' : 'none'} />
-                  </button>
-                  {chat.agent && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      isDarkMode ? 'bg-blue-900/50 text-blue-300 border border-blue-700/40' : 'bg-gray-100 text-gray-600'
-                    }`}>{chat.agent}</span>
-                  )}
-                  {chat.unread ? (
-                    <span className={`text-white text-xs rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 ${
-                      isDarkMode ? "bg-gradient-to-r from-blue-500 to-cyan-500" : "bg-[#25d366]"
-                    }`} style={isDarkMode ? { boxShadow: '0 0 15px rgba(59, 130, 246, 0.7)' } : {}}>
-                      {chat.unread}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              {chat.labels && chat.labels.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {chat.labels.map(l => (
-                    <span key={l} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      isDarkMode ? 'bg-blue-900/40 text-blue-300' : 'bg-green-100 text-green-700'
-                    }`}>{l}</span>
-                  ))}
-                </div>
-              )}
-            </div>
+            ))}
           </div>
-        ))}
+        ) : sorted.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+              isDarkMode ? "bg-[#202c33] text-slate-500" : "bg-slate-100 text-slate-400"
+            }`}>
+              <MessageSquare className="w-7 h-7" />
+            </div>
+            <h3 className="font-semibold text-base mb-1">
+              {query ? "No matching chats" : activeFilter === 'needsHuman' ? "All clear! No chats need attention" : "No chats yet"}
+            </h3>
+            <p className={`text-xs max-w-xs ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
+              {query
+                ? "Try searching for a different name, phone number, or message keyword."
+                : activeFilter === 'needsHuman'
+                ? "AI is handling all current conversations smoothly."
+                : "New incoming WhatsApp leads will appear here automatically."}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-[#202c33]/50">
+            {sorted.map((chat) => (
+              <div
+                key={chat.id}
+                onClick={() => onSelectChat(chat.id)}
+                className={`flex items-center px-4 py-3.5 cursor-pointer transition-all active:scale-[0.99] select-none ${
+                  isDarkMode
+                    ? "hover:bg-[#202c33]/40 active:bg-[#202c33]/80"
+                    : "hover:bg-slate-50 active:bg-slate-100"
+                } ${chat.needsHuman ? (isDarkMode ? "bg-rose-950/15" : "bg-rose-50/40") : ""}`}
+              >
+                {/* Avatar with Status Badge */}
+                <div className="relative shrink-0 mr-3.5">
+                  <img
+                    src={chat.avatar}
+                    alt={chat.name}
+                    className="w-13 h-13 rounded-full object-cover shadow-sm"
+                  />
+                  {chat.needsHuman && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-500 border-2 border-white dark:border-[#111b21]" />
+                    </span>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h3 className={`font-semibold text-[15px] truncate leading-tight ${
+                        isDarkMode ? "text-slate-100" : "text-slate-900"
+                      }`}>
+                        {chat.name}
+                      </h3>
+                      {chat.pinned && (
+                        <Pin className="w-3 h-3 text-amber-500 shrink-0" fill="currentColor" />
+                      )}
+                    </div>
+                    <span className={`text-[11px] font-medium shrink-0 ${
+                      chat.unread ? (isDarkMode ? "text-emerald-400" : "text-[#008069]") : (isDarkMode ? "text-slate-500" : "text-slate-400")
+                    }`}>
+                      {chat.time}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-xs truncate flex-1 leading-snug ${
+                      chat.unread
+                        ? (isDarkMode ? "font-semibold text-slate-200" : "font-semibold text-slate-800")
+                        : (isDarkMode ? "text-slate-400" : "text-slate-500")
+                    }`}>
+                      {chat.lastMessage || "No messages yet"}
+                    </p>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Needs Human Badge */}
+                      {chat.needsHuman && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500 text-white shrink-0">
+                          ATTENTION
+                        </span>
+                      )}
+
+                      {/* Agent Tag */}
+                      {chat.agent && !chat.needsHuman && (
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          isDarkMode
+                            ? "bg-[#202c33] text-slate-400 border border-[#2a3942]"
+                            : "bg-slate-100 text-slate-600 border border-slate-200"
+                        }`}>
+                          {chat.agent}
+                        </span>
+                      )}
+
+                      {/* Unread Counter Pill */}
+                      {Boolean(chat.unread) && (
+                        <span className="text-white text-[11px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-[#25D366] shadow-sm">
+                          {chat.unread}
+                        </span>
+                      )}
+
+                      {/* Quick Pin Action Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTogglePin(chat.id);
+                        }}
+                        title={chat.pinned ? "Unpin chat" : "Pin chat"}
+                        className={`p-1.5 rounded-full transition-colors ${
+                          chat.pinned
+                            ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                            : isDarkMode
+                            ? "text-slate-600 hover:text-slate-400 hover:bg-[#202c33]"
+                            : "text-slate-300 hover:text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Pin className="w-3.5 h-3.5" fill={chat.pinned ? "currentColor" : "none"} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Contact Labels */}
+                  {chat.labels && chat.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {chat.labels.map((l) => (
+                        <span
+                          key={l}
+                          className={`text-[9px] font-medium px-1.5 py-0.2 rounded ${
+                            isDarkMode
+                              ? "bg-slate-800 text-emerald-300 border border-emerald-900/40"
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          }`}
+                        >
+                          {l}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* New Conversation Modal */}
+      {/* New Conversation Modal Bottom Sheet */}
       {showNewConvo && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowNewConvo(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm transition-opacity"
+          onClick={() => setShowNewConvo(false)}
+        >
           <div
-            className={`w-full max-w-md rounded-t-2xl p-6 pb-10 shadow-2xl flex flex-col gap-4 ${
-              isDarkMode ? 'bg-gray-900 border-t border-blue-900/40' : 'bg-white border-t border-gray-200'
+            className={`w-full max-w-md rounded-t-3xl p-5 pb-8 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200 ${
+              isDarkMode ? "bg-[#111b21] border-t border-[#202c33]" : "bg-white border-t border-slate-200"
             }`}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-1">
-              <h2 className={`font-semibold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>New Conversation</h2>
-              <button onClick={() => setShowNewConvo(false)} className="hover:opacity-70">
-                <X className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            {/* Modal Handle */}
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-1" />
+
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-base">Start New Conversation</h2>
+              <button
+                onClick={() => setShowNewConvo(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
+
             <div>
-              <label className={`text-xs font-semibold mb-1.5 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>PHONE NUMBER</label>
+              <label className="text-[11px] font-bold tracking-wider mb-1.5 block uppercase text-slate-400">
+                Phone Number
+              </label>
               <input
                 type="tel"
                 value={newPhone}
-                onChange={e => { setNewPhone(e.target.value); setNewConvoError(''); }}
-                placeholder="9606746900 or +919606746900"
-                className={`w-full rounded-xl px-4 py-3 text-base outline-none ${
-                  isDarkMode ? 'bg-gray-800 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
+                onChange={(e) => {
+                  setNewPhone(e.target.value);
+                  setNewConvoError('');
+                }}
+                placeholder="e.g. 9606746900 or +919606746900"
+                className={`w-full rounded-xl px-4 py-3 text-base outline-none transition-all ${
+                  isDarkMode
+                    ? "bg-[#202c33] border border-[#2a3942] text-slate-100 placeholder:text-slate-500 focus:border-emerald-500"
+                    : "bg-slate-100 border border-slate-200 text-slate-900 focus:border-[#008069]"
                 }`}
               />
             </div>
+
             <button
               onClick={() => {
                 const phone = formatPhone(newPhone.trim());
@@ -324,35 +586,48 @@ export function ChatList({ onSelectChat, isDarkMode, onToggleTheme, onLogout, on
                 onSelectChat(phone);
               }}
               disabled={!newPhone.trim()}
-              className={`w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40 transition-all ${
-                isDarkMode ? 'bg-gray-800 border border-blue-500/30 text-blue-300 hover:bg-gray-700' : 'bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200'
+              className={`w-full py-3.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-all shadow-sm ${
+                isDarkMode
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                  : "bg-[#008069] text-white hover:bg-[#006e5a]"
               }`}
             >
-              Open Chat
+              Open Direct Chat
             </button>
+
             <div>
-              <label className={`text-xs font-semibold mb-2 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>SEND TEMPLATE</label>
+              <label className="text-[11px] font-bold tracking-wider mb-2 block uppercase text-slate-400">
+                Or Send Outbound Template
+              </label>
               <div className="flex flex-col gap-2">
-                {KNOWN_TEMPLATES.map(t => (
+                {KNOWN_TEMPLATES.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => sendNewConvo(t.id)}
                     disabled={!newPhone.trim() || newTemplateSending || newConvoSuccess}
-                    className={`w-full text-left rounded-xl px-4 py-3 border transition-all disabled:opacity-40 ${
-                      isDarkMode ? 'bg-gray-800 border-blue-900/40 hover:border-blue-500/60 text-white' : 'bg-gray-50 border-gray-200 hover:border-[#008069] text-gray-900'
+                    className={`w-full text-left rounded-xl px-4 py-3 border transition-all disabled:opacity-40 active:scale-[0.99] ${
+                      isDarkMode
+                        ? "bg-[#202c33] border-[#2a3942] hover:border-emerald-500/50"
+                        : "bg-slate-50 border-slate-200 hover:border-[#008069]"
                     }`}
                   >
-                    <p className="text-sm font-medium">{newConvoSuccess ? '✓ Sent!' : newTemplateSending ? 'Sending…' : t.name}</p>
-                    <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{t.body}</p>
+                    <p className="text-sm font-semibold text-emerald-500">
+                      {newConvoSuccess ? "✓ Sent!" : newTemplateSending ? "Sending…" : t.name}
+                    </p>
+                    <p className={`text-xs mt-0.5 line-clamp-2 ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+                      {t.body}
+                    </p>
                   </button>
                 ))}
               </div>
             </div>
-            {newConvoError && <p className="text-red-400 text-xs">{newConvoError}</p>}
+
+            {newConvoError && (
+              <p className="text-rose-500 text-xs font-medium text-center">{newConvoError}</p>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
-

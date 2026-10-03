@@ -282,20 +282,39 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   return (
     <div className={`flex flex-col h-full ${bg}`}>
       {/* Header */}
-      <div className={`px-4 py-4 flex items-center gap-3 border-b ${border} ${isDarkMode ? "bg-gray-950" : "bg-[#008069]"}`}>
-        <button onClick={onBack} className="text-white hover:opacity-70 transition-opacity">
+      <div className={`px-4 pt-safe py-3.5 flex items-center gap-2 border-b ${border} ${isDarkMode ? "bg-gray-950" : "bg-[#008069]"}`}>
+        <button
+          onClick={onBack}
+          aria-label="Back"
+          className="text-white hover:opacity-75 transition-opacity p-2 -ml-2 rounded-full min-w-[44px] min-h-[44px] flex items-center justify-center active:scale-95"
+        >
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <CalendarDays className="w-5 h-5 text-white" />
-        <h1 className="text-lg font-semibold text-white flex-1">Calendar</h1>
-        <button onClick={toggleStats} className={`text-white hover:opacity-70 transition-opacity mr-2 ${showStats ? 'opacity-100' : 'opacity-70'}`} title="Stats">
+        <CalendarDays className="w-5 h-5 text-white/90" />
+        <h1 className="text-base font-semibold text-white flex-1 truncate">Calendar</h1>
+        <button
+          onClick={toggleStats}
+          className={`text-white transition-opacity p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-95 ${showStats ? 'bg-white/20 opacity-100' : 'hover:bg-white/10 opacity-80'}`}
+          title="Stats"
+          aria-label="Stats"
+        >
           <BarChart3 className="w-5 h-5" />
         </button>
-        <button onClick={openMembers} className="text-white hover:opacity-70 transition-opacity mr-2" title="Member phones">
+        <button
+          onClick={openMembers}
+          className="text-white hover:bg-white/10 opacity-80 transition-opacity p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-95"
+          title="Member phones"
+          aria-label="Member phones"
+        >
           <Phone className="w-5 h-5" />
         </button>
-        <button onClick={() => openCreateModal()} className="text-white hover:opacity-70 transition-opacity" title="New event">
-          <Plus className="w-6 h-6" />
+        <button
+          onClick={() => openCreateModal()}
+          className="text-white bg-white/15 hover:bg-white/25 transition-all p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-95 ml-0.5"
+          title="New event"
+          aria-label="New event"
+        >
+          <Plus className="w-5 h-5" />
         </button>
       </div>
 

@@ -1,8 +1,28 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { avatarDataUrl } from '../avatarDataUrl';
-import { ArrowLeft, Send, MoreVertical, Check, CheckCheck, Info, X, FileText, ChevronLeft, CalendarPlus, ExternalLink, MapPin } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  Check,
+  CheckCheck,
+  Info,
+  X,
+  FileText,
+  ChevronLeft,
+  CalendarPlus,
+  ExternalLink,
+  MapPin,
+  Paperclip,
+  Image as ImageIcon,
+  Bot,
+  User,
+  Sparkles,
+  Download,
+  Clock,
+  Phone
+} from "lucide-react";
 import { supabase } from '../../lib/supabase';
 
 interface Message {
@@ -16,15 +36,60 @@ interface Message {
   status?: string | null;
   media_url?: string | null;
   created_at?: string;
+  whatsapp_id?: string | null;
 }
 
 interface ChatDetailProps {
   chatId: string;
   onBack: () => void;
   isDarkMode: boolean;
+  messages?: Message[];
+  chatName?: string;
+  chatAvatar?: string;
+  onSend: (text: string) => Promise<void>;
+  onSaveContact?: (name: string, notes: string) => void;
+  initialContact?: { name: string; notes: string };
+  initialLabels?: string[];
+  onAddLabel?: (label: string) => void;
+  onRemoveLabel?: (label: string) => void;
+  agentName?: string;
 }
 
-export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages = [], chatName, chatAvatar, onSend, onSaveContact, initialContact, initialLabels = [], onAddLabel, onRemoveLabel, agentName }: ChatDetailProps & { messages?: Message[]; chatName?: string; chatAvatar?: string; onSend: (text: string) => Promise<void>; onSaveContact?: (name: string, notes: string) => void; initialContact?: { name: string; notes: string }; initialLabels?: string[]; onAddLabel?: (label: string) => void; onRemoveLabel?: (label: string) => void; agentName?: string }) {
+const SERVER = 'https://kiddost-ai.onrender.com';
+
+const KNOWN_TEMPLATES = [
+  { id: 'session', name: 'Session Today?', body: 'Hi, Would you like to go ahead with the session today?', language: 'en' },
+  { id: 'confirm_booking', name: 'Confirm Booking', body: 'Hi! Would you like to go ahead and confirm your booking for tomorrow?', language: 'en' },
+  { id: 'slots_available', name: 'Slots Available', body: 'Hi! We have slots available {{1}} . Would you like to try a session and see how it works for you?', language: 'en' }
+];
+
+// Quick response suggestions for agents on mobile (1-tap to insert into textarea)
+const QUICK_RESPONSES = [
+  { label: "Child's Age?", text: "Could I please know the child's age first?" },
+  { label: "Intro ₹500", text: "We suggest scheduling a one-hour introductory session at your convenience. For the first experience of our service, we are happy to offer it at a discounted price of ₹500 per hour." },
+  { label: "Standard Rates", text: "Our standard pricing is: ₹700 for 1 hour, ₹1200 for 2 hours, and ₹1700 for 3 hours. Feel free to let us know if you have any questions." },
+  { label: "Check Area", text: "Let me check if we can service your area and get back to you." },
+  { label: "Slot Availability", text: "Sure, allow me to check the slot availability and come back to you." },
+  { label: "4-8 Yrs Activities", text: "For this age category we engage the child with puzzles, memory games, art and craft, brain boosting activities, storybook reading, worksheets etc. We can also help in studies if required. Additionally our members can also take them to park for physical activity." },
+  { label: "2-3 Yrs Activities", text: "For this age category we engage the child with verbal interaction, age appropriate puzzles, toys, rhymes, simple art n craft, storybook reading etc. We also introduce concepts like shapes, colours, numbers etc. Additionally our members can also take them to park for physical activity." },
+  { label: "Call Scheduled", text: "Hi! Our team will give you a call shortly to discuss all details and answer any questions." }
+];
+
+export function ChatDetail({
+  chatId,
+  onBack,
+  isDarkMode,
+  messages: propMessages = [],
+  chatName,
+  chatAvatar,
+  onSend,
+  onSaveContact,
+  initialContact,
+  initialLabels = [],
+  onAddLabel,
+  onRemoveLabel,
+  agentName,
+}: ChatDetailProps) {
   const [messages, setMessages] = useState<Message[]>(propMessages || []);
   const [inputValue, setInputValue] = useState("");
   const [showInfo, setShowInfo] = useState(false);
@@ -40,28 +105,205 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [templateSending, setTemplateSending] = useState(false);
   const [manualTemplateId, setManualTemplateId] = useState('');
   const [customerVars, setCustomerVars] = useState<{ children?: any[]; notes?: Record<string, string> } | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  const SERVER = 'https://kiddost-ai.onrender.com';
+  // Sync incoming prop messages
+  useEffect(() => {
+    setMessages(propMessages || []);
+  }, [propMessages]);
 
-  // Known templates — shown even when BotSpace listing API is unavailable
-  const KNOWN_TEMPLATES = [
-    { id: 'session', name: 'Session Today?', body: 'Hi, Would you like to go ahead with the session today?', language: 'en' },
-    { id: 'confirm_booking', name: 'Confirm Booking', body: 'Hi! Would you like to go ahead and confirm your booking for tomorrow?', language: 'en' },
-    { id: 'slots_available', name: 'Slots Available', body: 'Hi! We have slots available {{1}} . Would you like to try a session and see how it works for you?', language: 'en' }
-  ];
+  // AI Handler status tracking
+  const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
+    const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+    return lm && typeof lm.ai_enabled !== 'undefined' ? !!lm.ai_enabled : true;
+  });
 
-  function getTemplateBody(t: any): string {
-    const comps: any[] = t?.components || [];
-    const body = comps.find(c => (c.type || '').toUpperCase() === 'BODY');
-    return body?.text || t?.body || '';
+  const [handlerLocal, setHandlerLocal] = useState<string>(() => {
+    const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+    return lm && lm.agent ? lm.agent : (lm && lm.ai_enabled === false ? 'Agent' : 'AI');
+  });
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const lastWithState = [...messages].reverse().find(m => typeof m.ai_enabled !== 'undefined');
+    if (!lastWithState) return;
+    const enabled = !!lastWithState.ai_enabled;
+    setAiEnabledLocal(enabled);
+    if (lastWithState.sender !== 'other') {
+      setHandlerLocal(lastWithState.agent ? lastWithState.agent : (enabled ? 'AI' : 'Agent'));
+    }
+  }, [messages]);
+
+  const toggleAi = async (enable: boolean) => {
+    try {
+      const res = await fetch(`${SERVER}/toggle-ai`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
+      });
+      if (res.ok) {
+        setAiEnabledLocal(!!enable);
+        setHandlerLocal(enable ? 'AI' : 'Agent');
+      }
+    } catch (err) {
+      console.error("toggleAi error", err);
+    }
+  };
+
+  // Reset info panel state when switching chats
+  useEffect(() => {
+    setContactName(initialContact?.name || '');
+    setContactNotes(initialContact?.notes || '');
+    setShowInfo(false);
+    setLabels(initialLabels || []);
+    setLabelInput('');
+    setCustomerVars(null);
+  }, [chatId, initialContact?.name, initialContact?.notes]);
+
+  // Fetch conversation vars when info drawer opens
+  useEffect(() => {
+    if (!showInfo) return;
+    const cleanPhone = chatId.startsWith('+') ? chatId : `+${chatId}`;
+    supabase.from('conversations').select('vars').eq('phone', cleanPhone).single()
+      .then(({ data }) => {
+        setCustomerVars(data?.vars || {});
+      });
+  }, [showInfo, chatId]);
+
+  // Smart auto-scrolling
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevLengthRef = useRef(0);
+
+  const scrollToBottom = (instant = false) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'instant' : 'smooth' });
+  };
+
+  useEffect(() => {
+    const isInitial = prevLengthRef.current === 0;
+    if (messages.length > 0) {
+      scrollToBottom(isInitial);
+    }
+    prevLengthRef.current = messages.length;
+  }, [messages]);
+
+  // Auto-expand textarea
+  const adjustTextareaHeight = () => {
+    const tx = textareaRef.current;
+    if (!tx) return;
+    tx.style.height = "auto";
+    tx.style.height = `${Math.min(tx.scrollHeight, 120)}px`;
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [inputValue]);
+
+  // Send message
+  const [sendCooldown, setSendCooldown] = useState(false);
+  const handleSend = async () => {
+    if (sendCooldown || !inputValue.trim()) return;
+    const text = inputValue.trim();
+    setInputValue("");
+    if (textareaRef.current) textareaRef.current.style.height = '40px';
+    setSendCooldown(true);
+    await onSend(text);
+    setTimeout(() => setSendCooldown(false), 800);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Upload Media
+  const uploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const mediaCaption = inputValue.trim();
+    if (mediaCaption) setInputValue("");
+
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_\.]/g, "_");
+      const cleanPhone = String(chatId).replace(/^\+/, "");
+      const path = `${cleanPhone}/${Date.now()}_${safeName}`;
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from('media')
+        .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
+
+      if (uploadErr) {
+        // Fallback: try server proxy upload
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(',')[1];
+          const resp = await fetch(`${SERVER}/upload-media-server`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileBase64: base64, fileName: file.name, fileType: file.type || 'application/octet-stream', phone: chatId })
+          });
+          const json = await resp.json();
+          if (json?.publicUrl) {
+            await fetch(`${SERVER}/agent-send-media`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: chatId, mediaUrl: json.publicUrl, caption: mediaCaption })
+            });
+          }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const publicRes = supabase.storage.from('media').getPublicUrl(path);
+      const publicURL = publicRes?.data?.publicUrl || null;
+      if (publicURL) {
+        await fetch(`${SERVER}/agent-send-media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: mediaCaption })
+        });
+      }
+    } catch (err) {
+      console.error('uploadMedia error', err);
+    }
+  };
+
+  // Media link resolver & type detection
+  function resolveMediaUrl(url: string): string {
+    if (!url) return url;
+    if (url.includes('bot.space') || url.includes('botspace')) {
+      try {
+        return `${SERVER}/proxy-image?url=${encodeURIComponent(url)}`;
+      } catch {
+        return url;
+      }
+    }
+    return url;
   }
 
-  function countVars(text: string): number {
-    const m = text.match(/\{\{\d+\}\}/g) || [];
-    if (!m.length) return 0;
-    return Math.max(...m.map((s: string) => parseInt(s.replace(/\D/g, ''))));
+  function getMediaType(url: string): 'image' | 'video' | 'audio' | 'pdf' | 'file' {
+    try {
+      const parsed = new URL(url);
+      const typeParam = parsed.searchParams.get('type');
+      if (typeParam?.startsWith('image/')) return 'image';
+      if (typeParam?.startsWith('video/')) return 'video';
+      if (typeParam?.startsWith('audio/')) return 'audio';
+      if (typeParam === 'application/pdf') return 'pdf';
+    } catch {}
+    const clean = url.split('?')[0].toLowerCase();
+    if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)$/.test(clean)) return 'image';
+    if (/\.(mp4|mov|avi|mkv|webm|3gp)$/.test(clean)) return 'video';
+    if (/\.(mp3|ogg|wav|m4a|aac)$/.test(clean)) return 'audio';
+    if (/\.pdf$/.test(clean)) return 'pdf';
+    if (url.includes('/proxy-image')) return 'image';
+    return 'file';
   }
 
+  // Template handling
   const openTemplateModal = async () => {
     setShowTemplateModal(true);
     setSelectedTemplate(null);
@@ -71,7 +313,6 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       const res = await fetch(`${SERVER}/templates`);
       const json = await res.json();
       const fetched: any[] = json?.templates || json?.data || [];
-      // Merge server results with known templates (deduplicate by id)
       const knownNotInFetched = KNOWN_TEMPLATES.filter(k => !fetched.find((f: any) => (f.id || f.name) === k.id));
       setTemplates([...fetched, ...knownNotInFetched]);
     } catch {
@@ -99,333 +340,11 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       setSelectedTemplate(null);
       setTemplateVars([]);
       setManualTemplateId('');
-    } catch { /* silent */ }
+    } catch {}
     finally { setTemplateSending(false); }
   };
 
-  // Reset info panel when switching chats or when contact details update
-  useEffect(() => {
-    setContactName(initialContact?.name || '');
-    setContactNotes(initialContact?.notes || '');
-    setShowInfo(false);
-    setLabels(initialLabels || []);
-    setLabelInput('');
-    setCustomerVars(null);
-  }, [chatId, initialContact?.name, initialContact?.notes]);
-
-  // Fetch conversation vars when info panel opens
-  useEffect(() => {
-    if (!showInfo) return;
-    const cleanPhone = chatId.startsWith('+') ? chatId : `+${chatId}`;
-    supabase.from('conversations').select('vars').eq('phone', cleanPhone).single()
-      .then(({ data }) => {
-        setCustomerVars(data?.vars || {});
-      });
-  }, [showInfo, chatId]);
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const prevLengthRef = useRef(0);
-
-  // Auto-expand textarea height based on content, matching WhatsApp style
-  const adjustTextareaHeight = () => {
-    const tx = textareaRef.current;
-    if (!tx) return;
-    tx.style.height = "auto";
-    tx.style.height = `${Math.min(tx.scrollHeight, 120)}px`; // Cap height at 120px
-  };
-
-  // Adjust height when inputValue changes
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [inputValue]);
-
-  // Reset scroll tracking and textarea height when switching chats
-  useEffect(() => {
-    prevLengthRef.current = 0;
-    setTimeout(() => adjustTextareaHeight(), 50);
-  }, [chatId]);
-
-  useEffect(() => {
-    setMessages(propMessages || []);
-  }, [propMessages]);
-
-  // Smart scroll: instant on initial load, smooth on new message if already near bottom
-  useEffect(() => {
-    const end = messagesEndRef.current;
-    const container = scrollContainerRef.current;
-    if (!end || messages.length === 0) {
-      if (messages.length === 0) prevLengthRef.current = 0;
-      return;
-    }
-    const isInitialLoad = prevLengthRef.current === 0;
-    if (isInitialLoad) {
-      end.scrollIntoView({ behavior: 'instant' });
-    } else if (messages.length > prevLengthRef.current) {
-      end.scrollIntoView({ behavior: 'smooth' });
-    }
-    prevLengthRef.current = messages.length;
-  }, [messages]);
-
-  const [sendCooldown, setSendCooldown] = useState(false);
-  const handleSend = async () => {
-    if (sendCooldown || !inputValue.trim()) return;
-    const text = inputValue.trim();
-    setInputValue("");
-    setSendCooldown(true);
-    await onSend(text);
-    setTimeout(() => setSendCooldown(false), 1000);
-  };
-
-  const uploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const mediaCaption = inputValue.trim();
-    if (mediaCaption) {
-      setInputValue("");
-    }
-    // Direct upload to Supabase Storage (public bucket) to avoid server proxy limits
-    try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_\.]/g, "_");
-      const cleanPhone = String(chatId).replace(/^\+/, "");
-      const path = `${cleanPhone}/${Date.now()}_${safeName}`;
-      const { data: uploadData, error: uploadErr } = await supabase.storage.from('media').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
-      if (uploadErr) {
-        console.error('direct upload error', uploadErr.message || uploadErr);
-        // fallback: try server upload
-        try {
-          const reader = new FileReader();
-          reader.onload = async () => {
-            const dataUrl = reader.result as string;
-            const base64 = dataUrl.split(',')[1];
-            const resp = await fetch('https://kiddost-ai.onrender.com/upload-media-server', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileBase64: base64, fileName: file.name, fileType: file.type || 'application/octet-stream', phone: chatId })
-            });
-            const json = await resp.json();
-            if (!json || !json.publicUrl) {
-              console.error('server upload failed', json);
-              return;
-            }
-            const publicURL = json.publicUrl;
-            setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: mediaCaption, sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
-            await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: mediaCaption })
-            });
-          };
-          reader.readAsDataURL(file);
-        } catch (e) {
-          console.error('fallback server upload failed', e);
-        }
-        return;
-      }
-
-      const publicRes = supabase.storage.from('media').getPublicUrl(path);
-      const publicURL = publicRes?.data?.publicUrl || null;
-      if (!publicURL) {
-        console.error('failed to get public url for uploaded media');
-        return;
-      }
-
-      setMessages((prev) => [...prev, { id: `local-${Date.now()}`, text: mediaCaption, sender: 'me', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }), created_at: new Date().toISOString(), media_url: publicURL, status: 'sending' } as Message]);
-
-      await fetch('https://kiddost-ai.onrender.com/agent-send-media', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, mediaUrl: publicURL, caption: mediaCaption })
-      });
-    } catch (err) {
-      console.error('uploadMedia error', err);
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const name = chatName || "Unknown";
-  const avatar = chatAvatar || avatarDataUrl(name);
-
-  const handleSaveContact = () => {
-    onSaveContact?.(contactName.trim(), contactNotes.trim());
-    setShowInfo(false);
-  };
-
-  function resolveMediaUrl(url: string): string {
-    if (!url) return url;
-    // Route BotSpace-hosted media through the server proxy so browsers render inline
-    if (url.includes('bot.space') || url.includes('botspace')) {
-      try {
-        return `https://kiddost-ai.onrender.com/proxy-image?url=${encodeURIComponent(url)}`;
-      } catch (err) {
-        console.warn('Malformed URI in resolveMediaUrl:', url);
-        return url;
-      }
-    }
-    return url;
-  }
-
-  function getMediaType(url: string): 'image' | 'video' | 'audio' | 'pdf' | 'file' {
-    // Check for an explicit 'type' MIME hint in the query string (set by proxy URLs or server)
-    try {
-      const parsed = new URL(url);
-      const typeParam = parsed.searchParams.get('type');
-      if (typeParam) {
-        if (typeParam.startsWith('image/')) return 'image';
-        if (typeParam.startsWith('video/')) return 'video';
-        if (typeParam.startsWith('audio/')) return 'audio';
-        if (typeParam === 'application/pdf') return 'pdf';
-      }
-    } catch { /* ignore — not a valid absolute URL */ }
-    const clean = url.split('?')[0].toLowerCase();
-    if (/\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)$/.test(clean)) return 'image';
-    if (/\.(mp4|mov|avi|mkv|webm|3gp)$/.test(clean)) return 'video';
-    if (/\.(mp3|ogg|wav|m4a|aac)$/.test(clean)) return 'audio';
-    if (/\.pdf$/.test(clean)) return 'pdf';
-    // Proxy URLs lack an extension — BotSpace primarily sends images, so default to image
-    if (url.includes('/proxy-image')) return 'image';
-    return 'file';
-  }
-
-  function MediaRenderer({ url, isDark }: { url: string; isDark: boolean }) {
-    const resolved = resolveMediaUrl(url);
-    const type = getMediaType(url);
-    const linkClass = `text-sm underline ${isDark ? 'text-blue-300' : 'text-blue-600'}`;
-    if (type === 'image') {
-      return <img src={resolved} alt="media" className="w-48 rounded-md object-cover" />;
-    }
-    if (type === 'video') {
-      return (
-        <video controls className="w-48 rounded-md" preload="metadata">
-          <source src={resolved} />
-          <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>View video</a>
-        </video>
-      );
-    }
-    if (type === 'audio') {
-      return (
-        <audio controls className="w-48">
-          <source src={resolved} />
-          <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>Play audio</a>
-        </audio>
-      );
-    }
-    if (type === 'pdf') {
-      return <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>📄 View PDF</a>;
-    }
-    return <a href={resolved} target="_blank" rel="noreferrer" className={linkClass}>📎 Download file</a>;
-  }
-
-  function renderFormattedText(text: string, isMe: boolean, isDark: boolean) {
-    if (!text) return null;
-    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/gi;
-    const parts = text.split(urlRegex);
-
-    // Detect Google Maps URL to display a dedicated action button
-    const mapsMatch = text.match(/(https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/i);
-    const mapsUrl = mapsMatch ? (mapsMatch[0].startsWith('http') ? mapsMatch[0] : `https://${mapsMatch[0]}`) : null;
-
-    return (
-      <div className="space-y-2">
-        <p className={`text-base break-words whitespace-pre-wrap ${isDark ? '' : 'text-gray-900'}`}>
-          {parts.map((part, i) => {
-            if (part && part.match(urlRegex)) {
-              const href = part.startsWith('http') ? part : `https://${part}`;
-              return (
-                <a
-                  key={i}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-0.5 underline font-semibold break-all hover:opacity-80 transition-opacity cursor-pointer ${
-                    isMe
-                      ? (isDark ? 'text-blue-100 hover:text-white' : 'text-emerald-900 hover:text-emerald-950')
-                      : (isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800')
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(href, '_blank', 'noopener,noreferrer');
-                  }}
-                >
-                  <span>{part}</span>
-                  <ExternalLink className="w-3.5 h-3.5 inline-block ml-0.5 opacity-80 shrink-0" />
-                </a>
-              );
-            }
-            return part;
-          })}
-        </p>
-
-        {mapsUrl && (
-          <div className="pt-1">
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(mapsUrl, '_blank', 'noopener,noreferrer');
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Open in Google Maps</span>
-              <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
-            </a>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const [aiEnabledLocal, setAiEnabledLocal] = useState<boolean>(() => {
-    const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
-    return lm && typeof lm.ai_enabled !== 'undefined' ? !!lm.ai_enabled : true;
-  });
-  const [handlerLocal, setHandlerLocal] = useState<string>(() => {
-    const lm = messages && messages.length > 0 ? messages[messages.length - 1] : null;
-    return lm && lm.agent ? lm.agent : (lm && lm.ai_enabled === false ? 'Agent' : 'AI 🤖');
-  });
-
-  // sync AI/handler state when messages change
-  // Use the most recent message that has an explicit ai_enabled value — including system toggle messages
-  React.useEffect(() => {
-    if (messages.length === 0) return;
-    const lastWithState = [...messages].reverse().find(m => typeof m.ai_enabled !== 'undefined');
-    if (!lastWithState) return;
-    const enabled = !!lastWithState.ai_enabled;
-    setAiEnabledLocal(enabled);
-    // Only update the agent name if this message actually carries one (agent messages / system messages).
-    // Customer messages (sender=other) have no agent field — preserve whatever agent name we already have.
-    if (lastWithState.sender !== 'other') {
-      setHandlerLocal(lastWithState.agent ? lastWithState.agent : (enabled ? 'AI' : 'Agent'));
-    }
-  }, [messages]);
-
-  const toggleAi = async (enable: boolean) => {
-    try {
-      const res = await fetch("https://kiddost-ai.onrender.com/toggle-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: chatId, ai_enabled: enable }),
-      });
-      if (res.ok) {
-        setAiEnabledLocal(!!enable);
-        setHandlerLocal(enable ? 'AI' : 'Agent');
-      }
-    } catch (err) {
-      console.error("toggleAi error", err);
-    }
-  };
-
-  // ── Calendar extraction state ──────────────────────────────────
+  // Calendar event extraction
   const [showCalModal, setShowCalModal] = useState(false);
   const [calExtracting, setCalExtracting] = useState(false);
   const [calTitle, setCalTitle] = useState('');
@@ -434,7 +353,7 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
   const [calEnd, setCalEnd] = useState('');
   const [calNotes, setCalNotes] = useState('');
   const [calRepeat, setCalRepeat] = useState(1);
-  const [calDays, setCalDays] = useState<number[]>([]);  // JS day numbers: 0=Sun,1=Mon,...6=Sat
+  const [calDays, setCalDays] = useState<number[]>([]);
   const [calTrial, setCalTrial] = useState(false);
   const [calMember, setCalMember] = useState('');
   const [calSaving, setCalSaving] = useState(false);
@@ -442,8 +361,8 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
 
   const extractAndShowCalendar = async () => {
     setCalExtracting(true);
-    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes(''); setCalRepeat(1); setCalDays([]); setCalTrial(false); setCalMember('');
-    setCalSuccess(false);
+    setCalTitle(''); setCalDate(''); setCalStart(''); setCalEnd(''); setCalNotes('');
+    setCalRepeat(1); setCalDays([]); setCalTrial(false); setCalMember(''); setCalSuccess(false);
     try {
       const res = await fetch(`${SERVER}/calendar/extract`, {
         method: 'POST',
@@ -454,11 +373,9 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       const ex = json.extracted;
       if (ex && (ex.title || ex.startTime || ex.start_time || ex.date || (Array.isArray(ex.repeatDays) && ex.repeatDays.length > 0))) {
         setCalTitle(ex.title || 'KidDost Session');
-        // Compute date: use extracted date, or compute first occurrence from repeatDays
         if (ex.date) {
           setCalDate(ex.date);
         } else if (Array.isArray(ex.repeatDays) && ex.repeatDays.length > 0) {
-          // Find the nearest upcoming occurrence of any repeat day
           const today = new Date();
           let best: Date | null = null;
           for (const targetDay of ex.repeatDays) {
@@ -496,165 +413,603 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
       await fetch(`${SERVER}/calendar/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: chatId, title: calTitle.trim(), date: calDate, start_time: calStart || null, end_time: calEnd || null, notes: calNotes.trim() || null, created_by: agentName || null, assigned_member: calMember.trim() || null, repeat_count: calRepeat > 1 ? calRepeat : undefined, repeat_days: calDays.length > 0 ? calDays : undefined, is_trial: calTrial }),
+        body: JSON.stringify({
+          phone: chatId,
+          title: calTitle.trim(),
+          date: calDate,
+          start_time: calStart || null,
+          end_time: calEnd || null,
+          notes: calNotes.trim() || null,
+          created_by: agentName || null,
+          assigned_member: calMember.trim() || null,
+          repeat_count: calRepeat > 1 ? calRepeat : undefined,
+          repeat_days: calDays.length > 0 ? calDays : undefined,
+          is_trial: calTrial
+        }),
       });
       setCalSuccess(true);
       setTimeout(() => { setShowCalModal(false); setCalSuccess(false); }, 1200);
-    } catch { /* silent */ }
+    } catch {}
     finally { setCalSaving(false); }
   };
 
-  const calInputCls = `w-full rounded-xl px-4 py-3 text-sm outline-none transition-all ${isDarkMode ? 'bg-gray-800 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`;
+  const name = chatName || chatId;
+  const avatar = chatAvatar || avatarDataUrl(name, chatId);
+
+  // Check 24-hour WhatsApp messaging window
+  const lastUserMsg = useMemo(() => {
+    return [...messages].reverse().find(m => m.sender === 'other');
+  }, [messages]);
+
+  const is24hWindowClosed = useMemo(() => {
+    if (!lastUserMsg || !lastUserMsg.created_at) return true;
+    return (new Date().getTime() - new Date(lastUserMsg.created_at).getTime()) > 24 * 60 * 60 * 1000;
+  }, [lastUserMsg]);
 
   return (
-    <div className={`flex flex-col h-full relative overflow-hidden ${isDarkMode ? "bg-black" : "bg-[#efeae2]"}`}>
-      {isDarkMode && (
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute w-1 h-1 bg-blue-400 rounded-full top-[10%] left-[20%]" style={{ boxShadow: "0 0 3px rgba(96, 165, 250, 0.8)" }} />
-          <div className="absolute w-1 h-1 bg-cyan-400 rounded-full top-[30%] left-[80%]" style={{ boxShadow: "0 0 3px rgba(34, 211, 238, 0.8)" }} />
-          <div className="absolute w-1 h-1 bg-blue-300 rounded-full top-[60%] left-[15%]" style={{ boxShadow: "0 0 3px rgba(147, 197, 253, 0.8)" }} />
-          <div className="absolute w-1 h-1 bg-cyan-300 rounded-full top-[80%] left-[70%]" style={{ boxShadow: "0 0 3px rgba(103, 232, 249, 0.8)" }} />
+    <div className={`flex flex-col h-full relative overflow-hidden ${
+      isDarkMode ? "bg-[#0b141a] text-slate-100" : "bg-[#efeae2] text-slate-900"
+    }`}>
+      {/* WhatsApp Modern Header */}
+      <header className={`px-3 py-2.5 flex items-center justify-between sticky top-0 z-30 transition-colors shadow-sm select-none ${
+        isDarkMode ? "bg-[#111b21] border-b border-[#202c33]" : "bg-[#008069] text-white"
+      }`}>
+        <div className="flex items-center min-w-0 flex-1">
+          {/* Back button with standard 44px tap target */}
+          <button
+            onClick={onBack}
+            className={`p-2 -ml-1 rounded-full transition-all active:scale-95 shrink-0 mr-1 ${
+              isDarkMode ? "text-slate-300 hover:text-white hover:bg-[#202c33]" : "text-white hover:bg-white/10"
+            }`}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          {/* Contact Avatar & Info */}
+          <div
+            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+            onClick={() => setShowInfo(true)}
+          >
+            <img
+              src={avatar}
+              alt={name}
+              className="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm"
+            />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold text-[15px] truncate leading-tight">{name}</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[11px] font-medium leading-none ${
+                  isDarkMode ? "text-slate-400" : "text-emerald-100"
+                }`}>
+                  {chatId}
+                </span>
+
+                {/* AI Toggle Pill inside Header */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAi(!aiEnabledLocal);
+                  }}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 transition-all active:scale-95 ${
+                    aiEnabledLocal
+                      ? isDarkMode
+                        ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/60"
+                        : "bg-emerald-700 text-white"
+                      : isDarkMode
+                      ? "bg-amber-950/80 text-amber-400 border border-amber-800/60"
+                      : "bg-amber-500 text-white"
+                  }`}
+                  title={aiEnabledLocal ? "AI is running. Tap to stop." : "AI is paused. Tap to resume."}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${aiEnabledLocal ? "bg-emerald-400 animate-pulse" : "bg-amber-300"}`} />
+                  {aiEnabledLocal ? "AI ON" : "AI PAUSED"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Action Icons */}
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          <button
+            onClick={extractAndShowCalendar}
+            disabled={calExtracting}
+            title="Add to Calendar"
+            className={`p-2 rounded-full transition-all active:scale-95 ${
+              isDarkMode ? "text-slate-300 hover:text-white hover:bg-[#202c33]" : "text-white hover:bg-white/10"
+            }`}
+          >
+            <CalendarPlus className={`w-5 h-5 ${calExtracting ? "animate-spin text-amber-400" : ""}`} />
+          </button>
+
+          <button
+            onClick={() => setShowInfo(true)}
+            title="Contact Details"
+            className={`p-2 rounded-full transition-all active:scale-95 ${
+              isDarkMode ? "text-slate-300 hover:text-white hover:bg-[#202c33]" : "text-white hover:bg-white/10"
+            }`}
+          >
+            <Info className="w-5 h-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Message History Feed */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-3.5 py-4 space-y-2.5 overscroll-contain"
+      >
+        {(() => {
+          let lastDateStr = '';
+          return messages
+            .filter((m) => m.sender !== 'system')
+            .map((message) => {
+              const isMe = message.sender === 'me';
+              const msgDate = message.created_at ? new Date(message.created_at) : new Date();
+              const dateStr = msgDate.toDateString();
+              let showDivider = false;
+              if (dateStr !== lastDateStr) {
+                showDivider = true;
+                lastDateStr = dateStr;
+              }
+
+              const today = new Date();
+              const yesterday = new Date();
+              yesterday.setDate(today.getDate() - 1);
+
+              let dividerLabel = '';
+              if (showDivider) {
+                if (dateStr === today.toDateString()) {
+                  dividerLabel = 'Today';
+                } else if (dateStr === yesterday.toDateString()) {
+                  dividerLabel = 'Yesterday';
+                } else {
+                  dividerLabel = msgDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                }
+              }
+
+              return (
+                <React.Fragment key={message.id}>
+                  {showDivider && (
+                    <div className="flex justify-center my-3 select-none">
+                      <span className={`px-3 py-1 rounded-lg text-[11px] font-semibold tracking-wide shadow-sm border ${
+                        isDarkMode
+                          ? "bg-[#182229] text-slate-400 border-[#222e35]"
+                          : "bg-white/90 text-slate-600 border-slate-200/80 backdrop-blur-sm"
+                      }`}>
+                        {dividerLabel}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[84%] rounded-2xl px-3.5 py-2.5 shadow-sm text-sm break-words relative transition-all ${
+                        isMe
+                          ? isDarkMode
+                            ? "bg-[#005c4b] text-white rounded-tr-sm"
+                            : "bg-[#d9fdd3] text-slate-900 border border-[#c4f3bd] rounded-tr-sm"
+                          : isDarkMode
+                          ? "bg-[#202c33] text-slate-100 rounded-tl-sm border border-[#2a3942]"
+                          : "bg-white text-slate-900 rounded-tl-sm shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                      }`}
+                    >
+                      {/* Media Renderer */}
+                      {message.media_url && (
+                        <div className="mb-2 rounded-xl overflow-hidden max-w-sm">
+                          {getMediaType(message.media_url) === 'image' ? (
+                            <img
+                              src={resolveMediaUrl(message.media_url)}
+                              alt="media"
+                              className="rounded-xl w-full max-h-60 object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                              onClick={() => setLightboxUrl(resolveMediaUrl(message.media_url!))}
+                            />
+                          ) : getMediaType(message.media_url) === 'video' ? (
+                            <video controls className="w-full rounded-xl" preload="metadata">
+                              <source src={resolveMediaUrl(message.media_url)} />
+                            </video>
+                          ) : getMediaType(message.media_url) === 'audio' ? (
+                            <audio controls className="w-full">
+                              <source src={resolveMediaUrl(message.media_url)} />
+                            </audio>
+                          ) : (
+                            <a
+                              href={resolveMediaUrl(message.media_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-2 p-2.5 rounded-lg bg-black/10 hover:bg-black/20 text-xs font-semibold underline"
+                            >
+                              <Paperclip className="w-4 h-4 shrink-0" />
+                              View Attachment
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Text content with clickable links & Google Maps button */}
+                      {(() => {
+                        if (!message.text) return null;
+                        const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/gi;
+                        const parts = message.text.split(urlRegex);
+                        const mapsMatch = message.text.match(/(https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+|(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)[^\s]+)/i);
+                        const mapsUrl = mapsMatch ? (mapsMatch[0].startsWith('http') ? mapsMatch[0] : `https://${mapsMatch[0]}`) : null;
+
+                        return (
+                          <div className="space-y-2">
+                            <p className="whitespace-pre-wrap leading-relaxed text-[14.5px]">
+                              {parts.map((part, i) => {
+                                if (part && part.match(urlRegex)) {
+                                  const href = part.startsWith('http') ? part : `https://${part}`;
+                                  return (
+                                    <a
+                                      key={i}
+                                      href={href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center underline font-semibold text-emerald-600 dark:text-emerald-400 hover:opacity-80 break-all"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(href, '_blank', 'noopener,noreferrer');
+                                      }}
+                                    >
+                                      <span>{part}</span>
+                                      <ExternalLink className="w-3 h-3 ml-0.5 inline opacity-80" />
+                                    </a>
+                                  );
+                                }
+                                return part;
+                              })}
+                            </p>
+
+                            {mapsUrl && (
+                              <div className="pt-1">
+                                <a
+                                  href={mapsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all"
+                                >
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  <span>Open in Google Maps</span>
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Time and Delivery Status Checkmarks */}
+                      <div className={`flex items-center justify-end gap-1 mt-1 text-[11px] select-none ${
+                        isMe
+                          ? isDarkMode ? "text-emerald-200" : "text-emerald-800/80"
+                          : isDarkMode ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        <span>{message.time}</span>
+                        {isMe && (() => {
+                          const s = message.status?.toLowerCase() || '';
+                          if (s === 'read' || s === 'seen') {
+                            return <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />;
+                          }
+                          if (s === 'delivered' || s === 'delivery') {
+                            return <CheckCheck className="w-3.5 h-3.5 opacity-70" />;
+                          }
+                          if (s === 'sent' || s === 'accepted' || s === 'enqueued') {
+                            return <Check className="w-3.5 h-3.5 opacity-70" />;
+                          }
+                          return <Clock className="w-3 h-3 opacity-60" />;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </React.Fragment>
+              );
+            });
+        })()}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Quick Action Suggestion Chips Bar */}
+      <div className={`px-2.5 py-1.5 overflow-x-auto no-scrollbar flex items-center gap-1.5 border-t select-none ${
+        isDarkMode
+          ? "bg-[#111b21] border-[#202c33]"
+          : "bg-[#f8f9fa] border-slate-200"
+      }`}>
+        <span className={`text-[10px] uppercase font-bold tracking-wider px-1 shrink-0 ${
+          isDarkMode ? "text-slate-500" : "text-slate-400"
+        }`}>
+          Quick:
+        </span>
+        {QUICK_RESPONSES.map((qr) => (
+          <button
+            key={qr.label}
+            onClick={() => {
+              setInputValue(qr.text);
+              if (textareaRef.current) textareaRef.current.focus();
+            }}
+            className={`text-xs px-3 py-1 rounded-full font-medium whitespace-nowrap shrink-0 transition-all active:scale-95 border ${
+              isDarkMode
+                ? "bg-[#202c33] border-[#2a3942] text-slate-300 hover:text-white hover:border-emerald-500/50"
+                : "bg-white border-slate-200 text-slate-700 hover:text-[#008069] hover:border-[#008069]"
+            }`}
+          >
+            {qr.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Input Composer Bar (Safe Area Protected on iOS) */}
+      <footer className={`px-3 py-2.5 pb-safe border-t sticky bottom-0 z-30 transition-colors ${
+        isDarkMode
+          ? "bg-[#111b21] border-[#202c33]"
+          : "bg-white border-slate-200 shadow-md"
+      }`}>
+        {is24hWindowClosed ? (
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500">
+            <p className="text-xs font-medium flex-1">
+              24-hour WhatsApp messaging window closed. Send a template message to reopen.
+            </p>
+            <button
+              onClick={openTemplateModal}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500 text-white shrink-0 hover:bg-amber-600 active:scale-95 transition-all"
+            >
+              Send Template
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-end gap-2">
+            {/* Attachment Button */}
+            <label className={`p-2.5 rounded-full cursor-pointer transition-all active:scale-95 shrink-0 mb-0.5 ${
+              isDarkMode
+                ? "text-slate-400 hover:text-slate-200 hover:bg-[#202c33]"
+                : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+            }`}>
+              <input type="file" onChange={uploadMedia} className="hidden" />
+              <Paperclip className="w-5 h-5" />
+            </label>
+
+            {/* Template Button */}
+            <button
+              onClick={openTemplateModal}
+              title="Send Template"
+              className={`p-2.5 rounded-full transition-all active:scale-95 shrink-0 mb-0.5 ${
+                isDarkMode
+                  ? "text-slate-400 hover:text-slate-200 hover:bg-[#202c33]"
+                  : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+              }`}
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+
+            {/* Auto-expanding Textarea */}
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Type message..."
+              className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-[15px] resize-none overflow-y-auto leading-snug transition-all ${
+                isDarkMode
+                  ? "bg-[#202c33] text-slate-100 placeholder:text-slate-500 border border-[#2a3942] focus:border-emerald-500"
+                  : "bg-slate-100 text-slate-900 placeholder:text-slate-400 border border-slate-200 focus:border-[#008069]"
+              }`}
+              style={{ minHeight: '40px', maxHeight: '120px' }}
+            />
+
+            {/* Send Button */}
+            <button
+              onClick={handleSend}
+              disabled={sendCooldown || !inputValue.trim()}
+              className={`p-3 rounded-full shrink-0 mb-0.5 active:scale-95 transition-all shadow-sm ${
+                inputValue.trim()
+                  ? isDarkMode
+                    ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                    : "bg-[#008069] text-white hover:bg-[#006e5a]"
+                  : isDarkMode
+                  ? "bg-[#202c33] text-slate-500 cursor-not-allowed"
+                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
+              }`}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </footer>
+
+      {/* Fullscreen Image Lightbox Modal */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-150"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 p-2.5 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Enlarged media"
+            className="max-w-full max-h-[85vh] rounded-xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
 
-      <div className={`text-white px-4 py-3 flex items-center relative z-10 ${isDarkMode ? "bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900" : "bg-[#008069]"}`}>
-        {isDarkMode && <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />}
-        <button onClick={onBack} className={`mr-3 relative z-10 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`}>
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <div className="relative">
-          <img src={avatar} alt={name} className="w-11 h-11 rounded-full object-cover" />
-        </div>
-        <div className="flex-1 ml-3 relative z-10">
-          <h2 className="font-bold">{name}</h2>
-          <p className={`text-xs ${isDarkMode ? "text-white" : "text-gray-200"}`}>Online</p>
-          <div className="text-xs mt-1 flex items-center gap-2">
-            <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>Handled by:</strong> {handlerLocal}</span>
-            {aiEnabledLocal ? (
-              <button onClick={() => toggleAi(false)} className="ml-2 px-2 py-1 text-xs rounded bg-red-600 text-white">Stop AI</button>
-            ) : (
-              <button onClick={() => toggleAi(true)} className="ml-2 px-2 py-1 text-xs rounded bg-green-600 text-white">Resume AI</button>
-            )}
-          </div>
-        </div>
-        <button className={`relative z-10 mr-2 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`} onClick={extractAndShowCalendar} disabled={calExtracting} title="Add to Calendar">
-          <CalendarPlus className={`w-5 h-5 ${calExtracting ? 'animate-pulse' : ''}`} />
-        </button>
-        <button className={`relative z-10 ${isDarkMode ? "hover:scale-110" : ""} transition-transform`} onClick={() => setShowInfo(true)}>
-          <Info className="w-6 h-6" />
-        </button>
-      </div>
-
-      {/* Info / Notes drawer */}
+      {/* Contact Info & Notes Drawer */}
       {showInfo && (
-        <div className={`absolute inset-0 z-50 flex flex-col ${ isDarkMode ? 'bg-gray-950' : 'bg-white'}`}>
-          <div className={`flex items-center gap-3 px-4 py-4 border-b ${ isDarkMode ? 'border-blue-900/30 text-white' : 'border-gray-200 text-gray-900'}`}>
-            <button onClick={() => setShowInfo(false)} className="hover:opacity-70 transition-opacity">
-              <X className="w-5 h-5" />
+        <div className={`absolute inset-0 z-50 flex flex-col animate-in slide-in-from-right duration-200 ${
+          isDarkMode ? "bg-[#111b21] text-slate-100" : "bg-white text-slate-900"
+        }`}>
+          <div className={`flex items-center justify-between px-4 py-3.5 border-b ${
+            isDarkMode ? "border-[#202c33]" : "border-slate-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowInfo(false)}
+                className="p-1.5 -ml-1 rounded-full text-slate-400 hover:text-slate-200"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h2 className="font-bold text-base">Contact Information</h2>
+            </div>
+            <button
+              onClick={() => {
+                onSaveContact?.(contactName.trim(), contactNotes.trim());
+                setShowInfo(false);
+              }}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg text-white transition-all active:scale-95 ${
+                isDarkMode ? "bg-emerald-600 hover:bg-emerald-500" : "bg-[#008069] hover:bg-[#006e5a]"
+              }`}
+            >
+              Save
             </button>
-            <h2 className="font-semibold text-base flex-1">Contact Info</h2>
-            <button onClick={handleSaveContact} className={`text-sm font-semibold px-3 py-1 rounded-lg ${ isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white'} transition-colors`}>Save</button>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-6">
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
             {/* Phone */}
             <div>
-              <label className={`text-xs font-medium mb-1 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>PHONE</label>
-              <p className={`text-sm ${ isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{chatId}</p>
+              <label className="text-[11px] font-bold tracking-wider block text-slate-400 uppercase mb-1">
+                Phone Number
+              </label>
+              <p className="text-sm font-semibold">{chatId}</p>
             </div>
-            {/* Display name */}
+
+            {/* Display Name */}
             <div>
-              <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>DISPLAY NAME</label>
+              <label className="text-[11px] font-bold tracking-wider block text-slate-400 uppercase mb-1.5">
+                Customer Name
+              </label>
               <input
                 type="text"
                 value={contactName}
-                onChange={e => setContactName(e.target.value)}
+                onChange={(e) => setContactName(e.target.value)}
                 placeholder="e.g. Rahul Sharma"
-                className={`w-full rounded-xl px-4 py-3 text-base outline-none transition-all ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`}
+                className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                  isDarkMode
+                    ? "bg-[#202c33] border border-[#2a3942] text-slate-100 focus:border-emerald-500"
+                    : "bg-slate-100 border border-slate-200 text-slate-900 focus:border-[#008069]"
+                }`}
               />
             </div>
+
             {/* Notes */}
             <div>
-              <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>
+              <label className="text-[11px] font-bold tracking-wider block text-slate-400 uppercase mb-1.5">
+                Internal Notes
+              </label>
               <textarea
                 value={contactNotes}
-                onChange={e => setContactNotes(e.target.value)}
-                placeholder="Add any notes about this customer..."
-                rows={4}
-                className={`w-full rounded-xl px-4 py-3 text-base outline-none resize-none transition-all ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'}`}
+                onChange={(e) => setContactNotes(e.target.value)}
+                placeholder="Child details, preferences, addresses, special requests..."
+                rows={3}
+                className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none resize-none ${
+                  isDarkMode
+                    ? "bg-[#202c33] border border-[#2a3942] text-slate-100 focus:border-emerald-500"
+                    : "bg-slate-100 border border-slate-200 text-slate-900 focus:border-[#008069]"
+                }`}
               />
             </div>
+
             {/* Labels */}
             <div>
-              <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>LABELS</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {labels.map(l => (
-                  <span key={l} className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ isDarkMode ? 'bg-blue-900/60 text-blue-200' : 'bg-green-100 text-green-800'}`}>
+              <label className="text-[11px] font-bold tracking-wider block text-slate-400 uppercase mb-1.5">
+                Labels
+              </label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {labels.map((l) => (
+                  <span
+                    key={l}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      isDarkMode
+                        ? "bg-emerald-950 text-emerald-300 border border-emerald-800/60"
+                        : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    }`}
+                  >
                     {l}
-                  <button onClick={() => { onRemoveLabel?.(l); setLabels(prev => prev.filter(x => x !== l)); }} className="ml-1 hover:opacity-70">
+                    <button
+                      onClick={() => {
+                        onRemoveLabel?.(l);
+                        setLabels((prev) => prev.filter((x) => x !== l));
+                      }}
+                      className="p-0.5 hover:opacity-70"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 ))}
               </div>
+
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={labelInput}
-                  onChange={e => setLabelInput(e.target.value)}
-                  onKeyDown={e => {
+                  onChange={(e) => setLabelInput(e.target.value)}
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter' && labelInput.trim()) {
                       const l = labelInput.trim();
                       onAddLabel?.(l);
-                      setLabels(prev => prev.includes(l) ? prev : [...prev, l]);
+                      setLabels((prev) => prev.includes(l) ? prev : [...prev, l]);
                       setLabelInput('');
                     }
                   }}
-                  placeholder="Type label + Enter"
-                  className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600' : 'bg-gray-100 border border-gray-200 text-gray-900'}`}
+                  placeholder="New label + Enter"
+                  className={`flex-1 rounded-xl px-3 py-2 text-sm outline-none ${
+                    isDarkMode
+                      ? "bg-[#202c33] border border-[#2a3942] text-slate-100"
+                      : "bg-slate-100 border border-slate-200 text-slate-900"
+                  }`}
                 />
                 <button
                   onClick={() => {
                     if (labelInput.trim()) {
                       const l = labelInput.trim();
                       onAddLabel?.(l);
-                      setLabels(prev => prev.includes(l) ? prev : [...prev, l]);
+                      setLabels((prev) => prev.includes(l) ? prev : [...prev, l]);
                       setLabelInput('');
                     }
                   }}
-                  className={`px-3 py-2 rounded-xl text-sm font-medium ${ isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white'}`}
-                >Add</button>
+                  className={`px-3 py-2 rounded-xl text-xs font-bold text-white ${
+                    isDarkMode ? "bg-emerald-600" : "bg-[#008069]"
+                  }`}
+                >
+                  Add
+                </button>
               </div>
             </div>
-            {/* AI-extracted customer facts */}
+
+            {/* AI Extracted Facts */}
             {customerVars && (
-              <div>
-                <label className={`text-xs font-medium mb-1.5 block ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>AI-EXTRACTED FACTS</label>
-                {(!customerVars.children?.length && !Object.keys(customerVars.notes || {}).length) ? (
-                  <p className={`text-xs italic ${ isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>No facts extracted yet</p>
-                ) : (
-                  <div className={`rounded-xl px-4 py-3 text-sm space-y-2 ${ isDarkMode ? 'bg-gray-900 border border-blue-500/30' : 'bg-gray-50 border border-gray-200'}`}>
-                    {customerVars.children && customerVars.children.length > 0 && (
-                      <div>
-                        <span className={`text-xs font-medium ${ isDarkMode ? 'text-blue-300' : 'text-green-700'}`}>Children</span>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {customerVars.children.map((c: any, i: number) => (
-                            <span key={i} className={`px-2 py-0.5 rounded-full text-xs ${ isDarkMode ? 'bg-blue-900/60 text-blue-200' : 'bg-green-100 text-green-800'}`}>
-                              {c.name || 'Unnamed'}{c.age ? ` (${c.age})` : ''}
-                            </span>
-                          ))}
-                        </div>
+              <div className={`p-3.5 rounded-2xl border ${
+                isDarkMode ? "bg-[#202c33]/50 border-[#2a3942]" : "bg-slate-50 border-slate-200"
+              }`}>
+                <div className="flex items-center gap-1.5 mb-2 text-emerald-500">
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-wider">AI Extracted Memory</span>
+                </div>
+
+                {customerVars.children && customerVars.children.length > 0 && (
+                  <div className="mb-2">
+                    <span className="text-xs font-medium text-slate-400 block mb-1">Children</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {customerVars.children.map((c: any, i: number) => (
+                        <span key={i} className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 font-semibold border border-emerald-500/20">
+                          {c.name || 'Child'}{c.age ? ` (${c.age})` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {customerVars.notes && Object.keys(customerVars.notes).length > 0 && (
+                  <div className="space-y-1.5 text-xs">
+                    {Object.entries(customerVars.notes).map(([k, v]) => (
+                      <div key={k} className="flex gap-2">
+                        <span className="text-slate-400 font-medium">{k}:</span>
+                        <span className="font-semibold text-slate-200">{String(v)}</span>
                       </div>
-                    )}
-                    {customerVars.notes && Object.keys(customerVars.notes).length > 0 && (
-                      <div className="space-y-1">
-                        {Object.entries(customerVars.notes).map(([key, val]) => (
-                          <div key={key} className="flex gap-2 text-xs">
-                            <span className={`font-medium whitespace-nowrap ${ isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}:</span>
-                            <span className={isDarkMode ? 'text-gray-200' : 'text-gray-800'}>{String(val)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    ))}
                   </div>
                 )}
               </div>
@@ -663,385 +1018,258 @@ export function ChatDetail({ chatId, onBack, isDarkMode, messages: propMessages 
         </div>
       )}
 
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4 relative z-10">
-        {(() => {
-          let lastDateStr = '';
-          return messages.filter(m => m.sender !== 'system').map((message) => {
-            const isMe = message.sender === 'me';
-            console.log("[ChatDetail DEBUG] message id:", message.id, "created_at:", message.created_at, "time:", message.time);
-            const msgDate = message.created_at ? new Date(message.created_at) : new Date();
-            const dateStr = msgDate.toDateString();
-            let showDivider = false;
-            if (dateStr !== lastDateStr) {
-              showDivider = true;
-              lastDateStr = dateStr;
-            }
-
-            const today = new Date();
-            const yesterday = new Date();
-            yesterday.setDate(today.getDate() - 1);
-
-            let dividerLabel = '';
-            if (showDivider) {
-              if (dateStr === today.toDateString()) {
-                dividerLabel = 'Today';
-              } else if (dateStr === yesterday.toDateString()) {
-                dividerLabel = 'Yesterday';
-              } else {
-                dividerLabel = msgDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
-              }
-            }
-
-            return (
-              <React.Fragment key={message.id}>
-                {showDivider && (
-                  <div className="flex justify-center my-4">
-                    <span className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide shadow-sm border ${
-                      isDarkMode 
-                        ? 'bg-gray-900/90 text-blue-400 border-blue-500/20 backdrop-blur-md' 
-                        : 'bg-white/80 text-gray-600 border-gray-200/60 backdrop-blur-md shadow-sm'
-                    }`}>
-                      {dividerLabel}
-                    </span>
-                  </div>
-                )}
-                <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${isDarkMode ? (isMe ? 'bg-gradient-to-r from-blue-800 to-blue-700 text-white backdrop-blur-sm' : 'bg-gray-900/80 text-gray-100 border border-blue-500/20 backdrop-blur-sm') : (isMe ? 'bg-[#d9fdd3]' : 'bg-white')}`} style={isDarkMode ? (isMe ? { boxShadow: '0 0 15px rgba(37, 99, 235, 0.2)' } : { boxShadow: '0 0 15px rgba(59, 130, 246, 0.1)' }) : {}}>
-                    {message.media_url && (
-                      <div className="mb-2">
-                        <MediaRenderer url={message.media_url} isDark={isDarkMode} />
-                      </div>
-                    )}
-                    {renderFormattedText(message.text, isMe, isDarkMode)}
-                    <div className={`flex items-center justify-end gap-1 mt-1.5 text-sm ${isDarkMode ? (isMe ? 'text-blue-200' : 'text-blue-400') : 'text-gray-500'}`}>
-                      <span title={message.created_at ? new Date(message.created_at).toLocaleString() : undefined}>{message.time}</span>
-                      {isMe && (() => {
-                        const s = message.status?.toLowerCase() || '';
-                        if (s === 'read' || s === 'seen') return <CheckCheck className="w-4 h-4" style={{ color: '#22aaff' }} />;
-                        if (s === 'delivered' || s === 'delivery') return <CheckCheck className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
-                        if (s === 'sent' || s === 'accepted' || s === 'enqueued') return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#9ca3af' : '#6b7280' }} />;
-                        return <Check className="w-4 h-4" style={{ color: isDarkMode ? '#4b5563' : '#d1d5db' }} />;
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </React.Fragment>
-            );
-          });
-        })()}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Template picker modal */}
+      {/* Template Modal */}
       {showTemplateModal && (
-        <div className={`absolute inset-0 z-50 flex flex-col ${isDarkMode ? 'bg-gray-950' : 'bg-white'}`}>
-          {/* Header */}
-          <div className={`flex items-center gap-3 px-4 py-4 border-b ${isDarkMode ? 'border-blue-900/30 text-white' : 'border-gray-200 text-gray-900'}`}>
-            {selectedTemplate ? (
-              <button onClick={() => { setSelectedTemplate(null); setTemplateVars([]); }} className="hover:opacity-70">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-            ) : (
-              <button onClick={() => setShowTemplateModal(false)} className="hover:opacity-70">
-                <X className="w-5 h-5" />
-              </button>
-            )}
-            <h2 className="font-semibold text-base flex-1">
-              {selectedTemplate ? selectedTemplate.name : 'Send Template'}
-            </h2>
+        <div className={`absolute inset-0 z-50 flex flex-col animate-in slide-in-from-bottom duration-200 ${
+          isDarkMode ? "bg-[#111b21] text-slate-100" : "bg-white text-slate-900"
+        }`}>
+          <div className={`flex items-center justify-between px-4 py-3.5 border-b ${
+            isDarkMode ? "border-[#202c33]" : "border-slate-200"
+          }`}>
+            <div className="flex items-center gap-2">
+              {selectedTemplate ? (
+                <button
+                  onClick={() => { setSelectedTemplate(null); setTemplateVars([]); }}
+                  className="p-1.5 -ml-1 rounded-full text-slate-400 hover:text-slate-200"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowTemplateModal(false)}
+                  className="p-1.5 -ml-1 rounded-full text-slate-400 hover:text-slate-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+              <h2 className="font-bold text-base">
+                {selectedTemplate ? selectedTemplate.name : "Select Template"}
+              </h2>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
-            {/* Step 1: template list */}
-            {!selectedTemplate && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {!selectedTemplate ? (
               templatesLoading ? (
-                <p className={`text-center text-sm py-10 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading templates…</p>
-              ) : templates.length === 0 ? (
-                // Fallback: manual template ID entry when listing API is unavailable
-                <div className="flex flex-col gap-4 pt-2">
-                  <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    Could not load template list. Enter the template ID manually (find it in your BotSpace dashboard).
-                  </p>
-                  <div>
-                    <label className={`text-xs font-semibold mb-1.5 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TEMPLATE ID</label>
-                    <input
-                      type="text"
-                      value={manualTemplateId}
-                      onChange={e => setManualTemplateId(e.target.value)}
-                      placeholder="e.g. payment_reminder"
-                      className={`w-full rounded-xl px-4 py-3 text-sm outline-none ${
-                        isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
-                      }`}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>VARIABLES (if any)</p>
-                      <button
-                        onClick={() => setTemplateVars(prev => [...prev, ''])}
-                        className={`text-xs px-2 py-1 rounded-lg ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-gray-100 text-[#008069] hover:bg-gray-200'}`}
-                      >+ Add</button>
-                    </div>
-                    {templateVars.map((v, i) => (
-                      <div key={i} className="flex gap-2 items-center">
-                        <span className={`text-xs w-6 text-center flex-shrink-0 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{i + 1}</span>
-                        <input
-                          type="text"
-                          value={v}
-                          onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                          placeholder={`Variable ${i + 1}`}
-                          className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${
-                            isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
-                          }`}
-                        />
-                        <button onClick={() => setTemplateVars(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={sendTemplate}
-                    disabled={templateSending || !manualTemplateId.trim()}
-                    className={`w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-all ${
-                      isDarkMode ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white hover:from-blue-600 hover:to-blue-500' : 'bg-[#008069] text-white hover:bg-[#017a5f]'
-                    }`}
-                  >
-                    {templateSending ? 'Sending…' : 'Send Template'}
-                  </button>
-                </div>
-              ) : templates.map((t: any) => {
-                const body = getTemplateBody(t);
-                return (
+                <p className="text-center text-sm py-10 text-slate-400">Loading templates...</p>
+              ) : (
+                templates.map((t) => (
                   <button
                     key={t.id || t.name}
                     onClick={() => { setSelectedTemplate(t); setTemplateVars([]); }}
-                    className={`w-full text-left rounded-xl px-4 py-3 transition-all ${
-                      isDarkMode ? 'bg-gray-900 border border-blue-900/30 hover:border-blue-500/50 text-white' : 'bg-gray-50 border border-gray-200 hover:border-[#008069] text-gray-900'
+                    className={`w-full text-left rounded-xl p-3.5 border transition-all active:scale-[0.99] ${
+                      isDarkMode
+                        ? "bg-[#202c33] border-[#2a3942] hover:border-emerald-500/50"
+                        : "bg-slate-50 border-slate-200 hover:border-[#008069]"
                     }`}
                   >
-                    <p className="font-medium text-sm mb-1">{t.name}</p>
-                    {body && <p className={`text-xs line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{body}</p>}
-                    {t.language && <p className={`text-[10px] mt-1 ${isDarkMode ? 'text-blue-500' : 'text-[#008069]'}`}>{t.language}</p>}
+                    <p className="text-sm font-bold text-emerald-500 mb-1">{t.name}</p>
+                    <p className="text-xs text-slate-400 line-clamp-2">{t.body || t.text}</p>
                   </button>
-                );
-              })
-            )}
-
-            {/* Step 2: fill variables */}
-            {selectedTemplate && (() => {
-              const bodyText = getTemplateBody(selectedTemplate);
-              const varCount = countVars(bodyText);
-              return (
-                <div className="flex flex-col gap-4">
-                  {bodyText && (
-                    <div className={`rounded-xl px-4 py-3 text-sm ${isDarkMode ? 'bg-gray-900 text-gray-300 border border-blue-900/30' : 'bg-gray-50 text-gray-700 border border-gray-200'}`}>
-                      <p className={`text-[10px] font-semibold mb-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>PREVIEW</p>
-                      {bodyText}
-                    </div>
-                  )}
-                  {/* Variables — shown if body has {{n}} or user can add manually */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>VARIABLES</p>
-                      <button
-                        onClick={() => setTemplateVars(prev => [...prev, ''])}
-                        className={`text-xs px-2 py-1 rounded-lg ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-gray-100 text-[#008069] hover:bg-gray-200'}`}
-                      >+ Add</button>
-                    </div>
-                    {templateVars.length === 0 && (
-                      <p className={`text-xs ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>No variables — tap + Add if your template needs them.</p>
-                    )}
-                    {templateVars.map((v, i) => (
-                      <div key={i} className="flex flex-col gap-2">
-                        <div className="flex gap-2 items-center">
-                          <span className={`text-xs w-6 text-center flex-shrink-0 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{i + 1}</span>
-                          <input
-                            type="text"
-                            value={v}
-                            onChange={e => setTemplateVars(prev => prev.map((x, j) => j === i ? e.target.value : x))}
-                            placeholder={`Variable ${i + 1}`}
-                            className={`flex-1 rounded-xl px-3 py-2 text-base outline-none ${
-                              isDarkMode ? 'bg-gray-900 border border-blue-500/30 text-white placeholder:text-gray-600 focus:border-blue-500' : 'bg-gray-100 border border-gray-200 text-gray-900 focus:border-[#008069]'
-                            }`}
-                          />
-                          <button onClick={() => setTemplateVars(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300">
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="flex gap-2 ml-8 overflow-x-auto pb-1 no-scrollbar">
-                          {['today', 'tomorrow', 'day after tomorrow'].map(quick => (
-                            <button
-                              key={quick}
-                              onClick={() => setTemplateVars(prev => prev.map((x, j) => j === i ? quick : x))}
-                              className={`text-[11px] font-medium whitespace-nowrap px-3 py-1.5 rounded-full transition-all ${
-                                v === quick 
-                                  ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white')
-                                  : (isDarkMode ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300')
-                              }`}
-                            >
-                              {quick.charAt(0).toUpperCase() + quick.slice(1)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={sendTemplate}
-                    disabled={templateSending}
-                    className={`w-full py-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-all ${
-                      isDarkMode ? 'bg-gradient-to-r from-blue-700 to-blue-600 text-white hover:from-blue-600 hover:to-blue-500' : 'bg-[#008069] text-white hover:bg-[#017a5f]'
-                    }`}
-                  >
-                    {templateSending ? 'Sending…' : 'Send Template'}
-                  </button>
+                ))
+              )
+            ) : (
+              <div className="space-y-4">
+                <div className={`p-3.5 rounded-xl border text-xs leading-relaxed ${
+                  isDarkMode ? "bg-[#202c33] border-[#2a3942] text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"
+                }`}>
+                  <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Preview</p>
+                  {selectedTemplate.body || selectedTemplate.text}
                 </div>
-              );
-            })()}
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase text-slate-400">Variables</span>
+                    <button
+                      onClick={() => setTemplateVars((prev) => [...prev, ''])}
+                      className="text-xs font-bold px-2 py-1 rounded bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30"
+                    >
+                      + Add Variable
+                    </button>
+                  </div>
+
+                  {templateVars.map((v, i) => (
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={v}
+                          onChange={(e) => setTemplateVars((prev) => prev.map((x, j) => j === i ? e.target.value : x))}
+                          placeholder={`Variable {{${i + 1}}}`}
+                          className={`flex-1 rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                            isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                          }`}
+                        />
+                        <button onClick={() => setTemplateVars((prev) => prev.filter((_, j) => j !== i))} className="text-rose-400 p-1">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                        {['today', 'tomorrow', 'this evening'].map((quick) => (
+                          <button
+                            key={quick}
+                            onClick={() => setTemplateVars((prev) => prev.map((x, j) => j === i ? quick : x))}
+                            className="text-[11px] px-2.5 py-1 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
+                          >
+                            {quick}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={sendTemplate}
+                  disabled={templateSending}
+                  className={`w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 shadow-sm ${
+                    isDarkMode ? "bg-emerald-600 hover:bg-emerald-500" : "bg-[#008069] hover:bg-[#006e5a]"
+                  }`}
+                >
+                  {templateSending ? "Sending Template..." : "Send Template Now"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {(() => {
-        const lastUserMsg = [...messages].reverse().find(m => m.sender === 'other');
-        const is24hWindowClosed = lastUserMsg && lastUserMsg.created_at
-          ? (new Date().getTime() - new Date(lastUserMsg.created_at).getTime()) > 24 * 60 * 60 * 1000
-          : true;
-
-        return (
-          <div className={`px-4 py-3 flex items-end gap-3 relative z-10 ${isDarkMode ? "bg-gradient-to-t from-gray-900 to-black border-t border-blue-900/30" : "bg-[#f0f0f0]"}`}>
-            <button
-              onClick={openTemplateModal}
-              title="Send Template"
-              className={`p-2 mb-1 rounded-full transition-all flex-shrink-0 ${isDarkMode ? 'bg-gray-800 text-blue-400 hover:bg-gray-700' : 'bg-white text-[#008069] hover:bg-gray-100'}`}
-            >
-              <FileText className="w-5 h-5" />
-            </button>
-            {is24hWindowClosed ? (
-              <div className={`flex-1 text-center py-2.5 mb-1 text-sm rounded-xl font-medium ${isDarkMode ? 'bg-amber-900/20 text-amber-500 border border-amber-900/50' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                24-hour window closed. Please send a template message.
-              </div>
-            ) : (
-              <>
-                <label className="cursor-pointer mb-1.5 flex-shrink-0">
-                  <input type="file" onChange={uploadMedia} className="hidden" />
-                  <div className={`px-3 py-2 rounded-full ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'}`}>+</div>
-                </label>
-                <textarea
-                  ref={textareaRef}
-                  rows={1}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={isDarkMode ? "Transmit message..." : "Type a message"}
-                  className={`flex-1 rounded-2xl px-4 py-2.5 outline-none text-base resize-none overflow-y-auto ${isDarkMode ? "bg-gray-900/70 border border-blue-500/30 text-gray-100 placeholder:text-gray-600 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 backdrop-blur-sm" : "bg-white border border-gray-300 text-gray-900 focus:border-[#008069] focus:ring-2 focus:ring-[#008069]/20"} transition-all`}
-                  style={{ height: '40px', minHeight: '40px', maxHeight: '120px' }}
-                />
-                <button onClick={handleSend} disabled={sendCooldown} className={`p-3 mb-1 rounded-full flex-shrink-0 active:scale-95 transition-all ${sendCooldown ? 'opacity-40 cursor-not-allowed' : ''} ${isDarkMode ? "bg-gradient-to-r from-blue-800 to-blue-700 text-white hover:from-blue-700 hover:to-blue-600" : "bg-[#008069] text-white hover:bg-[#017a5f]"}`} style={isDarkMode ? { boxShadow: "0 0 15px rgba(37, 99, 235, 0.3)" } : {}}>
-                  <Send className="w-5 h-5" />
-                </button>
-              </>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Calendar extraction confirmation modal */}
+      {/* Calendar Confirmation Modal */}
       {showCalModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCalModal(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowCalModal(false)}
+        >
           <div
-            className={`w-full max-w-md rounded-t-2xl p-6 pb-10 shadow-2xl flex flex-col gap-4 ${isDarkMode ? 'bg-gray-900 border-t border-blue-900/40' : 'bg-white border-t border-gray-200'}`}
-            onClick={e => e.stopPropagation()}
+            className={`w-full max-w-md rounded-t-3xl p-5 pb-8 shadow-2xl flex flex-col gap-3.5 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 ${
+              isDarkMode ? "bg-[#111b21] border-t border-[#202c33]" : "bg-white border-t border-slate-200"
+            }`}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-1">
-              <h2 className={`font-semibold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                {calSuccess ? '✓ Event Created!' : 'Add to Calendar'}
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-1 shrink-0" />
+
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-base">
+                {calSuccess ? "✓ Event Created!" : "Add Session to Calendar"}
               </h2>
-              <button onClick={() => setShowCalModal(false)} className="hover:opacity-70">
-                <X className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+              <button onClick={() => setShowCalModal(false)} className="p-1 text-slate-400">
+                <X className="w-5 h-5" />
               </button>
             </div>
+
             {calSuccess ? (
-              <p className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>Session saved to calendar.</p>
+              <p className="text-emerald-500 text-sm font-semibold py-4 text-center">
+                Session saved to KidDost calendar.
+              </p>
             ) : (
               <>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                  AI extracted these details from the last 8 messages. Edit anything before saving.
+                <p className="text-xs text-slate-400">
+                  AI extracted these session details from conversation history. Verify and tap save.
                 </p>
+
                 <div>
-                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TITLE</label>
-                  <input type="text" value={calTitle} onChange={e => setCalTitle(e.target.value)} placeholder="Session title" className={calInputCls} />
+                  <label className="text-[11px] font-bold uppercase text-slate-400 block mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={calTitle}
+                    onChange={(e) => setCalTitle(e.target.value)}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                      isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                    }`}
+                  />
                 </div>
+
                 <div>
-                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>DATE</label>
-                  <input type="date" value={calDate} onChange={e => setCalDate(e.target.value)} className={calInputCls} />
+                  <label className="text-[11px] font-bold uppercase text-slate-400 block mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={calDate}
+                    onChange={(e) => setCalDate(e.target.value)}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                      isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                    }`}
+                  />
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>START</label>
-                    <input type="time" value={calStart} onChange={e => setCalStart(e.target.value)} className={calInputCls} />
+                    <label className="text-[11px] font-bold uppercase text-slate-400 block mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      value={calStart}
+                      onChange={(e) => setCalStart(e.target.value)}
+                      className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                        isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                      }`}
+                    />
                   </div>
                   <div>
-                    <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>END</label>
-                    <input type="time" value={calEnd} onChange={e => setCalEnd(e.target.value)} className={calInputCls} />
+                    <label className="text-[11px] font-bold uppercase text-slate-400 block mb-1">End Time</label>
+                    <input
+                      type="time"
+                      value={calEnd}
+                      onChange={(e) => setCalEnd(e.target.value)}
+                      className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                        isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                      }`}
+                    />
                   </div>
                 </div>
+
                 <div>
-                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>ASSIGNED MEMBER</label>
-                  <input type="text" value={calMember} onChange={e => setCalMember(e.target.value)} placeholder="e.g. Priya, Rahul..." className={calInputCls} />
+                  <label className="text-[11px] font-bold uppercase text-slate-400 block mb-1">Assigned Member</label>
+                  <input
+                    type="text"
+                    value={calMember}
+                    onChange={(e) => setCalMember(e.target.value)}
+                    placeholder="e.g. Priya, Rahul..."
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none ${
+                      isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                    }`}
+                  />
                 </div>
+
                 <div>
-                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>NOTES</label>
-                  <textarea value={calNotes} onChange={e => setCalNotes(e.target.value)} placeholder="Location, special instructions..." rows={2} className={`${calInputCls} resize-none`} />
+                  <label className="text-[11px] font-bold uppercase text-slate-400 block mb-1">Notes / Address</label>
+                  <textarea
+                    value={calNotes}
+                    onChange={(e) => setCalNotes(e.target.value)}
+                    placeholder="Society name, flat number, special instructions..."
+                    rows={2}
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-sm outline-none resize-none ${
+                      isDarkMode ? "bg-[#202c33] border border-[#2a3942] text-slate-100" : "bg-slate-100 border border-slate-200 text-slate-900"
+                    }`}
+                  />
                 </div>
+
+                {/* Trial Pill Toggle */}
                 <button
                   type="button"
                   onClick={() => setCalTrial(!calTrial)}
-                  className={`flex items-center gap-3 w-full rounded-xl px-4 py-3 text-sm font-medium transition-all border ${
+                  className={`flex items-center gap-3 w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold border transition-all ${
                     calTrial
-                      ? 'bg-orange-50 border-orange-400 text-orange-600'
-                      : isDarkMode ? 'bg-gray-800 border-blue-500/30 text-gray-400' : 'bg-gray-100 border-gray-200 text-gray-500'
+                      ? "bg-amber-500/10 border-amber-500/50 text-amber-500"
+                      : isDarkMode
+                      ? "bg-[#202c33] border-[#2a3942] text-slate-400"
+                      : "bg-slate-100 border-slate-200 text-slate-600"
                   }`}
                 >
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold ${calTrial ? 'bg-orange-400 text-white' : isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}>
-                    {calTrial ? '✓' : ''}
+                  <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold text-white ${
+                    calTrial ? "bg-amber-500" : "bg-slate-400"
+                  }`}>
+                    {calTrial ? "✓" : ""}
                   </div>
-                  Trial Session
-                  {calTrial && <span className="ml-auto text-xs font-bold bg-orange-400 text-white px-2 py-0.5 rounded">TRIAL</span>}
+                  Introductory / Trial Session (₹500)
                 </button>
-                <div>
-                  <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TOTAL SESSIONS</label>
-                  <div className="flex items-center gap-3">
-                    <input type="range" min={1} max={30} value={calRepeat} onChange={e => setCalRepeat(parseInt(e.target.value))} className="flex-1 accent-blue-500" />
-                    <span className={`text-sm font-semibold min-w-[3rem] text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{calRepeat === 1 ? 'Once' : `${calRepeat}x`}</span>
-                  </div>
-                  {calRepeat > 1 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Creates {calRepeat} sessions{calDays.length > 1 ? ` across ${calDays.length} days/week (~${Math.ceil(calRepeat / calDays.length)} weeks)` : ` (${calRepeat} weeks)`} starting {calDate || 'selected date'}</p>}
-                  <div className="flex gap-2 mt-2">
-                    {[1, 4, 8, 11].map(n => (
-                      <button key={n} type="button" onClick={() => setCalRepeat(n)} className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${calRepeat === n ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white') : (isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600')}`}>{n === 1 ? 'Once' : `${n}x`}</button>
-                    ))}
-                  </div>
-                  {calRepeat > 1 && (
-                    <div className="mt-3">
-                      <label className={`text-xs font-medium mb-1 block ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>DAYS OF WEEK</label>
-                      <div className="flex gap-1.5">
-                        {(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as const).map((day, idx) => (
-                          <button key={day} type="button" onClick={() => setCalDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort())}
-                            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${calDays.includes(idx) ? (isDarkMode ? 'bg-blue-600 text-white' : 'bg-[#008069] text-white') : (isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600')}`}
-                          >{day}</button>
-                        ))}
-                      </div>
-                      {calDays.length === 0 && <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>No days selected — will repeat on same weekday as start date</p>}
-                    </div>
-                  )}
-                </div>
+
                 <button
                   onClick={saveCalEvent}
                   disabled={calSaving || !calTitle.trim() || !calDate}
-                  className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#008069] text-white hover:bg-[#006d5b]'}`}
+                  className={`w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 shadow-sm ${
+                    isDarkMode ? "bg-emerald-600 hover:bg-emerald-500" : "bg-[#008069] hover:bg-[#006e5a]"
+                  }`}
                 >
-                  {calSaving ? 'Saving...' : calRepeat > 1 ? `Save ${calRepeat} Sessions` : 'Save to Calendar'}
+                  {calSaving ? "Saving..." : "Save Session"}
                 </button>
               </>
             )}
