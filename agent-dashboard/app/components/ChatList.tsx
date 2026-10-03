@@ -117,10 +117,9 @@ export function ChatList({
     });
   }, [filterApplied, query, allRecentMessages]);
 
-  // 3. Sort chats: pinned first, then latest message by default
+  // 3. Sort chats strictly by latest message (no pin prioritization)
   const sorted = useMemo(() => {
     return [...searchResults].sort((a, b) => {
-      if (a.pinned !== b.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
       const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
       const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
       return timeB - timeA;
