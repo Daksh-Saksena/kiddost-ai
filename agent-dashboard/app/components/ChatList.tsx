@@ -409,28 +409,20 @@ export function ChatList({
                     alt={chat.name}
                     className="w-13 h-13 rounded-full object-cover shadow-sm"
                   />
-                  {chat.needsHuman ? (
-                    /* Solid static red dot (no glowing animation) */
+                  {chat.needsHuman && (
+                    /* Solid static red dot */
                     <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-white dark:border-[#111b21]" />
-                  ) : Boolean(chat.unread) ? (
-                    /* Solid green dot on avatar for chats with unread notifications */
-                    <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#25D366] border-2 border-white dark:border-[#111b21]" />
-                  ) : null}
+                  )}
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-1 mb-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <h3 className={`font-bold text-[17px] truncate leading-tight ${
-                        isDarkMode ? "text-slate-100" : "text-slate-900"
-                      }`}>
-                        {chat.name}
-                      </h3>
-                      {chat.pinned && (
-                        <Pin className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="currentColor" />
-                      )}
-                    </div>
+                  <div className="flex items-baseline justify-between gap-2 mb-1">
+                    <h3 className={`font-bold text-[17px] truncate leading-tight ${
+                      isDarkMode ? "text-slate-100" : "text-slate-900"
+                    }`}>
+                      {chat.name}
+                    </h3>
                     <span className={`text-xs font-semibold shrink-0 ${
                       chat.unread ? (isDarkMode ? "text-emerald-400" : "text-[#008069]") : (isDarkMode ? "text-slate-500" : "text-slate-400")
                     }`}>
@@ -447,14 +439,17 @@ export function ChatList({
                       {chat.lastMessage || "No messages yet"}
                     </p>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Green dot indicator for unread notifications */}
+                    {/* Uniform Right Action Group: [Number of Notifications] -> [AI or Admin] -> [Pin] */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Number of notifications pill (left of AI/Admin) */}
                       {Boolean(chat.unread) && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#25D366] shrink-0" />
+                        <span className="text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] px-1.5 flex items-center justify-center bg-[#25D366] shadow-sm">
+                          {chat.unread}
+                        </span>
                       )}
 
-                      {/* Always present uniform handler badge: Admin / Agent Name / AI */}
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full min-w-[36px] text-center tracking-wide ${
+                      {/* AI or Admin / Agent badge (middle: left of Pin, right of Notifications) */}
+                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full min-w-[34px] text-center tracking-wide ${
                         chat.agent
                           ? isDarkMode
                             ? "bg-[#202c33] text-blue-300 border border-blue-900/40"
@@ -470,14 +465,7 @@ export function ChatList({
                         {chat.agent || (chat.needsHuman ? "Admin" : "AI")}
                       </span>
 
-                      {/* Unread Counter Pill */}
-                      {Boolean(chat.unread) && (
-                        <span className="text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center bg-[#25D366] shadow-sm">
-                          {chat.unread}
-                        </span>
-                      )}
-
-                      {/* Quick Pin Action Button */}
+                      {/* Pin Button (far right) */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -485,12 +473,12 @@ export function ChatList({
                           onTogglePin(chat.id);
                         }}
                         title={chat.pinned ? "Unpin chat" : "Pin chat"}
-                        className={`p-1.5 rounded-full transition-colors ${
+                        className={`p-1 rounded-full transition-colors ${
                           chat.pinned
-                            ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10"
+                            ? "text-amber-500 hover:text-amber-600"
                             : isDarkMode
-                            ? "text-slate-600 hover:text-slate-400 hover:bg-[#202c33]"
-                            : "text-slate-300 hover:text-slate-600 hover:bg-slate-100"
+                            ? "text-slate-600 hover:text-slate-400"
+                            : "text-slate-300 hover:text-slate-600"
                         }`}
                       >
                         <Pin className="w-4 h-4" fill={chat.pinned ? "currentColor" : "none"} />
