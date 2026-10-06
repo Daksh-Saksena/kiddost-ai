@@ -2147,7 +2147,7 @@ app.get('/contacts', async (req, res) => {
     const step = 1000;
     
     while (true) {
-      const { data, error } = await supabase.from('contacts').select('phone, name, notes, labels').range(from, from + step - 1);
+      const { data, error } = await supabase.from('contacts').select('phone, name, notes, labels').order('updated_at', { ascending: false }).range(from, from + step - 1);
       if (error) return res.status(500).json({ error: error.message });
       if (!data || data.length === 0) break;
       allData = allData.concat(data);
@@ -2177,15 +2177,13 @@ app.post('/contacts', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'missing phone' });
   
   try {
-    const { data: existingAll } = await supabase.from('contacts').select('id').eq('phone', phone);
-    
-    if (existingAll && existingAll.length > 0) {
-      const { error } = await supabase.from('contacts').update({ name: name || '', notes: notes || '' }).eq('phone', phone);
-      if (error) return res.status(500).json({ error: error.message });
-    } else {
-      const { error } = await supabase.from('contacts').insert({ phone, name: name || '', notes: notes || '' });
-      if (error) return res.status(500).json({ error: error.message });
-    }
+    const { error } = await supabase.from('contacts').upsert({
+      phone,
+      name: name || '',
+      notes: notes || '',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'phone' });
+    if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });

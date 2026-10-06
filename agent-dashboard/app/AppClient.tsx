@@ -365,27 +365,66 @@ export default function AppClient() {
     };
   }, []);
 
-  // Load shared contacts from server on mount
+  // Load shared contacts directly from Supabase (instant, zero cold-start latency) and sync with server
   useEffect(() => {
-    fetch(`${SERVER}/contacts`)
-      .then(r => r.json())
-      .then(j => {
-        if (j.contacts) {
+    const loadSharedContacts = async () => {
+      try {
+        const { data: dbContacts } = await supabase
+          .from("contacts")
+          .select("phone, name, notes, labels")
+          .order("updated_at", { ascending: false })
+          .limit(2000);
+        if (dbContacts && dbContacts.length > 0) {
+          const map: Record<string, { name: string; notes: string; labels?: string[] }> = {};
+          for (const row of dbContacts) {
+            if (row.phone) {
+              map[row.phone] = {
+                name: row.name || '',
+                notes: row.notes || '',
+                labels: Array.isArray(row.labels) ? row.labels : []
+              };
+            }
+          }
           setContacts(prev => {
-            const merged = { ...prev, ...j.contacts };
+            const merged = { ...prev, ...map };
             try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(merged)); } catch {}
             return merged;
           });
           setChats(prevChats => prevChats.map(c => {
-            const entry = j.contacts[c.id];
+            const entry = map[c.id];
             if (entry?.name && entry.name !== c.id && !/^(\+?\d+)$/.test(entry.name)) {
               return { ...c, name: entry.name, avatar: avatarDataUrl(entry.name, c.id), labels: entry.labels || c.labels };
             }
             return c;
           }));
         }
-      })
-      .catch(() => {});
+      } catch (err) {
+        console.warn("Direct Supabase contacts load error:", err);
+      }
+
+      // Secondary sync via server
+      fetch(`${SERVER}/contacts`)
+        .then(r => r.json())
+        .then(j => {
+          if (j.contacts) {
+            setContacts(prev => {
+              const merged = { ...prev, ...j.contacts };
+              try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(merged)); } catch {}
+              return merged;
+            });
+            setChats(prevChats => prevChats.map(c => {
+              const entry = j.contacts[c.id];
+              if (entry?.name && entry.name !== c.id && !/^(\+?\d+)$/.test(entry.name)) {
+                return { ...c, name: entry.name, avatar: avatarDataUrl(entry.name, c.id), labels: entry.labels || c.labels };
+              }
+              return c;
+            }));
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadSharedContacts();
   }, []);
 
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
@@ -504,14 +543,16 @@ export default function AppClient() {
     const store = getPinnedStore();
     const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
 
-    // Lightweight query: recent messages and recent conversations only (no full table scans)
-    const [convsRes, msgsRes] = await Promise.all([
+    // Lightweight query: recent conversations, messages, and contacts directly from Supabase
+    const [convsRes, msgsRes, contactsRes] = await Promise.all([
       supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(150),
-      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(1000)
+      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("contacts").select("phone, name, notes, labels").order("updated_at", { ascending: false }).limit(2000)
     ]);
 
     const conversationsData = convsRes.data || [];
     let messagesData = msgsRes.data || [];
+    const dbContacts = contactsRes.data || [];
 
     if (msgsRes.error && conversationsData.length === 0) return;
 
@@ -559,8 +600,26 @@ export default function AppClient() {
       }
     }
 
-    // Use contacts from local cache & state (populated on mount and updated via Realtime)
-    const contactsMap: Record<string, { name: string; notes: string; labels?: string[] }> = { ...getContacts(), ...contacts };
+    // Extract contacts from fresh Supabase query
+    const serverContacts: Record<string, { name: string; notes: string; labels?: string[] }> = {};
+    for (const row of dbContacts) {
+      if (row.phone) {
+        serverContacts[row.phone] = {
+          name: row.name || '',
+          notes: row.notes || '',
+          labels: Array.isArray(row.labels) ? row.labels : []
+        };
+      }
+    }
+
+    // Use contacts merged from local cache, state, and direct Supabase database
+    const contactsMap: Record<string, { name: string; notes: string; labels?: string[] }> = {
+      ...getContacts(),
+      ...contacts,
+      ...serverContacts
+    };
+    setContacts(contactsMap);
+    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(contactsMap)); } catch {}
 
     const getDisplayName = (phone: string) => {
       const entry = contactsMap[phone];
@@ -999,46 +1058,84 @@ export default function AppClient() {
                 chatAvatar={currentChat?.avatar}
                 onSend={sendMessage}
                 agentName={agentName}
-                onSaveContact={(name, notes) => {
-                  // Save to server (shared across all agents) + local state
+                onSaveContact={async (name, notes) => {
+                  const trimmedName = name.trim();
+                  const trimmedNotes = notes.trim();
+                  const cur = contacts[selectedChat] || { name: '', notes: '', labels: [] };
+                  // 1. Immediately persist directly to Supabase database
+                  try {
+                    await supabase.from("contacts").upsert({
+                      phone: selectedChat,
+                      name: trimmedName,
+                      notes: trimmedNotes,
+                      labels: cur.labels || [],
+                      updated_at: new Date().toISOString()
+                    }, { onConflict: 'phone' });
+                  } catch (err) {
+                    console.error("Failed to save contact directly to Supabase:", err);
+                  }
+                  // 2. Also notify server (shared across all agents)
                   fetch(`${SERVER}/contacts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: selectedChat, name, notes })
+                    body: JSON.stringify({ phone: selectedChat, name: trimmedName, notes: trimmedNotes })
                   }).catch(() => {});
-                  saveContact(selectedChat, { name, notes });
-                  setContacts(prev => ({ ...prev, [selectedChat]: { name, notes } }));
-                  setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: name || c.id } : c));
+                  // 3. Update local state & cache immediately
+                  saveContact(selectedChat, { name: trimmedName, notes: trimmedNotes, labels: cur.labels || [] });
+                  setContacts(prev => ({ ...prev, [selectedChat]: { ...(prev[selectedChat] || {}), name: trimmedName, notes: trimmedNotes } }));
+                  setChats(prev => prev.map(c => c.id === selectedChat ? { ...c, name: trimmedName || c.id, avatar: avatarDataUrl(trimmedName || c.id, c.id) } : c));
                 }}
                 initialContact={contacts[selectedChat] || { name: '', notes: '' }}
                 initialLabels={contacts[selectedChat]?.labels || []}
-                onAddLabel={(label) => {
+                onAddLabel={async (label) => {
+                  const cur = contacts[selectedChat] || { name: '', notes: '', labels: [] };
+                  const newLabels = cur.labels?.includes(label) ? cur.labels : [...(cur.labels || []), label];
+                  try {
+                    await supabase.from("contacts").upsert({
+                      phone: selectedChat,
+                      name: cur.name || '',
+                      notes: cur.notes || '',
+                      labels: newLabels,
+                      updated_at: new Date().toISOString()
+                    }, { onConflict: 'phone' });
+                  } catch (err) {
+                    console.error("Failed to persist label to Supabase:", err);
+                  }
                   fetch(`${SERVER}/label`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ phone: selectedChat, label })
                   }).catch(() => {});
                   setContacts(prev => {
-                    const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
-                    const newLabels = cur.labels?.includes(label) ? cur.labels : [...(cur.labels || []), label];
                     const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
                     try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
-                    setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
                     return updated;
                   });
+                  setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
                 }}
-                onRemoveLabel={(label) => {
+                onRemoveLabel={async (label) => {
+                  const cur = contacts[selectedChat] || { name: '', notes: '', labels: [] };
+                  const newLabels = (cur.labels || []).filter(l => l !== label);
+                  try {
+                    await supabase.from("contacts").upsert({
+                      phone: selectedChat,
+                      name: cur.name || '',
+                      notes: cur.notes || '',
+                      labels: newLabels,
+                      updated_at: new Date().toISOString()
+                    }, { onConflict: 'phone' });
+                  } catch (err) {
+                    console.error("Failed to persist label removal to Supabase:", err);
+                  }
                   fetch(`${SERVER}/label?phone=${encodeURIComponent(selectedChat)}&label=${encodeURIComponent(label)}`, {
                     method: 'DELETE',
                   }).catch(() => {});
                   setContacts(prev => {
-                    const cur = prev[selectedChat] || { name: '', notes: '', labels: [] };
-                    const newLabels = (cur.labels || []).filter(l => l !== label);
                     const updated = { ...prev, [selectedChat]: { ...cur, labels: newLabels } };
                     try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(updated)); } catch {}
-                    setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
                     return updated;
                   });
+                  setChats(chats => chats.map(c => c.id === selectedChat ? { ...c, labels: newLabels } : c));
                 }}
               />
             </div>
