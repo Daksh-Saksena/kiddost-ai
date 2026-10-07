@@ -2140,6 +2140,20 @@ app.get("/debug-webhooks", (req, res) => {
   res.json({ count: recentWebhooks.length, webhooks: recentWebhooks });
 });
 
+// In-memory store to track messages sent from our dashboard so BotSpace outgoing webhooks don't duplicate them
+const recentAgentSends = new Map(); // key: `${phone}:${content}` -> timestamp
+const recentSentWhatsappIds = new Map(); // key: whatsappId -> timestamp
+function pruneRecentSends() {
+  const cutoff = Date.now() - 120000;
+  for (const [k, ts] of recentAgentSends.entries()) {
+    if (ts < cutoff) recentAgentSends.delete(k);
+  }
+  for (const [k, ts] of recentSentWhatsappIds.entries()) {
+    if (ts < cutoff) recentSentWhatsappIds.delete(k);
+  }
+}
+setInterval(pruneRecentSends, 60000);
+
 // Push notification endpoints
 app.get('/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
@@ -2487,6 +2501,20 @@ app.post("/webhook", async (req, res) => {
           return res.status(200).json({ ok: true, is_api_echo: true });
         }
 
+        // 1b. Check if this is an echo of a message recently sent from our agent dashboard (/agent-send or /agent-send-media)
+        const trimmedMsg = (message || '').trim();
+        const isAgentSendEcho = (messageId && recentSentWhatsappIds.has(messageId)) ||
+          (trimmedMsg && recentAgentSends.has(`${fullPhone}:${trimmedMsg}`)) ||
+          (mediaUrl && recentAgentSends.has(`${fullPhone}:${mediaUrl}`));
+
+        if (isAgentSendEcho) {
+          console.log(`[webhook] Detected echo of dashboard /agent-send for ${fullPhone}. Updating status/whatsapp_id and skipping duplicate insert.`);
+          if (messageId) {
+            await supabase.from('messages').update({ whatsapp_id: messageId, status: status || 'sent' }).eq('whatsapp_id', messageId);
+          }
+          return res.status(200).json({ ok: true, is_agent_send_echo: true });
+        }
+
         // 2. Check if this message matches a recent message sent by the server/AI within the last 60 seconds
         const { data: recentMsgs } = await supabase
           .from('messages')
@@ -2524,12 +2552,32 @@ app.post("/webhook", async (req, res) => {
         // 3. Genuine human agent typed directly in BotSpace dashboard!
         console.log(`[webhook] Detected genuine outgoing agent message from BotSpace for ${fullPhone}:`, message || mediaUrl);
         if (messageId) {
-          const { data: existing } = await supabase.from('messages').select('id').eq('whatsapp_id', messageId).maybeSingle();
-          if (existing) {
-            if (status) await supabase.from('messages').update({ status }).eq('id', existing.id);
+          const { data: existingRows } = await supabase.from('messages').select('id').eq('whatsapp_id', messageId);
+          if (existingRows && existingRows.length > 0) {
+            if (status) await supabase.from('messages').update({ status }).eq('id', existingRows[0].id);
             return res.status(200).json({ ok: true, already_exists: true });
           }
         }
+
+        // Also check if a message with identical phone and content was inserted in the last 15 seconds
+        const fifteenSecsAgo = new Date(Date.now() - 15000).toISOString();
+        const { data: recentDupeInDb } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('phone', fullPhone)
+          .eq('role', 'assistant')
+          .eq('content', message || '')
+          .gte('created_at', fifteenSecsAgo)
+          .limit(1);
+
+        if (recentDupeInDb && recentDupeInDb.length > 0) {
+          console.log(`[webhook] Message already inserted recently in DB for ${fullPhone}. Updating whatsapp_id and skipping duplicate insert.`);
+          if (messageId) {
+            await supabase.from('messages').update({ whatsapp_id: messageId, status: status || 'sent' }).eq('id', recentDupeInDb[0].id);
+          }
+          return res.status(200).json({ ok: true, already_exists_recent: true });
+        }
+
         const agentName = body?.author?.name || body?.sender?.name || body?.user?.name || body?.from?.name || 'Agent (BotSpace)';
         await supabase.from('messages').insert({
           phone: fullPhone,
@@ -2923,6 +2971,9 @@ app.post("/agent-send", async (req, res) => {
 
     // Send WhatsApp message through BotSpace and capture returned message id/status
     const agentName = req.body.agent || "Daksh";
+    const trimmedMsg = (message || '').trim();
+    recentAgentSends.set(`${phone}:${trimmedMsg}`, Date.now());
+
     let botResp;
     try {
       botResp = await axios.post(
@@ -2953,18 +3004,57 @@ app.post("/agent-send", async (req, res) => {
       null;
     const status = d?.status || d?.data?.status || "sent";
 
-    // Save message to database with whatsapp id and status
+    if (whatsappId) {
+      recentSentWhatsappIds.set(whatsappId, Date.now());
+    }
+
+    // Save message to database with whatsapp id and status (prevent race with webhook)
     try {
-      await supabase.from("messages").insert({
-        phone: phone,
-        role: "assistant",
-        content: message,
-        sender: "agent",
-        agent: agentName,
-        ai_enabled: false,
-        whatsapp_id: whatsappId,
-        status: status
-      });
+      let alreadyInserted = false;
+      if (whatsappId) {
+        const { data: existingRows } = await supabase
+          .from("messages")
+          .select("id, agent")
+          .eq("whatsapp_id", whatsappId);
+        if (existingRows && existingRows.length > 0) {
+          alreadyInserted = true;
+          console.log(`[agent-send] Message ${whatsappId} already inserted by webhook. Updating agent to ${agentName}.`);
+          await supabase.from("messages").update({ agent: agentName, status }).eq("id", existingRows[0].id);
+        }
+      }
+
+      if (!alreadyInserted) {
+        const tenSecondsAgo = new Date(Date.now() - 10000).toISOString();
+        const { data: recentDupes } = await supabase
+          .from("messages")
+          .select("id")
+          .eq("phone", phone)
+          .eq("role", "assistant")
+          .eq("content", message)
+          .gte("created_at", tenSecondsAgo)
+          .limit(1);
+
+        if (recentDupes && recentDupes.length > 0) {
+          alreadyInserted = true;
+          console.log(`[agent-send] Message already found in DB for ${phone}. Updating whatsapp_id and skipping duplicate insert.`);
+          if (whatsappId) {
+            await supabase.from("messages").update({ whatsapp_id: whatsappId, status, agent: agentName }).eq("id", recentDupes[0].id);
+          }
+        }
+      }
+
+      if (!alreadyInserted) {
+        await supabase.from("messages").insert({
+          phone: phone,
+          role: "assistant",
+          content: message,
+          sender: "agent",
+          agent: agentName,
+          ai_enabled: false,
+          whatsapp_id: whatsappId,
+          status: status
+        });
+      }
 
       // Also update conversations table flag for compatibility
       await supabase
@@ -3022,17 +3112,30 @@ app.post("/agent-send-media", async (req, res) => {
 
     console.log('BOTSPACE RESPONSE', response.data);
 
-    const { data: insertData, error: insertError } = await supabase.from("messages").insert({
-      phone: phone,
-      role: "assistant",
-      sender: "agent",
-      content: caption || "",
-      media_url: mediaUrl,
-      whatsapp_id: response?.data?.data?.id || response?.data?.data?.messageId || response?.data?.messageId || response?.data?.id || response?.data?.message_id || null
-    });
-    console.log('/agent-send-media insert result', { insertError, insertData });
-
     const mediaMsgId = response?.data?.data?.id || response?.data?.data?.messageId || response?.data?.messageId || response?.data?.id || null;
+    if (mediaMsgId) recentSentWhatsappIds.set(mediaMsgId, Date.now());
+    if (mediaUrl) recentAgentSends.set(`${phone}:${mediaUrl}`, Date.now());
+
+    let alreadyExistsMedia = false;
+    if (mediaMsgId) {
+      const { data: existingMedia } = await supabase.from("messages").select("id").eq("whatsapp_id", mediaMsgId);
+      if (existingMedia && existingMedia.length > 0) {
+        alreadyExistsMedia = true;
+        console.log(`[agent-send-media] Media message ${mediaMsgId} already inserted by webhook.`);
+      }
+    }
+
+    if (!alreadyExistsMedia) {
+      const { data: insertData, error: insertError } = await supabase.from("messages").insert({
+        phone: phone,
+        role: "assistant",
+        sender: "agent",
+        content: caption || "",
+        media_url: mediaUrl,
+        whatsapp_id: mediaMsgId
+      });
+      console.log('/agent-send-media insert result', { insertError, insertData });
+    }
     if (mediaMsgId) console.log('[agent-send-media] whatsapp_id captured:', mediaMsgId);
 
     res.json({ success: true });

@@ -741,7 +741,7 @@ export default function AppClient() {
       messagesCacheRef.current[phone] = [];
       return;
     }
-    const msgs: Message[] = data.map((m: any) => {
+    const rawMsgs: Message[] = data.map((m: any) => {
       // prefer explicit sender column when present
       const isOther = m.sender === 'user' || m.role === 'user';
       const isSystem = m.sender === 'system' || m.role === 'system';
@@ -758,6 +758,25 @@ export default function AppClient() {
         whatsapp_id: m.whatsapp_id ?? null,
       });
     });
+
+    // Deduplicate any accidental duplicate messages (e.g. echo races with same whatsapp_id or same text/sender within 4 seconds)
+    const seenWid = new Set<string>();
+    const msgs: Message[] = [];
+    for (const m of rawMsgs) {
+      if (m.whatsapp_id) {
+        if (seenWid.has(m.whatsapp_id)) continue;
+        seenWid.add(m.whatsapp_id);
+      }
+      const isRecentDupe = msgs.some(prev =>
+        prev.sender === m.sender &&
+        prev.text === m.text &&
+        prev.media_url === m.media_url &&
+        (prev.created_at && m.created_at ? Math.abs(new Date(prev.created_at).getTime() - new Date(m.created_at).getTime()) < 4000 : false)
+      );
+      if (isRecentDupe) continue;
+      msgs.push(m);
+    }
+
     messagesCacheRef.current[phone] = msgs;
     setMessages(msgs);
     setTimeout(scrollToBottom, 50);
@@ -814,10 +833,28 @@ export default function AppClient() {
               whatsapp_id: msg.whatsapp_id ?? null,
             };
             setMessages((prev) => {
-              // Dedup: skip if message with same id already exists (or optimistic match)
-              if (prev.some(m => m.id === mapped.id || (m.id.startsWith('optimistic-') && m.text === mapped.text && m.sender === mapped.sender))) {
+              // Dedup: skip if message with same id, same whatsapp_id, or optimistic match
+              const hasOptimisticMatch = prev.some(m => m.id.startsWith('optimistic-') && m.text === mapped.text && m.sender === mapped.sender);
+              if (hasOptimisticMatch) {
                 return prev.map(m => (m.id.startsWith('optimistic-') && m.text === mapped.text && m.sender === mapped.sender) ? mapped : m);
               }
+
+              const isDupe = prev.some(m =>
+                m.id === mapped.id ||
+                (mapped.whatsapp_id && m.whatsapp_id === mapped.whatsapp_id) ||
+                (m.text === mapped.text && m.sender === mapped.sender && m.media_url === mapped.media_url &&
+                  (m.created_at && mapped.created_at ? Math.abs(new Date(m.created_at).getTime() - new Date(mapped.created_at).getTime()) < 4000 : false))
+              );
+
+              if (isDupe) {
+                return prev.map(m => {
+                  if (mapped.whatsapp_id && m.whatsapp_id === mapped.whatsapp_id) {
+                    return { ...m, ...mapped, id: m.id };
+                  }
+                  return m;
+                });
+              }
+
               return [...prev, mapped];
             });
             setTimeout(scrollToBottom, 100);
