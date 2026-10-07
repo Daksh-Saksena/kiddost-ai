@@ -2154,6 +2154,46 @@ function pruneRecentSends() {
 }
 setInterval(pruneRecentSends, 60000);
 
+// Endpoint to clean up any duplicate messages in DB caused by previous webhook races
+app.post("/api/cleanup-duplicate-messages", async (req, res) => {
+  try {
+    const client = supabaseService || supabase;
+    const { data: msgs } = await client
+      .from("messages")
+      .select("id, whatsapp_id, sender, agent, created_at")
+      .not("whatsapp_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const byWid = {};
+    for (const m of msgs || []) {
+      if (!byWid[m.whatsapp_id]) byWid[m.whatsapp_id] = [];
+      byWid[m.whatsapp_id].push(m);
+    }
+
+    const idsToDelete = [];
+    for (const [wid, list] of Object.entries(byWid)) {
+      if (list.length > 1) {
+        list.sort((a, b) => {
+          if (a.agent === "Agent (BotSpace)" && b.agent !== "Agent (BotSpace)") return 1;
+          if (b.agent === "Agent (BotSpace)" && a.agent !== "Agent (BotSpace)") return -1;
+          return a.id - b.id;
+        });
+        const dupes = list.slice(1);
+        for (const d of dupes) idsToDelete.push(d.id);
+      }
+    }
+
+    if (idsToDelete.length > 0) {
+      const { error } = await client.from("messages").delete().in("id", idsToDelete);
+      return res.json({ success: true, deletedCount: idsToDelete.length, ids: idsToDelete, error });
+    }
+    return res.json({ success: true, deletedCount: 0 });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Push notification endpoints
 app.get('/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
