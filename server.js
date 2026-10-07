@@ -1022,6 +1022,7 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
 Return ONLY valid JSON with these fields:
 - "isOutOfScope": true ONLY if the user's message is asking about personal advice (such as crushes, dating, romance, how to impress someone, best friends, gift ideas), homework solving, trivia, jokes, storytelling, buying products/computers/electronics, or random general chat completely unrelated to a childcare/tutoring business.
 CRITICAL: NEVER mark greetings, general interest, or requests to know more about our service (e.g. "could I know more?", "tell me more", "how does this work?", "what is KidDost?", "need info", "share details", "interested", "how can you help?") as out of scope! These are 100% valid inquiries for our services.
+CRITICAL: NEVER mark job inquiries, vacancies, hiring, part-time/full-time work opportunities, or resume submissions (e.g. "is there a job available", "part time job", "any vacancy", "looking for job", "careers", "share resume") as out of scope! KidDost has a dedicated hiring script for them.
 - "children": array of children mentioned ANYWHERE in the FULL conversation. Each entry: { "name": string or null, "age": string or number or null }. CRITICAL: If the child's age is in months (e.g. "10 months", "4 months", "18 months"), keep it as a string with "months" (e.g. "10 months"). Example: [{"name":"Ram","age":4},{"name":null,"age":"10 months"}]
 - "notes": an object of important facts/details about the customer mentioned ANYWHERE in the conversation. Extract things like:
   • "parentName": mother's/father's name if mentioned
@@ -1235,8 +1236,9 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       console.log(`[Location Check] Non-Bangalore city detected: "${detectedNonBangaloreCity}" — injecting rejection`);
       messagesForAI.splice(-1, 0, { role: "system", content: `NON-BANGALORE CITY DETECTED: The user mentioned "${detectedNonBangaloreCity}". This is NOT in Bangalore. You MUST reject: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?" Do NOT proceed with booking. Do NOT ask for more details.` });
     }
-    const IN_SCOPE_INQUIRY_RE = /\b(know more|tell me more|more info|more details|how (?:does this|it) work|what is kiddost|about your service|about kiddost|details|charges|fees|cost|rate|pricing|activities|tutoring|care|child|children|kid|kids|baby|infant|toddler|session|booking|hours|nanny|supervisor|play|puzzle)\b/i;
-    if (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage)) {
+    const JOB_INQUIRY_RE = /\b(?:job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv|work\s+opportunities?|work\s+with\s+(?:you|kiddost)|part\s*time\s*job)\b/i;
+    const IN_SCOPE_INQUIRY_RE = /\b(know more|tell me more|more info|more details|how (?:does this|it) work|what is kiddost|about your service|about kiddost|details|charges|fees|cost|rate|pricing|activities|tutoring|care|child|children|kid|kids|baby|infant|toddler|session|booking|hours|nanny|supervisor|play|puzzle|job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv)\b/i;
+    if (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage) && !JOB_INQUIRY_RE.test(combinedMessage)) {
       console.log(`[Out-of-Scope Check] Out-of-scope query detected for ${fullPhone}: "${combinedMessage}" — injecting UNSURE instruction`);
       messagesForAI.splice(-1, 0, { role: "system", content: `OUT-OF-SCOPE INQUIRY DETECTED: The user's query is about a topic completely unrelated to KidDost child engagement services (e.g. personal advice, crushes, romance, friendship, gifts, general chat). You MUST reply with ONLY the single word: UNSURE.` });
     }
@@ -1406,17 +1408,27 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       aiReply = "Feel free to let us know if you have any questions.";
     }
 
-    // Safety net: Block false customer hesitation / ad-hoc message in hiring/job inquiry conversations
+    // Safety net: Block false customer hesitation / ad-hoc message or UNSURE in hiring/job inquiry conversations
     const allConvTextForJob = [
       combinedMessage,
       ...history.map(m => m.content)
     ].join(' ');
     const isJobContext = /\b(job|jobs|vacancy|vacancies|hiring|work|career|internship|resume|cv)\b/i.test(allConvTextForJob);
-    if (isJobContext && (AD_HOC_REPLY_RE.test(aiReply) || /Thank you for considering our services/i.test(aiReply))) {
-      console.warn(`[SAFETY NET] Blocked false hesitation exit in job inquiry for ${fullPhone}. User message: "${combinedMessage}"`);
+    const isJobMessage = JOB_INQUIRY_RE.test(combinedMessage);
+    if ((isJobContext || isJobMessage) && (
+      aiReply === 'UNSURE' ||
+      /\bUNSURE\b/i.test(aiReply) ||
+      AD_HOC_REPLY_RE.test(aiReply) ||
+      /Thank you for considering our services/i.test(aiReply) ||
+      /child(?:'s)? age|introductory session|charges|pricing|hourly rate/i.test(aiReply)
+    )) {
+      console.warn(`[SAFETY NET] Enforcing job inquiry script for ${fullPhone}. User message: "${combinedMessage}"`);
       const hasLocation = /\b(bangalore|bengaluru|koramangala|btm|whitefield|hsr|indiranagar|jp nagar|marathahalli|electronic city|jayanagar|malleshwaram|hebbal|yelahanka|sarjapur|bellandur)\b/i.test(allConvTextForJob);
-      if (hasLocation) {
-        aiReply = "Please share your resume, and we will get back to you.";
+      const hasResumeInHistory = history.some(m => /\[Media\/Document Attached\]/i.test(m.content) || /\b(resume|cv)\b/i.test(m.content));
+      if (hasResumeInHistory) {
+        aiReply = "Thank you! We will review your profile and get back to you.";
+      } else if (hasLocation) {
+        aiReply = "Thank you for sharing your location! Please share your resume, and we will get back to you.";
       } else {
         aiReply = "Could you please tell your location in Bangalore and share your resume? We will get back to you.";
       }
@@ -1528,7 +1540,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const OUT_OF_SCOPE_KEYWORDS_RE = /\b(crush|crushing|impress (?:her|she|him|he|girl|boy)|girlfriend|boyfriend|propose|love advice|dating|best friend|make friends|handmade gift|gift idea|gift to she|gift for (?:her|him|girl|boy)|give (?:her|him|she) (?:a )?gift|what gift|which gift|special gift)\b/i;
     const RANDOM_ADVICE_REPLY_RE = /(?:sweet to have a crush|normal to have crushes|feelings for someone special|impress (?:her|him)|handmade gifts are a wonderful idea|for a thoughtful gift|custom bracelet with her initials|your best friend can be someone|great to have feelings)/i;
 
-    const isDefinitelyOutOfScope = (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage)) || OUT_OF_SCOPE_KEYWORDS_RE.test(combinedMessage) || RANDOM_ADVICE_REPLY_RE.test(aiReply);
+    const isJobContextOrMsg = isJobContext || JOB_INQUIRY_RE.test(combinedMessage);
+    const isDefinitelyOutOfScope = !isJobContextOrMsg && ((intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage)) || OUT_OF_SCOPE_KEYWORDS_RE.test(combinedMessage) || RANDOM_ADVICE_REPLY_RE.test(aiReply));
     if (isDefinitelyOutOfScope) {
       console.warn(`[SAFETY NET] Intercepted out-of-scope random nonsense / personal advice for ${fullPhone}. User message: "${combinedMessage}"`);
       aiReply = 'UNSURE';
@@ -1822,7 +1835,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       /check.*(?:area|location).*service/i,
       /best options for your children/i,
     ];
-    const needsHuman = NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
+    const isWaitingForResume = /share your resume/i.test(aiReply);
+    const needsHuman = !isWaitingForResume && NEEDS_HUMAN_PATTERNS.some(p => p.test(aiReply));
 
     if (needsHuman) {
       // Flag conversation as needing human attention
