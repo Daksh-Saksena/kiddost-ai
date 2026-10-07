@@ -418,7 +418,15 @@ CRITICAL RULES:
       THIS IS A SERVICE INQUIRY, NOT A BARE GREETING!
       You are STRICTLY FORBIDDEN from replying with just "Hello! How can I help you today?" or "Hi! How can I assist you?".
       Treat it immediately as a service inquiry! If child's age is not known yet, ask: "Could I please know the child's age first?"
-- ACKNOWLEDGMENTS RULE: If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool") with no new question, respond with: "Feel free to let us know if you have any questions." or simply wait for their next question. You are STRICTLY FORBIDDEN from treating simple "Ok" as hesitation/rejection! NEVER send "Thank you for considering our services! If you ever need ad-hoc support..." for a simple "Ok"!
+- ACKNOWLEDGMENTS RULE: If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool") with no new question, do NOT send "Feel free to let us know if you have any questions." if it was already sent earlier in the conversation. Simply wait for their next question or reply with a brief acknowledgment.
+- PHONE CALL / VOICE CALL REQUESTS (CRITICAL):
+  KidDost operates exclusively via WhatsApp chat and voice notes. We do NOT provide voice calls or phone callbacks.
+  If the user asks for a call (e.g. "Can someone call me?", "Please call me", "Can you call?", "Call me in 15 mins", "Give me a call", "Can I get a call?", "Talk on phone", "Call back"):
+  Respond with this EXACT friendly message:
+  "Hi! We have only chat and voice note support available. Kindly message us your query or leave us a voice note here, and we shall respond immediately! Thank you."
+  If their location in Bangalore is not yet known, also ask:
+  "Could you please share your location in Bangalore to confirm our service availability?"
+  You are STRICTLY FORBIDDEN from saying "Our team is available between 9:00 AM and 7:45 PM. We will get back to you shortly!" or implying a phone call will happen!
 - GENDER / CHILD INFO RULE: If the user shares the child's gender ("Male", "Female", "Boy", "Girl", "He", "She") or any incidental child detail that doesn't ask a new question, simply acknowledge briefly ("Thank you for sharing!") and wait for their next question. Do NOT re-send pricing, activities, or any information already given.
 - ONLY answer questions that are explicitly covered in the RESPONSE PLAYBOOK below. If a question is not covered, reply UNSURE.
 - Do NOT improvise, fabricate, assume, or fill gaps with your own knowledge. You only know what is written in this prompt and the conversation history.
@@ -1555,13 +1563,6 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       }
     }
 
-    // Safety net: Intercept phone call requests and trigger agent handoff
-    const CALL_REQUEST_RE = /\b(?:can (?:you|someone|u) call|please call|give me a call|call me|talk on (?:the )?phone|talk on call|speak on call|voice call)\b/i;
-    if (CALL_REQUEST_RE.test(combinedMessage)) {
-      console.warn(`[SAFETY NET] Intercepted call request for ${fullPhone}. Alerting human agent.`);
-      aiReply = 'UNSURE';
-    }
-
     console.log("AI Reply (buffered):", aiReply);
 
     // ── UNSURE handling ───────────────────────────────────────────────────
@@ -1691,6 +1692,39 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       }
     };
 
+    // Safety net: Intercept phone call requests and trigger polite chat-only message + agent handoff
+    const CALL_REQUEST_RE = /\b(?:can (?:you|someone|u) call|please call|give me a call|call me|talk on (?:the )?phone|talk on call|speak on call|voice call|call back)\b/i;
+    const isCallRequest = CALL_REQUEST_RE.test(combinedMessage) || 
+      (history.length > 0 && CALL_REQUEST_RE.test(history[history.length - 1]?.content || '') && /\b(?:\d+\s*(?:min|mins|minute|minutes|hour|hours)|now|asap|today)\b/i.test(combinedMessage));
+
+    if (isCallRequest) {
+      console.warn(`[SAFETY NET] Intercepted call request for ${fullPhone}. Sending chat-only clarification and pausing AI for agent handoff.`);
+      const chatOnlyMsg = "Hi! We have only chat and voice note support available. Kindly message us your query or leave us a voice note here, and we shall respond immediately! Thank you.";
+      await sendAIText(chatOnlyMsg);
+
+      const hasLocation = history.some(m => /(?:bangalore|bengaluru|koramangala|indiranagar|whitefield|hsr|bellandur|jp nagar|jayanagar|sarjapur|marathahalli|hebbal|electronic city)/i.test(m.content || ''));
+      if (!hasLocation) {
+        await new Promise(r => setTimeout(r, 600));
+        await sendAIText("Could you please share your location in Bangalore to confirm our service availability?");
+      }
+
+      await supabase.from('conversations').upsert({ phone: fullPhone, ai_paused: true, needs_human: true }, { onConflict: 'phone' });
+      await supabase.from('messages').insert({
+        phone: fullPhone,
+        role: 'system',
+        content: 'AI paused (call request)',
+        sender: 'system',
+        ai_enabled: false
+      });
+      sendPushToAll({
+        title: `📞 Call Requested: ${displayContact}`,
+        body: `${displayContact} (${fullPhone}) requested a phone call. AI clarified chat-only and paused for agent review.`,
+        phone: fullPhone,
+        icon: '/icon-192.png'
+      }).catch(() => {});
+      return;
+    }
+
     if (prependWelcomeBack) {
       await sendAIText('Welcome back! Great to hear from you again.');
       await new Promise(r => setTimeout(r, 400));
@@ -1753,10 +1787,10 @@ Consider the FULL conversation history carefully — do not confuse one child's 
 
     // Safety fallback: if month image was sent, but the AI omitted the value packages text, send it now!
     const VALUE_PACKAGES_CANONICAL_TEXT = "Our KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.";
-    if (monthImageSent && !/packages offer you the flexibility/i.test(aiReply)) {
+    const packagesAlreadyInReply = /packages?\b|bundle of sessions|discounted rate/i.test(aiReply);
+    if (monthImageSent && !packagesAlreadyInReply) {
       console.log('[Safety Net] month.jpeg was sent but AI omitted package text. Auto-dispatching canonical text.');
       await sendAIText(VALUE_PACKAGES_CANONICAL_TEXT);
-      shouldSendFeelFree = true;
       await new Promise(r => setTimeout(r, 400));
     }
 
@@ -1766,12 +1800,12 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     if (pricingImageSent && !pricingAlreadyInHistory && !/introductory session/i.test(aiReply)) {
       console.log('[Safety Net] pricing.jpeg was sent but AI omitted intro session text. Auto-dispatching canonical text.');
       await sendAIText(INTRO_SESSION_CANONICAL_TEXT);
-      shouldSendFeelFree = true;
       await new Promise(r => setTimeout(r, 400));
     }
 
-    // Send "Feel free" as its own final message
-    if (shouldSendFeelFree) {
+    // Send "Feel free" as its own final message ONLY IF not already sent recently in conversation
+    const feelFreeAlreadyInHistory = history.slice(-5).some(m => m.role === 'assistant' && FEEL_FREE_PATTERN.test(m.content || ''));
+    if (shouldSendFeelFree && !feelFreeAlreadyInHistory) {
       await new Promise(r => setTimeout(r, 400));
       await sendAIText(FEEL_FREE_TEXT);
     }
