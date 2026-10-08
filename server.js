@@ -727,17 +727,26 @@ BEFORE BOOKING:
     - "Shall we book a session for you?"
   • Just answer the user's question and end with "Feel free to let us know if you have any questions." Wait patiently for the user to explicitly ask to book.
 
+BOOKING PROCESS / HOW TO BOOK INQUIRY:
+- If the user asks about the booking process or how booking works (e.g. "What's the booking process?", "how do I book?", "how does booking work?", "what is the process for booking?"):
+  - If their area/locality in Bangalore is not yet known:
+    Reply: "To book a session, we first confirm our service availability in your area. Could you please share your area or locality in Bangalore, and what date and time would work best for you?"
+  - If their area/locality in Bangalore is already known:
+    Reply: "To schedule your session, could you please share what date and time would work best for you?"
+  CRITICAL: NEVER ask for the child's age if age was ALREADY provided in the conversation history or KNOWN FACTS!
+
 - WHEN USER EXPLICITLY ASKS TO BOOK:
   - Step 1: Check if the suggested time is within our operational hours (9:00 AM – 7:45 PM) and on a working day (Monday to Saturday). Sunday is our ONLY closed day.
     • If today is Sunday, reject "today" requests immediately with "Currently, we are operational Monday to Saturday."
     • If today is Saturday and the user asks for "tomorrow", reject immediately with "Currently, we are operational Monday to Saturday." NEVER start collecting name, time slot, or location for a Sunday session!
     • If the user suggests an explicit time outside the 9:00 AM - 7:45 PM window (e.g. 7:00 AM, 8:00 PM), inform them: "Our services are typically available from 9:00 AM to 7:45 PM. Would you like to schedule for another time?"
   - Step 2: Ensure the child's age is known.
-    • CRITICAL: If age is unknown, you MUST ask: "Could I please know the child's age first?" before asking for parent's name or location.
+    • CRITICAL: If child's age was ALREADY mentioned in conversation history or KNOWN FACTS, DO NOT ASK FOR AGE AGAIN! Proceed immediately to Step 3.
+    • ONLY if age is completely unknown, ask: "Could I please know the child's age first?" before asking for parent's name or location.
   - Step 3: Only after age is known, gather the remaining missing details ONE AT A TIME:
-    1. Parent's/customer's name — if not known, ask: "And may I know your name as well?"
+    1. Area/locality — if not already known, ask: "Could you please share your area or locality in Bangalore so I can confirm our service availability?"
     2. Preferred date and time — ask: "What date and time would work best for you?"
-    3. Area/locality — if not already known, ask: "Could you also share your area or locality so I can confirm we service your location?"
+    3. Parent's/customer's name — if not known, ask: "And may I know your name as well?"
   - NEVER ask for information that the user has already provided earlier in the conversation.
   - CRITICAL PRECEDENCE — LOCATION OVERRIDES BOOKING FLOW: If at any point the user mentions their area, locality, or road (e.g. "My location is Sompura Gate, Sarjapura Road", "I am in Whitefield"), Rule 3 of LOCATION / SERVICEABILITY takes HIGHEST PRIORITY: respond with EXACTLY "Let me check if we can service your area and get back to you." NEVER ignore a shared location to ask for date, time, or name!
   - STRICT NEGATIVE CONSTRAINT FOR AREA CHECK: You are STRICTLY FORBIDDEN from saying "Let me check if we can service your area and get back to you" if the customer has NOT shared an area, locality, or address! If the customer asks to book (e.g. "Can you send tomorrow at 5PM\nFor 1 hr") but has NOT provided an area, you MUST ASK for their area: "Could you also share your area or locality so I can confirm we service your location?" (or ask for their name and area). NEVER claim to check their area when they haven't told you where they live!
@@ -867,9 +876,17 @@ function getActivityPitchForAge(age) {
 
   if (typeof age === 'string') {
     const trimmed = age.trim().toLowerCase();
-    if (trimmed.includes('month') || trimmed.includes('mth')) {
+    const yMatch = trimmed.match(/\b(\d+(?:\.\d+)?)\s*(?:years?|yrs?|yr)\b/i);
+    const mMatch = trimmed.match(/\b(\d+(?:\.\d+)?)\s*(?:months?|mths?)\b/i);
+
+    if (yMatch) {
+      const years = parseFloat(yMatch[1]);
+      const months = mMatch ? parseFloat(mMatch[1]) : 0;
+      numAge = years + (months / 12);
+      isMonths = false;
+    } else if (mMatch) {
       isMonths = true;
-      numAge = parseFloat(trimmed);
+      numAge = parseFloat(mMatch[1]);
     } else {
       numAge = parseFloat(trimmed);
     }
@@ -1498,6 +1515,13 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       console.warn(`[SAFETY NET] Intercepted false age ask when age is already known (${detectedAge}) for ${fullPhone}`);
       if (/\b(?:monthly|value|package|packages)\b/i.test(combinedMessage)) {
         aiReply = "[MONTH_IMAGE]\nOur KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.\n\nFeel free to let us know if you have any questions.";
+      } else if (/\b(?:book|booking|schedule|process|start|how\s+to\s+book)\b/i.test(combinedMessage)) {
+        const hasLoc = hasUserSharedLocation(allCustomerText);
+        if (!hasLoc) {
+          aiReply = "To book a session, we first confirm our service availability in your area. Could you please share your area or locality in Bangalore, and what date and time would work best for you?";
+        } else {
+          aiReply = "To schedule your session, what date and time would work best for you?";
+        }
       } else {
         aiReply = getActivityPitchForAge(detectedAge);
         if (userAskedForNanny && !alreadyGaveNannyDisclaimer) {
