@@ -392,6 +392,12 @@ const AI_DISABLED_NUMBERS = new Set([
   '9930133134', // Deepak 6 JP nagar
   '9980937623', // Sneha Swara mom
   '9591922442', // sapna - suriya
+  '6366000911', // avantika - rysa
+  '9481753678', // Akshatha Pramathi mom
+  '6361112387', // kumar - Iraj
+  '9113692023', // Tejaswini - Atharv mom
+  '9885989399', // Jayati Indiranagar
+  '9731826368', // Sushmitha - Kumarapark
 ]);
 
 function isAiDisabledForPhone(phone) {
