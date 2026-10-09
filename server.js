@@ -377,6 +377,19 @@ const messageTimers = {};
 const welcomeBackFlags = {};
 const aiProcessingPerPhone = new Set();
 
+// Numbers for which AI is permanently disabled (migrated customers from old phone handled manually)
+const AI_DISABLED_NUMBERS = new Set([
+  '9910569998',
+  '9901029836',
+]);
+
+function isAiDisabledForPhone(phone) {
+  if (!phone) return false;
+  const digits = String(phone).replace(/\D/g, '');
+  const tenDigits = digits.slice(-10);
+  return AI_DISABLED_NUMBERS.has(tenDigits) || AI_DISABLED_NUMBERS.has(digits);
+}
+
 // In-memory OTP store for agent creation: { token -> { otp, expiresAt } }
 const otpStore = {};
 
@@ -924,6 +937,10 @@ function getActivityPitchForAge(age) {
 
 // Helper: generate AI response for a combined user message
 async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
+  if (isAiDisabledForPhone(fullPhone)) {
+    console.log(`[ai] AI is permanently disabled for ${fullPhone}. Skipping response generation.`);
+    return;
+  }
   try {
     combinedMessage = normalizeMessageTypos(combinedMessage);
     const { prependWelcomeBack = false, contactName = '' } = options;
@@ -1901,6 +1918,10 @@ const welcomeInProgress = new Set();
 
 // Send 3-part welcome sequence to a new user
 async function sendWelcome(fullPhone) {
+  if (isAiDisabledForPhone(fullPhone)) {
+    console.log(`[welcome] AI is permanently disabled for ${fullPhone}. Skipping welcome sequence.`);
+    return;
+  }
   if (welcomeInProgress.has(fullPhone)) {
     console.log(`[welcome] Sequence already in-progress for ${fullPhone}. Skipping duplicate execution.`);
     return;
@@ -2729,15 +2750,22 @@ app.post("/webhook", async (req, res) => {
     }
 
     const botspaceConversationId = body?.customer?.id || null;
-    const isAiPaused = existingConversation?.ai_paused === true;
-    // A user is strictly new ONLY if there was NO DB error, NO conversation row, AND zero prior messages in database
-    const isNewUser = !dbCheckFailed && !existingConversation && priorMsgCount === 0;
+    const aiPermanentlyDisabled = isAiDisabledForPhone(fullPhone);
+    const isAiPaused = aiPermanentlyDisabled || existingConversation?.ai_paused === true;
+    // A user is strictly new ONLY if there was NO DB error, NO conversation row, AND zero prior messages in database (and AI is not permanently disabled)
+    const isNewUser = !aiPermanentlyDisabled && !dbCheckFailed && !existingConversation && priorMsgCount === 0;
 
     if (!existingConversation && !dbCheckFailed) {
       await supabase.from("conversations").upsert({
         phone: fullPhone,
         conversation_id: botspaceConversationId,
-        ai_paused: false
+        ai_paused: aiPermanentlyDisabled ? true : false
+      }, { onConflict: 'phone' });
+    } else if (aiPermanentlyDisabled && existingConversation?.ai_paused !== true) {
+      await supabase.from("conversations").upsert({
+        phone: fullPhone,
+        conversation_id: botspaceConversationId || existingConversation?.conversation_id,
+        ai_paused: true
       }, { onConflict: 'phone' });
     } else if (botspaceConversationId) {
       // Crucial: only update conversation_id, preserve ai_paused!
@@ -2791,7 +2819,7 @@ app.post("/webhook", async (req, res) => {
     }
 
     let aiEnabledForInsert = true;
-    if (isAiPaused) {
+    if (isAiPaused || aiPermanentlyDisabled) {
       aiEnabledForInsert = false;
     } else if (lastBefore && typeof lastBefore.ai_enabled !== 'undefined') {
       aiEnabledForInsert = lastBefore.ai_enabled;
@@ -2877,8 +2905,8 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ success: true, ai_skipped: true });
     }
 
-    if (isAiPaused || (last && (last.ai_enabled === false || last.sender === 'agent'))) {
-      console.log('AI disabled for this conversation (isAiPaused=true, last message ai_enabled=false, or sender=agent)');
+    if (isAiPaused || aiPermanentlyDisabled || (last && (last.ai_enabled === false || last.sender === 'agent'))) {
+      console.log('AI disabled for this conversation (isAiPaused=true, aiPermanentlyDisabled, last message ai_enabled=false, or sender=agent)');
       return res.status(200).json({ success: true, ai_skipped: true });
     }
 
@@ -3271,6 +3299,10 @@ app.post('/toggle-ai', async (req, res) => {
     const { phone, ai_enabled } = req.body;
     if (typeof phone === 'undefined' || typeof ai_enabled === 'undefined') {
       return res.status(400).json({ error: 'missing phone or ai_enabled' });
+    }
+
+    if (ai_enabled && isAiDisabledForPhone(phone)) {
+      return res.status(400).json({ error: 'AI is permanently disabled for this customer.' });
     }
 
     // Insert a system message so the next webhook message inherits the correct ai_enabled state
