@@ -514,24 +514,85 @@ export default function AppClient() {
       return;
     }
     const store = getPinnedStore();
-    const scoped = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
-    setPinnedChatIds(scoped);
+    let pins: string[] = [];
+    if (Array.isArray(store['shared_pins'])) {
+      pins = store['shared_pins'];
+    } else if (Array.isArray(store[agentScopedKey])) {
+      pins = store[agentScopedKey];
+    } else {
+      for (const val of Object.values(store)) {
+        if (Array.isArray(val) && val.length > 0) {
+          pins = val;
+          break;
+        }
+      }
+    }
+    // Strictly cap to at most 3 pins as done by admin (WhatsApp standard)
+    if (pins.length > 3) {
+      pins = pins.slice(0, 3);
+    }
+    store['shared_pins'] = pins;
+    store[agentScopedKey] = pins;
+    setPinnedStore(store);
+    setPinnedChatIds(pins);
   }, [authed, agentScopedKey]);
 
   const togglePinChat = (chatId: string) => {
     setPinnedChatIds((prev) => {
-      const next = prev.includes(chatId) ? prev.filter((id) => id !== chatId) : [...prev, chatId];
+      let next: string[];
+      if (prev.includes(chatId)) {
+        next = prev.filter((id) => id !== chatId);
+      } else {
+        // Enforce max 3 pinned chats
+        if (prev.length >= 3) {
+          next = [...prev.slice(1), chatId];
+        } else {
+          next = [...prev, chatId];
+        }
+      }
       const store = getPinnedStore();
+      store['shared_pins'] = next;
       store[agentScopedKey] = next;
       setPinnedStore(store);
-      setChats((current) => current.map((c) => c.id === chatId ? { ...c, pinned: !prev.includes(chatId) } : c));
+      setChats((current) => current.map((c) => ({ ...c, pinned: next.includes(c.id) })));
+
+      // Sync pin state to Supabase conversations so all agent profiles see it
+      (async () => {
+        try {
+          const { data: conv } = await supabase.from('conversations').select('vars').eq('phone', chatId).maybeSingle();
+          const currentVars = (conv && conv.vars && typeof conv.vars === 'object') ? conv.vars : {};
+          await supabase.from('conversations').upsert({
+            phone: chatId,
+            vars: { ...currentVars, pinned: next.includes(chatId) }
+          }, { onConflict: 'phone' });
+        } catch (e) {
+          console.warn('Failed to sync pin to Supabase:', e);
+        }
+      })();
+
       return next;
     });
   };
 
-  const markRead = (phone: string) => {
-    lastSeenRef.current[phone] = new Date().toISOString();
+  const markRead = async (phone: string) => {
+    const nowIso = new Date().toISOString();
+    lastSeenRef.current[phone] = nowIso;
     try { localStorage.setItem('kiddost_lastSeen', JSON.stringify(lastSeenRef.current)); } catch {}
+
+    // Immediately clear unread badge in current view
+    setChats(prev => prev.map(c => c.id === phone ? { ...c, unread: 0 } : c));
+
+    // Persist to Supabase conversations so all agent profiles on all devices see it as read
+    try {
+      const { data: conv } = await supabase.from('conversations').select('vars').eq('phone', phone).maybeSingle();
+      const currentVars = (conv && conv.vars && typeof conv.vars === 'object') ? conv.vars : {};
+      await supabase.from('conversations').upsert({
+        phone: phone,
+        vars: { ...currentVars, last_read_at: nowIso }
+      }, { onConflict: 'phone' });
+    } catch (err) {
+      console.warn('Failed to sync markRead to Supabase:', err);
+    }
   };
 
   const scrollToBottom = () => {
@@ -539,13 +600,28 @@ export default function AppClient() {
   };
 
   const loadChats = async () => {
-    // Read pinned chats locally to avoid waiting for state sync
+    // Read pinned chats locally (support shared pins across profiles, strictly capped to max 3)
     const store = getPinnedStore();
-    const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
+    let scopedPinned: string[] = [];
+    if (Array.isArray(store['shared_pins'])) {
+      scopedPinned = store['shared_pins'];
+    } else if (Array.isArray(store[agentScopedKey])) {
+      scopedPinned = store[agentScopedKey];
+    } else {
+      for (const val of Object.values(store)) {
+        if (Array.isArray(val) && val.length > 0) {
+          scopedPinned = val;
+          break;
+        }
+      }
+    }
+    if (scopedPinned.length > 3) {
+      scopedPinned = scopedPinned.slice(0, 3);
+    }
 
     // Lightweight query: recent conversations, messages, and contacts directly from Supabase
     const [convsRes, msgsRes, contactsRes1, contactsRes2] = await Promise.all([
-      supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("conversations").select("phone, needs_human, vars").order("created_at", { ascending: false }).limit(1000),
       supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(1000),
       supabase.from("contacts").select("phone, name, notes, labels").range(0, 999),
       supabase.from("contacts").select("phone, name, notes, labels").range(1000, 1999)
@@ -556,6 +632,23 @@ export default function AppClient() {
     const dbContacts = [...(contactsRes1.data || []), ...(contactsRes2.data || [])];
 
     if (msgsRes.error && conversationsData.length === 0) return;
+
+    // Merge any DB-level pinned flags (capped at 3)
+    const dbPinnedPhones: string[] = [];
+    const sharedReadMap: Record<string, string> = {};
+    for (const c of conversationsData) {
+      if (c.phone) {
+        if (c.vars?.pinned === true) {
+          dbPinnedPhones.push(c.phone);
+        }
+        if (c.vars?.last_read_at) {
+          sharedReadMap[c.phone] = c.vars.last_read_at;
+        }
+      }
+    }
+    if (dbPinnedPhones.length > 0) {
+      scopedPinned = Array.from(new Set([...scopedPinned, ...dbPinnedPhones])).slice(0, 3);
+    }
 
     // Map each phone number to its latest message row
     const latestMsgMap = new Map();
@@ -591,12 +684,12 @@ export default function AppClient() {
     // Save messages to allRecentMessages for global search
     setAllRecentMessages(messagesData);
 
-    // Count unread (user messages newer than last-seen) per phone
+    // Count unread: user messages newer than shared read timestamp or local last-seen
     const unreadCount: Record<string, number> = {};
     for (const row of messagesData) {
       if (row.role !== 'user' && row.sender !== 'user') continue;
-      const lastSeen = lastSeenRef.current[row.phone];
-      if (!lastSeen || row.created_at > lastSeen) {
+      const readAt = sharedReadMap[row.phone] || lastSeenRef.current[row.phone];
+      if (!readAt || row.created_at > readAt) {
         unreadCount[row.phone] = (unreadCount[row.phone] || 0) + 1;
       }
     }
@@ -960,6 +1053,21 @@ export default function AppClient() {
           if (row && row.phone) {
             if (typeof row.needs_human !== 'undefined') {
               setChats(prev => prev.map(c => c.id === row.phone ? { ...c, needsHuman: row.needs_human } : c));
+            }
+            // Shared read state update: clear unread count across all profiles instantly!
+            if (row.vars?.last_read_at) {
+              lastSeenRef.current[row.phone] = row.vars.last_read_at;
+              setChats(prev => prev.map(c => c.id === row.phone ? { ...c, unread: 0 } : c));
+            }
+            // Shared pin state update: sync pin across all profiles instantly!
+            if (typeof row.vars?.pinned !== 'undefined') {
+              setPinnedChatIds(prev => {
+                const next = row.vars.pinned
+                  ? Array.from(new Set([...prev, row.phone])).slice(-3)
+                  : prev.filter(p => p !== row.phone);
+                return next;
+              });
+              setChats(prev => prev.map(c => c.id === row.phone ? { ...c, pinned: !!row.vars.pinned } : c));
             }
           }
         }
