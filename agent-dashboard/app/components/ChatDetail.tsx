@@ -21,7 +21,8 @@ import {
   Sparkles,
   Download,
   Clock,
-  Phone
+  Phone,
+  MessageSquare
 } from "lucide-react";
 import { supabase } from '../../lib/supabase';
 
@@ -158,6 +159,18 @@ export function ChatDetail({
         setCustomerVars(data?.vars || {});
       });
   }, [showInfo, chatId]);
+
+  // Synchronize AI state from conversations table (ensures accurate state for new or 0-message chats)
+  useEffect(() => {
+    const cleanPhone = chatId.startsWith('+') ? chatId : `+${chatId}`;
+    supabase.from('conversations').select('ai_paused').eq('phone', cleanPhone).maybeSingle()
+      .then(({ data }) => {
+        if (data && typeof data.ai_paused !== 'undefined') {
+          setAiEnabledLocal(!data.ai_paused);
+          setHandlerLocal(data.ai_paused ? 'Agent' : 'AI');
+        }
+      });
+  }, [chatId]);
 
   // Smart auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -528,7 +541,21 @@ export function ChatDetail({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-3.5 py-4 space-y-2.5 overscroll-contain"
       >
-        {(() => {
+        {messages.filter((m) => m.sender !== 'system').length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[320px] py-16 text-center select-none">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 shadow-sm ${
+              isDarkMode ? "bg-[#202c33] text-slate-400" : "bg-slate-100 text-slate-400"
+            }`}>
+              <MessageSquare className="w-7 h-7" />
+            </div>
+            <p className={`text-base font-semibold ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}>
+              No messages yet
+            </p>
+            <p className={`text-xs mt-1.5 max-w-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+              This contact is saved. When incoming or outgoing messages are sent, the chat history will appear here.
+            </p>
+          </div>
+        ) : (() => {
           let lastDateStr = '';
           return messages
             .filter((m) => m.sender !== 'system')

@@ -94,30 +94,45 @@ export function ChatList({
   };
 
   // Pre-calculate filter counts with useMemo for zero-lag updates
+  const activeChatsCount = useMemo(() => {
+    return chats.filter(c => c.lastMsgAt || c.pinned || (c.unread && c.unread > 0) || c.needsHuman).length;
+  }, [chats]);
   const needsHumanCount = useMemo(() => chats.filter(c => c.needsHuman).length, [chats]);
   const unreadCount = useMemo(() => chats.filter(c => (c.unread || 0) > 0).length, [chats]);
 
   // 1. Filter chats by active tab
   const filterApplied = useMemo(() => {
+    if (query.trim()) return chats;
     if (activeFilter === 'needsHuman') return chats.filter(c => c.needsHuman);
     if (activeFilter === 'unread') return chats.filter(c => (c.unread || 0) > 0);
-    return chats;
-  }, [chats, activeFilter]);
+    return chats.filter(c => c.lastMsgAt || c.pinned || (c.unread && c.unread > 0) || c.needsHuman);
+  }, [chats, activeFilter, query]);
 
   // 2. Filter chats by search query (instant memoized search)
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return filterApplied;
+
+    const qDigits = q.replace(/\D/g, '');
+
     return filterApplied.filter((c) => {
+      // 1. Name match
       if (c.name.toLowerCase().includes(q)) return true;
-      if (c.lastMessage.toLowerCase().includes(q)) return true;
+      // 2. Phone match (exact string or digits substring)
+      if (c.id.toLowerCase().includes(q)) return true;
+      if (qDigits.length >= 3 && c.id.replace(/\D/g, '').includes(qDigits)) return true;
+      // 3. Label match
+      if (c.labels && c.labels.some(l => l.toLowerCase().includes(q))) return true;
+      // 4. Last message preview match
+      if (c.lastMessage && c.lastMessage.toLowerCase().includes(q)) return true;
+      // 5. Deep recent message content match
       return allRecentMessages.some(
         (m) => m.phone === c.id && m.content && m.content.toLowerCase().includes(q)
       );
     });
   }, [filterApplied, query, allRecentMessages]);
 
-  // 3. Sort chats: pinned first (in pinned order, so newly pinned goes to the bottom of the pinned list at the top), then latest message timestamp
+  // 3. Sort chats: pinned first, then query prefix priority if searching, then latest message timestamp
   const sorted = useMemo(() => {
     return [...searchResults].sort((a, b) => {
       if (a.pinned !== b.pinned) {
@@ -130,11 +145,17 @@ export function ChatList({
           return indexA - indexB;
         }
       }
+      const q = query.trim().toLowerCase();
+      if (q) {
+        const aStarts = a.name.toLowerCase().startsWith(q) || a.id.replace(/\D/g, '').startsWith(q.replace(/\D/g, ''));
+        const bStarts = b.name.toLowerCase().startsWith(q) || b.id.replace(/\D/g, '').startsWith(q.replace(/\D/g, ''));
+        if (aStarts !== bStarts) return Number(bStarts) - Number(aStarts);
+      }
       const timeA = a.lastMsgAt ? new Date(a.lastMsgAt).getTime() : 0;
       const timeB = b.lastMsgAt ? new Date(b.lastMsgAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [searchResults, pinnedOrder]);
+  }, [searchResults, pinnedOrder, query]);
 
   return (
     <div className={`flex flex-col h-full ${isDarkMode ? "bg-[#0b141a] text-slate-100" : "bg-white text-slate-900"}`}>
@@ -249,7 +270,7 @@ export function ChatList({
                 ? isDarkMode ? "bg-[#25d366]/20 text-[#25d366]" : "bg-[#008069]/15 text-[#008069]"
                 : isDarkMode ? "bg-[#111b21] text-slate-400" : "bg-slate-200 text-slate-600"
             }`}>
-              {chats.length}
+              {activeChatsCount}
             </span>
           </button>
 

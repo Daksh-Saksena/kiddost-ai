@@ -13,7 +13,7 @@ const SERVER = "https://kiddost-ai.onrender.com";
 const SESSION_KEY = "kiddost_auth";
 const THEME_KEY = "kiddost_dark_mode";
 
-type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string; labels?: string[]; pinned?: boolean; needsHuman?: boolean };
+type Chat = { id: string; name: string; avatar: string; lastMessage: string; time: string; unread?: number; agent?: string | null; lastMsgAt?: string | null; labels?: string[]; pinned?: boolean; needsHuman?: boolean };
 type Message = { id: string; text: string; sender: "me" | "other" | "system"; time: string; created_at?: string; agent?: string | null; ai_enabled?: boolean; status?: string | null; media_url?: string | null; whatsapp_id?: string | null };
 type AgentProfile = { id: string; name: string };
 
@@ -544,15 +544,16 @@ export default function AppClient() {
     const scopedPinned = Array.isArray(store[agentScopedKey]) ? store[agentScopedKey] : [];
 
     // Lightweight query: recent conversations, messages, and contacts directly from Supabase
-    const [convsRes, msgsRes, contactsRes] = await Promise.all([
-      supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(150),
+    const [convsRes, msgsRes, contactsRes1, contactsRes2] = await Promise.all([
+      supabase.from("conversations").select("phone, needs_human").order("created_at", { ascending: false }).limit(1000),
       supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("contacts").select("phone, name, notes, labels").order("updated_at", { ascending: false }).limit(2000)
+      supabase.from("contacts").select("phone, name, notes, labels").range(0, 999),
+      supabase.from("contacts").select("phone, name, notes, labels").range(1000, 1999)
     ]);
 
     const conversationsData = convsRes.data || [];
     let messagesData = msgsRes.data || [];
-    const dbContacts = contactsRes.data || [];
+    const dbContacts = [...(contactsRes1.data || []), ...(contactsRes2.data || [])];
 
     if (msgsRes.error && conversationsData.length === 0) return;
 
@@ -681,6 +682,27 @@ export default function AppClient() {
           pinned: scopedPinned.includes(phone),
           needsHuman: needsHumanPhones.has(phone),
         });
+      }
+    }
+
+    // Also include all contacts from contactsMap so ANY saved contact can be searched up in the dashboard
+    for (const phone of Object.keys(contactsMap)) {
+      if (phone && !addedPhones.has(phone)) {
+        const dispName = getDisplayName(phone);
+        result.push({
+          id: phone,
+          name: dispName,
+          avatar: avatarDataUrl(dispName, phone),
+          lastMessage: 'No messages yet',
+          time: '',
+          agent: null,
+          unread: 0,
+          lastMsgAt: null,
+          labels: contactsMap[phone]?.labels || [],
+          pinned: scopedPinned.includes(phone),
+          needsHuman: needsHumanPhones.has(phone),
+        });
+        addedPhones.add(phone);
       }
     }
 
