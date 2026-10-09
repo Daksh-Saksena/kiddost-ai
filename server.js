@@ -403,6 +403,8 @@ const AI_DISABLED_NUMBERS = new Set([
   '7769077119', // pooja - vanya
   '9620644283', // Prianka - nuts in jar
   '9701765806', // deepthi - Harini
+  '9486683809', // archana - vedanshi
+  '9711346137', // neha Darsh mom
 ]);
 
 function isAiDisabledForPhone(phone) {
