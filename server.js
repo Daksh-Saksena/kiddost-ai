@@ -379,8 +379,19 @@ const aiProcessingPerPhone = new Set();
 
 // Numbers for which AI is permanently disabled (migrated customers from old phone handled manually)
 const AI_DISABLED_NUMBERS = new Set([
-  '9910569998',
-  '9901029836',
+  '9910569998', // Seema
+  '9901029836', // kidDost
+  '9986039445', // meghna Kiara mom
+  '7974678498', // Anmol- golden blossom
+  '9535672746', // Anu geethik mom
+  '9902545878', // Aarthi Sahana PLH
+  '8217880413', // Karan APR
+  '9008225872', // Shriti Sambhavi mom
+  '9940428166', // swati - Maisha mom
+  '9431669077', // Ms Mani blue sky
+  '9930133134', // Deepak 6 JP nagar
+  '9980937623', // Sneha Swara mom
+  '9591922442', // sapna - suriya
 ]);
 
 function isAiDisabledForPhone(phone) {
