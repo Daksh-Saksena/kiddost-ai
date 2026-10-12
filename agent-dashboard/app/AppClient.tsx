@@ -527,10 +527,6 @@ export default function AppClient() {
         }
       }
     }
-    // Strictly cap to at most 3 pins as done by admin (WhatsApp standard)
-    if (pins.length > 3) {
-      pins = pins.slice(0, 3);
-    }
     store['shared_pins'] = pins;
     store[agentScopedKey] = pins;
     setPinnedStore(store);
@@ -539,17 +535,7 @@ export default function AppClient() {
 
   const togglePinChat = (chatId: string) => {
     setPinnedChatIds((prev) => {
-      let next: string[];
-      if (prev.includes(chatId)) {
-        next = prev.filter((id) => id !== chatId);
-      } else {
-        // Enforce max 3 pinned chats
-        if (prev.length >= 3) {
-          next = [...prev.slice(1), chatId];
-        } else {
-          next = [...prev, chatId];
-        }
-      }
+      const next = prev.includes(chatId) ? prev.filter((id) => id !== chatId) : [...prev, chatId];
       const store = getPinnedStore();
       store['shared_pins'] = next;
       store[agentScopedKey] = next;
@@ -615,9 +601,6 @@ export default function AppClient() {
         }
       }
     }
-    if (scopedPinned.length > 3) {
-      scopedPinned = scopedPinned.slice(0, 3);
-    }
 
     // Lightweight query: recent conversations, messages, and contacts directly from Supabase
     const [convsRes, msgsRes, contactsRes1, contactsRes2] = await Promise.all([
@@ -647,7 +630,7 @@ export default function AppClient() {
       }
     }
     if (dbPinnedPhones.length > 0) {
-      scopedPinned = Array.from(new Set([...scopedPinned, ...dbPinnedPhones])).slice(0, 3);
+      scopedPinned = Array.from(new Set([...scopedPinned, ...dbPinnedPhones]));
     }
 
     // Map each phone number to its latest message row
@@ -1063,7 +1046,7 @@ export default function AppClient() {
             if (typeof row.vars?.pinned !== 'undefined') {
               setPinnedChatIds(prev => {
                 const next = row.vars.pinned
-                  ? Array.from(new Set([...prev, row.phone])).slice(-3)
+                  ? Array.from(new Set([...prev, row.phone]))
                   : prev.filter(p => p !== row.phone);
                 return next;
               });
