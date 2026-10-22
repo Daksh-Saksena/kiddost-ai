@@ -371,10 +371,11 @@ if (SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 // In-memory buffering to combine fragmented user messages per phone
-const MESSAGE_BUFFER_DELAY_MS = 2000; // 2 seconds to allow multiple fragmented user lines to combine
+const MESSAGE_BUFFER_DELAY_MS = 3000; // 3 seconds to allow multiple fragmented user lines to combine
 const messageBuffers = {};
 const messageTimers = {};
 const welcomeBackFlags = {};
+const rebatchedFlags = {};
 const aiProcessingPerPhone = new Set();
 
 // Numbers for which AI is permanently disabled (migrated customers from old phone handled manually)
@@ -537,11 +538,11 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
 - REJECTION / HESITATION RULE: ONLY if the user explicitly says they will let us know, will think about it, will get back to us, or says they are not interested right now (e.g. "I will get back to you", "I will let you know", "will inform you", "ok thanks I will let you know", "not right now", "no I'm not interested", "don't want it"):
   Reply EXACTLY: "Thank you for considering our services! If you ever need ad-hoc support, don’t hesitate to reach out. We’re here to help."
   STRICT NEGATIVE CONSTRAINT:
-  • NEVER trigger this rule for simple acknowledgements like "Ok", "Okay", "Ok.", "Sure", "Got it", "Noted", "Alright", "Cool"!
+  • NEVER trigger this rule for acknowledgements or scope acceptances like "Ok", "Okay", "Ok.", "Okay that's fine", "That's fine", "Ok fine", "It's fine", "Works for me", "Sounds good", "No issues", "No problem", "Sure", "Got it", "Noted", "Alright", "Cool"!
+  • When a parent says "Okay that's fine" or "That's fine" after you explain our scope/limitations (e.g. infant care scope or no nanny work), they are ACCEPTING our scope and want to proceed — they are NOT rejecting or leaving!
   • NEVER trigger this rule for job inquiries, applicants, hiring questions, or anyone asking about vacancies/work (e.g. "if you have vacancy let me know", "looking for job", "let me know if any opening"). A job applicant is NOT a customer!
   • ONLY trigger this rule when the customer says THEY will let us know (e.g. "I will let you know", "I will get back to you"). Do NOT trigger when the user asks US to let THEM know ("let me know")!
-  • A customer saying "Ok" is just acknowledging your previous message — they are NOT leaving or rejecting!
-  • If the user sends ONLY a simple acknowledgment ("Ok", "Okay", "Sure", "Got it"), respond with: "Feel free to let us know if you have any questions."
+  • If the user sends ONLY a simple acknowledgment or acceptance ("Ok", "Okay", "Okay that's fine", "That's fine", "Sure", "Got it"), respond with: "Feel free to let us know if you have any questions."
 - WEEKENDS INQUIRY RULE: If the user asks whether we offer sessions on weekends, come on weekends, or mentions "weekend" / "weekends" in general (e.g. "You also come over weekend for introductory session?", "Do you come on weekends?", "Do you work on weekends?", "weekend sessions available?"):
   Reply EXACTLY: "We offer sessions on Saturdays, but we are closed on Sundays."
   STRICT NEGATIVE CONSTRAINT:
@@ -883,15 +884,17 @@ function normalizeMessageTypos(text) {
     .replace(/\bpe\s+hour\b/gi, 'per hour');
 }
 
-const BANGALORE_AREAS_RE = /\b(?:koramangala|btm(?:\s*layout)?|whitefield|hsr(?:\s*layout)?|indiranagar|jp\s*nagar|marathahalli|electronic\s*city(?:\s*phase\s*[12])?|ecity|jayanagar|malleshwaram|hebbal|yelahanka|sarjapur(?:a)?(?:\s*road)?|bellandur|banashankari|rajajinagar|sadashivanagar|frazer\s*town|cooke\s*town|kalyan\s*nagar|kammanahalli|richmond\s*town|ulsoor|hal|kadugodi|hoodi|varthur|panathur|kundalahalli|domlur|ejipura|shanthi\s*nagar|basavanagudi|padmanabhanagar|uttarahalli|rr\s*nagar|rajarajeshwari\s*nagar|kengeri|nagavara|hennur|thanisandra|jakkur|sahakara\s*nagar|rt\s*nagar|yeshwanthpur|peenya|vidyaranyapura|sompura(?:\s*gate)?|haralur(?:\s*road)?|kasavanahalli|green\s*glen|hosa\s*road|singasandra|begur|kudlu|aecs\s*layout|cv\s*raman\s*nagar|mahadevapura|kr\s*puram|brookefield|brookfield|bannerghatta(?:\s*road)?|gottigere|hulimavu|arekere|bilekahalli|bommanahalli|kumaraswamy\s*layout|konanakunte|kanakapura(?:\s*road)?|mathikere|sanjaynagar|new\s*bel\s*road|bellary\s*road|old\s*airport\s*road|outer\s*ring\s*road)\b/i;
-const LOCATION_KEYWORDS_RE = /\b(?:my location is|location is|we are located at|we live in|our area is|area is|locality is|address is|living in|staying in)\b/i;
+const BANGALORE_AREAS_RE = /\b(?:koramangala|btm(?:\s*layout)?|white\s*field|hsr(?:\s*layout)?|indira\s*nagar|j\.?\s*p\.?\s*nagar|marath?ahalli|munnekol(?:a|la)?l(?:a)?|doddanekundi|doddakannelli|kaikondrahalli|chinnap+anahalli|thubarahalli|nallurhalli|siddapura|karthik\s*nagar|spice\s*garden|beml\s*layout|pai\s*layout|itpl|electronic\s*city(?:\s*phase\s*[12])?|ecity|jayanagar|malles(?:h)?waram|hebbal|yelahanka|sarjapur(?:a)?(?:\s*road)?|bellandur|banashankari|rajajinagar|sadashivanagar|frazer\s*town|cooke\s*town|kalyan\s*nagar|kammanahalli|richmond\s*town|ulsoor|hal|kadugodi|hoodi|varthur|panathur|kundalahalli|domlur|ejipura|shanthi\s*nagar|basavanagudi|padmanabhanagar|uttarahalli|r\.?\s*r\.?\s*nagar|rajarajeshwari\s*nagar|kengeri|nagavara|hennur|thanisandra|jakkur|sahakara\s*nagar|r\.?\s*t\.?\s*nagar|yeshwanthpur|peenya|vidyaranyapura|sompura(?:\s*gate)?|haralur(?:\s*road)?|kasavanahalli|green\s*glen|hosa\s*road|singasandra|begur(?:\s*road)?|kudlu|aecs\s*layout|c\.?\s*v\.?\s*raman\s*nagar|mahadevapura|k\.?\s*r\.?\s*puram|brookefield|brookfield|bannerghatta(?:\s*road)?|gottigere|hulimavu|arekere|bilekahalli|bom+anahalli|hongasandra|akshayanagar|puttenahalli|yelachenahalli|kumaraswamy\s*layout|konanakunte|kanakapura(?:\s*road)?|mathikere|sanjay\s*nagar|new\s*bel\s*road|bellary\s*road|old\s*airport\s*road|outer\s*ring\s*road|ramamurthy\s*nagar|horamavu|banaswadi|kasturi\s*nagar|hrbr(?:\s*layout)?|hbr(?:\s*layout)?|cox\s*town|benson\s*town|vasanth\s*nagar|shivajinagar|wilson\s*garden|adugodi|tavarekere|madiwala|girinagar|hanumanthanagar|chamrajpet|vijay(?:a)?\s*nagar|nagar(?:a)?bhavi|chandra\s*layout|mahalakshmi\s*layout|nandini\s*layout|basaveshwara\s*nagar|vyalikaval|geddalahalli|rmv|dollars?\s*colony|kodigehalli|ms\s*palya|jalahalli|dasarahalli|bagalagunte|kothanur|kannuru|bagalur|budigere|hoskote|carmelaram|kodathi|dommasandra|chandapura|attibele|jigani|neeladri\s*nagar|yem(?:a)?lur|murugeshpalya|jeevan\s*bheema\s*nagar|thippasandra|gm\s*palya|kaggadasapura|vignana?\s*nagar|garudacharpalya|seetharampalya|medahalli|tc\s*palya|rachenahalli|amruthahalli|byatarayanapura|kogilu|devanahalli)\b/i;
+const LOCATION_KEYWORDS_RE = /\b(?:my location is|location is|we are located at|we live in|our area is|area is|locality is|address is|living in|staying in|located in|located near|staying near)\b/i;
+const ADDRESS_INDICATORS_RE = /\b(?:[a-z]{3,}halli|[a-z]{3,}palya|[a-z]{3,}sandra|[a-z]{3,}kunte|[a-z]{3,}gudi|[a-z]{3,}nagar|[a-z]{3,}pura|layout|main\s+road|temple\s+road|ring\s+road|cross\s+road|\d+(?:st|nd|rd|th)\s+(?:cross|main|stage|phase|block|sector)|(?:near|opposite|opp|behind|beside|next\s+to)\s+[a-z0-9\s]{2,35}\b(?:road|temple|metro|mall|school|college|hospital|circle|junction|gate|signal|park|apartment|society|layout|tech\s*park))\b/i;
 const PINCODE_RE = /\b560\d{3}\b/;
-const MAPS_URL_RE = /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.)?google\.[a-z.]+\/maps)\S*/i;
+const MAPS_URL_RE = /(?:https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|maps\.google\.[a-z.]+\S*|(?:www\.)?google\.[a-z.]+\/maps\S*)|📍\s*location\b|\b1[23]\.\d{3,}\s*,\s*77\.\d{3,}\b)/i;
 
 function hasUserSharedLocation(text) {
   if (!text) return false;
   return BANGALORE_AREAS_RE.test(text) ||
     LOCATION_KEYWORDS_RE.test(text) ||
+    ADDRESS_INDICATORS_RE.test(text) ||
     PINCODE_RE.test(text) ||
     MAPS_URL_RE.test(text);
 }
@@ -1458,9 +1461,9 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       }
     }
 
-    // Safety net: Block false rejection/hesitation exit on pure acknowledgments like "Ok", "Okay"
-    const PURE_ACKNOWLEDGMENT_RE = /^[\s\.\,\!\?]*\b(ok|okay|k|got it|sure|alright|cool|noted)\b[\s\.\,\!\?]*$/i;
-    const AD_HOC_REPLY_RE = /Thank you for considering our services! If you ever need ad-hoc support/i;
+    // Safety net: Block false rejection/hesitation exit on pure acknowledgments or scope acceptances like "Ok", "Okay", "Okay that's fine"
+    const PURE_ACKNOWLEDGMENT_RE = /^[\s\.\,\!\?]*(?:ok|okay|k|got it|sure|alright|cool|noted|fine|that['’]?s\s*(?:fine|okay|ok|alright|good|great|cool)|it['’]?s\s*(?:fine|okay|ok|alright)|(?:ok|okay|alright)\s*(?:,\s*)?(?:that['’]?s\s*)?(?:fine|okay|ok|alright|cool|got it|noted|sure|no problem|no worries|no issues)|no\s*(?:problem|worries|issues?)|works(?:\s+for\s+me)?|sounds\s+(?:good|fine|great|okay)|makes\s+sense|fair\s+enough|understood)[\s\.\,\!\?]*$/i;
+    const AD_HOC_REPLY_RE = /Thank you for considering our services[!\.]?\s*If you ever need ad-hoc support/i;
     if (PURE_ACKNOWLEDGMENT_RE.test(combinedMessage) && AD_HOC_REPLY_RE.test(aiReply)) {
       console.warn(`[SAFETY NET] Blocked false hesitation exit on pure acknowledgment "${combinedMessage}" for ${fullPhone}`);
       aiReply = "Feel free to let us know if you have any questions.";
@@ -1481,7 +1484,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       /child(?:'s)? age|introductory session|charges|pricing|hourly rate/i.test(aiReply)
     )) {
       console.warn(`[SAFETY NET] Enforcing job inquiry script for ${fullPhone}. User message: "${combinedMessage}"`);
-      const hasLocation = /\b(bangalore|bengaluru|koramangala|btm|whitefield|hsr|indiranagar|jp nagar|marathahalli|electronic city|jayanagar|malleshwaram|hebbal|yelahanka|sarjapur|bellandur)\b/i.test(allConvTextForJob);
+      const hasLocation = Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allConvTextForJob) || /\b(bangalore|bengaluru)\b/i.test(allConvTextForJob);
       const hasResumeInHistory = history.some(m => /\[Media\/Document Attached\]/i.test(m.content) || /\b(resume|cv)\b/i.test(m.content));
       if (hasResumeInHistory) {
         aiReply = "Thank you! We will review your profile and get back to you.";
@@ -1551,14 +1554,14 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const NANNY_DISCLAIMER_TEXT = "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English.";
     const NANNY_DISCLAIMER_RE = /we don'?t provide nanny services/i;
     const alreadyGaveNannyDisclaimer = NANNY_DISCLAIMER_RE.test(aiReply) || history.some(m => m.role === 'assistant' && NANNY_DISCLAIMER_RE.test(m.content));
+    const hasKnownLocation = Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allCustomerText);
 
     if (AGE_ASK_RE.test(aiReply) && detectedAge != null) {
       console.warn(`[SAFETY NET] Intercepted false age ask when age is already known (${detectedAge}) for ${fullPhone}`);
       if (/\b(?:monthly|value|package|packages)\b/i.test(combinedMessage)) {
         aiReply = "[MONTH_IMAGE]\nOur KidDost packages offer you the flexibility to purchase a bundle of sessions at a discounted rate, allowing you to use them according to your specific needs. The choice is yours; you can use them within a month or extend their use over 2-3 months.\n\nFeel free to let us know if you have any questions.";
       } else if (/\b(?:book|booking|schedule|process|start|how\s+to\s+book)\b/i.test(combinedMessage)) {
-        const hasLoc = hasUserSharedLocation(allCustomerText);
-        if (!hasLoc) {
+        if (!hasKnownLocation) {
           aiReply = "To book a session, we first confirm our service availability in your area. Could you please share your area or locality in Bangalore, and what date and time would work best for you?";
         } else {
           aiReply = "To schedule your session, what date and time would work best for you?";
@@ -1580,9 +1583,19 @@ Consider the FULL conversation history carefully — do not confuse one child's 
 
     // Safety net: Block false "Let me check if we can service your area" when NO location was shared!
     const SERVICE_AREA_CHECK_RE = /(?:check if we can service your area|service your area and get back to you)/i;
-    if (SERVICE_AREA_CHECK_RE.test(aiReply) && !hasUserSharedLocation(allCustomerText)) {
+    const ASKING_FOR_LOCALITY_RE = /(?:Could you (?:also |please )?share your area or locality|share your area or locality (?:in Bangalore )?so I can confirm)/i;
+    const alreadySaidLetMeCheckArea = history.some(m => m.role === 'assistant' && SERVICE_AREA_CHECK_RE.test(m.content || ''));
+
+    if (SERVICE_AREA_CHECK_RE.test(aiReply) && !hasKnownLocation) {
       console.warn(`[SAFETY NET] Intercepted false area check when no location was shared for ${fullPhone}. Asking for locality instead.`);
       aiReply = "Could you also share your area or locality so I can confirm we service your location?";
+    } else if (ASKING_FOR_LOCALITY_RE.test(aiReply) && hasKnownLocation && !detectedNonBangaloreCity) {
+      // Never ask for locality again when location has already been provided!
+      console.warn(`[SAFETY NET] Blocked repetitive locality ask when location is already known for ${fullPhone}.`);
+      aiReply = alreadySaidLetMeCheckArea ? 'UNSURE' : "Let me check if we can service your area and get back to you.";
+    } else if (alreadySaidLetMeCheckArea && (SERVICE_AREA_CHECK_RE.test(aiReply) || /\b(?:i have shared|already shared|check and confirm|did you check|any update)\b/i.test(combinedMessage))) {
+      console.warn(`[SAFETY NET] Area check already promised earlier for ${fullPhone}; deferring follow-up "${combinedMessage}" to human via UNSURE.`);
+      aiReply = 'UNSURE';
     }
 
     // Safety net: Enforce location precedence over booking detail collection
@@ -1639,6 +1652,15 @@ Consider the FULL conversation history carefully — do not confuse one child's 
           aiReply += ".";
         }
       }
+    }
+
+    // Re-batch guard: If the user sent another message while OpenAI was generating this reply,
+    // fold the current message back into the buffer so we respond to both messages together in one turn!
+    if (!options.rebatched && Array.isArray(messageBuffers[fullPhone]) && messageBuffers[fullPhone].length > 0) {
+      console.log(`[buffer] New message(s) arrived for ${fullPhone} while AI was generating reply. Re-batching "${combinedMessage}" with new message(s).`);
+      messageBuffers[fullPhone].unshift(combinedMessage);
+      rebatchedFlags[fullPhone] = (options.bufferedCount || 1);
+      return;
     }
 
     console.log("AI Reply (buffered):", aiReply);
@@ -1780,7 +1802,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       const chatOnlyMsg = "Hi! We have only chat and voice note support available. Kindly message us your query or leave us a voice note here, and we shall respond immediately! Thank you.";
       await sendAIText(chatOnlyMsg);
 
-      const hasLocation = history.some(m => /(?:bangalore|bengaluru|koramangala|indiranagar|whitefield|hsr|bellandur|jp nagar|jayanagar|sarjapur|marathahalli|hebbal|electronic city)/i.test(m.content || ''));
+      const hasLocation = hasKnownLocation || history.some(m => /(?:bangalore|bengaluru)/i.test(m.content || ''));
       if (!hasLocation) {
         await new Promise(r => setTimeout(r, 600));
         await sendAIText("Could you please share your location in Bangalore to confirm our service availability?");
@@ -2971,9 +2993,13 @@ app.post("/webhook", async (req, res) => {
         const buffered = messageBuffers[fullPhone] || [];
         const combined = buffered.join(" ").trim();
         const prependWelcomeBack = !!welcomeBackFlags[fullPhone];
+        const priorRebatchedCount = rebatchedFlags[fullPhone] || 0;
+        const isRebatched = priorRebatchedCount > 0;
+        const totalBufferedCount = isRebatched ? (priorRebatchedCount + buffered.length - 1) : buffered.length;
         // reset buffer
         messageBuffers[fullPhone] = [];
         welcomeBackFlags[fullPhone] = false;
+        delete rebatchedFlags[fullPhone];
 
         if (!combined) return;
 
@@ -2981,7 +3007,7 @@ app.post("/webhook", async (req, res) => {
 
         (async () => {
           try {
-            await handleAIResponse(fullPhone, combined, { prependWelcomeBack, contactName, bufferedCount: buffered.length });
+            await handleAIResponse(fullPhone, combined, { prependWelcomeBack, contactName, bufferedCount: totalBufferedCount, rebatched: isRebatched });
           } catch (e) {
             console.error('buffered AI handler error', e?.message || e);
           } finally {
