@@ -1470,12 +1470,12 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     }
 
     // Safety net: Block false customer hesitation / ad-hoc message or UNSURE in hiring/job inquiry conversations
-    const allConvTextForJob = [
-      combinedMessage,
-      ...history.map(m => m.content)
-    ].join(' ');
-    const isJobContext = /\b(job|jobs|vacancy|vacancies|hiring|work|career|internship|resume|cv)\b/i.test(allConvTextForJob);
-    const isJobMessage = JOB_INQUIRY_RE.test(combinedMessage);
+    // IMPORTANT: Never use bare `\bwork\b` (which false-positives on "How does this work", "What time would work", "work from home")
+    // and never treat a parent who has shared a child's age as a job applicant!
+    const hasParentChildContext = Boolean(activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText) || (allChildren && allChildren.length > 0)) ||
+      /\b(?:my\s+(?:kid|child|children|son|daughter|baby|toddler|infant)|years?\s+old|months?\s+old)\b/i.test(allCustomerText);
+    const isJobContext = !hasParentChildContext && JOB_INQUIRY_RE.test(allCustomerText);
+    const isJobMessage = !hasParentChildContext && JOB_INQUIRY_RE.test(combinedMessage);
     if ((isJobContext || isJobMessage) && (
       aiReply === 'UNSURE' ||
       /\bUNSURE\b/i.test(aiReply) ||
@@ -1484,8 +1484,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       /child(?:'s)? age|introductory session|charges|pricing|hourly rate/i.test(aiReply)
     )) {
       console.warn(`[SAFETY NET] Enforcing job inquiry script for ${fullPhone}. User message: "${combinedMessage}"`);
-      const hasLocation = Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allConvTextForJob) || /\b(bangalore|bengaluru)\b/i.test(allConvTextForJob);
-      const hasResumeInHistory = history.some(m => /\[Media\/Document Attached\]/i.test(m.content) || /\b(resume|cv)\b/i.test(m.content));
+      const hasLocation = Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allCustomerText) || /\b(bangalore|bengaluru)\b/i.test(allCustomerText);
+      const hasResumeInHistory = history.some(m => m.role === 'user' && (/\[Media\/Document Attached\]/i.test(m.content) || /\b(resume|cv)\b/i.test(m.content)));
       if (hasResumeInHistory) {
         aiReply = "Thank you! We will review your profile and get back to you.";
       } else if (hasLocation) {
@@ -2070,7 +2070,7 @@ async function sendWelcome(fullPhone) {
     const { data: allUserMsgs } = await supabase.from('messages').select('content').eq('phone', fullPhone).eq('sender', 'user');
     const allUserText = (allUserMsgs || []).map(m => m.content).join(' ');
     const mentionsAge = /\b(\d{1,2}\s*(?:years?|yrs?|months?|m|yo|y\/o)|dob|born|infant|toddler)\b/i.test(allUserText);
-    const isJobInquiry = /\b(job|jobs|vacancy|vacancies|hiring|work|career|internship|resume|cv)\b/i.test(allUserText);
+    const isJobInquiry = /\b(?:job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv|work\s+opportunities?|work\s+with\s+(?:you|kiddost)|part\s*time\s*job)\b/i.test(allUserText);
 
     const { data: aiMsgs } = await supabase.from('messages').select('id, content').eq('phone', fullPhone).eq('role', 'assistant').neq('content', '');
     const hasSubstantiveAiReply = (aiMsgs || []).some(m => !m.content.includes('thank you for contacting') && !m.content.includes('questions'));
