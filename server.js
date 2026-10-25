@@ -637,25 +637,28 @@ We can customize the package as per your requirement once we have done the first
 - NEVER add any extra lines about special rates, 5-day schedules, or ask if they want to proceed. End there.
 
 JOB INQUIRIES / HIRING:
-- If a user asks about job openings, hiring, "job available hai", "vacancy", "is there any vacancy", careers, working at KidDost, or submitting a resume:
+- If a user asks about job openings, hiring, "job available hai", "vacancy", "is there any vacancy", careers, applying to teach, working at KidDost, or submitting a resume:
 
   • If the current message ALREADY contains a document/file attachment (resume/CV):
     - If location is unknown: "Could you please tell your location in Bangalore? We will get back to you."
     - If location is already known: "Thank you! We will review your profile and get back to you."
 
-  • If NO resume/document is attached yet:
+  • If the user ALREADY shared a resume/document earlier in the conversation:
+    - NEVER ask them to share their resume again!
+    - If we have NOT yet told them we will review their profile, respond EXACTLY: "Thank you! We will review your profile and get back to you."
+    - If we ALREADY told them "We will review your profile and get back to you" earlier in the conversation, and they ask a specific question (e.g. "Is there any vacancy of music teacher?", salary, role specifics) or follow up further, respond with ONLY the word: UNSURE (so a human agent can answer them).
+
+  • If NO resume/document has been shared yet in the conversation:
     - If location in Bangalore is NOT known yet:
       "Could you please tell your location in Bangalore and share your resume? We will get back to you."
     - If location in Bangalore was ALREADY shared earlier:
       "Thank you for sharing your location! Please share your resume, and we will get back to you."
-
-  • If the user acknowledges or follows up without attaching a resume (e.g. "if you have vacancy let me know", "looking for job", "let me know", "okay"):
-    Respond EXACTLY: "Please share your resume, and we will get back to you."
-
-  • If the user already shared a resume earlier in the conversation:
-    Respond EXACTLY: "Thank you! We will review your profile and get back to you."
+    - If the user acknowledges or follows up without attaching a resume (e.g. "if you have vacancy let me know", "looking for job", "let me know", "okay"):
+      Respond EXACTLY: "Please share your resume, and we will get back to you."
 
 - STRICT NEGATIVE CONSTRAINT:
+  • NEVER say "Currently we operate only in Bangalore. We're expanding soon..." to a job applicant who is in Bangalore or asking about a role/vacancy (e.g. "Is there any vacancy of music teacher?")!
+  • NEVER ask for a resume again if the applicant already sent a resume/PDF earlier in the chat!
   • You are STRICTLY FORBIDDEN from sending the customer hesitation / ad-hoc support message ("Thank you for considering our services! If you ever need ad-hoc support...") to a job applicant or in any hiring/vacancy conversation!
   • A job applicant saying "if you have vacancy let me know" is asking us to contact them about jobs — they are NOT a customer hesitating or rejecting services!
   SESSION LENGTH / DURATION:
@@ -1297,7 +1300,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       console.log(`[Location Check] Non-Bangalore city detected: "${detectedNonBangaloreCity}" — injecting rejection`);
       messagesForAI.splice(-1, 0, { role: "system", content: `NON-BANGALORE CITY DETECTED: The user mentioned "${detectedNonBangaloreCity}". This is NOT in Bangalore. You MUST reject: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?" Do NOT proceed with booking. Do NOT ask for more details.` });
     }
-    const JOB_INQUIRY_RE = /\b(?:job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv|work\s+opportunities?|work\s+with\s+(?:you|kiddost)|part\s*time\s*job)\b/i;
+    const JOB_INQUIRY_RE = /\b(?:job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv|work\s+opportunities?|work\s+with\s+(?:you|kiddost)|part\s*time\s*job|apply\s+for\s+teaching|can\s+i\s+apply|experience\s+of\s+teaching|teaching\s+experience)\b/i;
     const IN_SCOPE_INQUIRY_RE = /\b(know more|tell me more|more info|more details|how (?:does this|it) work|what is kiddost|about your service|about kiddost|details|charges|fees|cost|rate|pricing|activities|tutoring|care|child|children|kid|kids|baby|infant|toddler|session|booking|hours|nanny|supervisor|play|puzzle|job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv)\b/i;
     if (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage) && !JOB_INQUIRY_RE.test(combinedMessage)) {
       console.log(`[Out-of-Scope Check] Out-of-scope query detected for ${fullPhone}: "${combinedMessage}" — injecting UNSURE instruction`);
@@ -1469,30 +1472,43 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       aiReply = "Feel free to let us know if you have any questions.";
     }
 
-    // Safety net: Block false customer hesitation / ad-hoc message or UNSURE in hiring/job inquiry conversations
+    // Safety net: Block false customer hesitation / ad-hoc message, false non-Bangalore rejection,
+    // repetitive resume requests, or UNSURE in hiring/job inquiry conversations.
     // IMPORTANT: Never use bare `\bwork\b` (which false-positives on "How does this work", "What time would work", "work from home")
     // and never treat a parent who has shared a child's age as a job applicant!
+    const NON_BANGALORE_REJECTION_RE = /(?:operate only in Bangalore.*expanding soon|notify you when we'?re available in your area)/i;
     const hasParentChildContext = Boolean(activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText) || (allChildren && allChildren.length > 0)) ||
       /\b(?:my\s+(?:kid|child|children|son|daughter|baby|toddler|infant)|years?\s+old|months?\s+old)\b/i.test(allCustomerText);
     const isJobContext = !hasParentChildContext && JOB_INQUIRY_RE.test(allCustomerText);
     const isJobMessage = !hasParentChildContext && JOB_INQUIRY_RE.test(combinedMessage);
+    const hasResumeInHistory = history.some(m => m.role === 'user' && (/\[Media\/Document Attached\]/i.test(m.content) || /\b(resume|cv)\b/i.test(m.content))) ||
+      /\[Media\/Document Attached\]|\b(?:my\s+(?:latest\s+)?resume|attached\s+resume|shared\s+resume)\b/i.test(combinedMessage);
+    const alreadySaidWillReviewProfile = history.some(m => m.role === 'assistant' && /review your profile and get back to you/i.test(m.content || ''));
+
     if ((isJobContext || isJobMessage) && (
       aiReply === 'UNSURE' ||
       /\bUNSURE\b/i.test(aiReply) ||
       AD_HOC_REPLY_RE.test(aiReply) ||
       /Thank you for considering our services/i.test(aiReply) ||
-      /child(?:'s)? age|introductory session|charges|pricing|hourly rate/i.test(aiReply)
+      /child(?:'s)? age|introductory session|charges|pricing|hourly rate/i.test(aiReply) ||
+      (!detectedNonBangaloreCity && NON_BANGALORE_REJECTION_RE.test(aiReply)) ||
+      (hasResumeInHistory && /\bshare your resume\b/i.test(aiReply))
     )) {
       console.warn(`[SAFETY NET] Enforcing job inquiry script for ${fullPhone}. User message: "${combinedMessage}"`);
       const hasLocation = Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allCustomerText) || /\b(bangalore|bengaluru)\b/i.test(allCustomerText);
-      const hasResumeInHistory = history.some(m => m.role === 'user' && (/\[Media\/Document Attached\]/i.test(m.content) || /\b(resume|cv)\b/i.test(m.content)));
+      const isSpecificJobFollowUpQuestion = alreadySaidWillReviewProfile && (/\?/.test(combinedMessage) || /\b(?:is there any|vacancy of|music|dance|salary|pay|timings)\b/i.test(combinedMessage));
       if (hasResumeInHistory) {
-        aiReply = "Thank you! We will review your profile and get back to you.";
+        aiReply = isSpecificJobFollowUpQuestion
+          ? "UNSURE"
+          : "Thank you! We will review your profile and get back to you.";
       } else if (hasLocation) {
         aiReply = "Thank you for sharing your location! Please share your resume, and we will get back to you.";
       } else {
         aiReply = "Could you please tell your location in Bangalore and share your resume? We will get back to you.";
       }
+    } else if (!detectedNonBangaloreCity && NON_BANGALORE_REJECTION_RE.test(aiReply) && (Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allCustomerText) || /\b(bangalore|bengaluru)\b/i.test(allCustomerText))) {
+      console.warn(`[SAFETY NET] Blocked false non-Bangalore rejection for customer already in Bangalore (${fullPhone}). User message: "${combinedMessage}"`);
+      aiReply = 'UNSURE';
     }
 
     // Safety net: Enforce 2nd-step competitive pricing script before ad-hoc exit
