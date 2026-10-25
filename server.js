@@ -515,7 +515,8 @@ IMPORTANT — UNSURE threshold:
 
 ---
 RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing slightly for natural conversation, but do NOT add information that isn't explicitly stated here. If the user asks something not covered below, reply UNSURE.
-- ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message contains Hindi, Hinglish (e.g., "mera name", "han ji", "kya"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
+- ABSOLUTE PRIORITY 1: STRICT LANGUAGE RULE - If the user's message is written in Hindi, Hinglish (e.g., "mera name", "han ji", "kya charges hai"), or ANY language other than English, you MUST immediately STOP processing all other rules (including age rules or bookings) and reply EXACTLY: "I'd be happy to assist you. I can provide support in English only. Could you please repeat your message in English?"
+  • STRICT NEGATIVE CONSTRAINT: NEVER trigger this language rule for English messages that have spelling mistakes/typos (e.g. "avilable", "tution", "enquire"), Indian English salutations ("Mam", "Ma'am", "Madam", "Sir"), or short/broken English grammar (e.g. "Mam day care avilable", "In 6 month baby")! Those are 100% English — process them normally!
 - STRICT SPECIAL NEEDS RULE:
   • TRIGGER: This rule applies ONLY if the customer EXPLICITLY mentions that their child has "autism", "autistic", "ADHD", "Down syndrome", or a known "disability".
   • STRICT NEGATIVE CONSTRAINT: You are STRICTLY FORBIDDEN from using this special needs script if the user has NOT explicitly mentioned a disability! NEVER use this script for:
@@ -524,8 +525,12 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
     - Job applications, hiring, vacancies, or salary questions.
     - Unfamiliar acronyms (e.g. "HNI"). Respond with ONLY the single word UNSURE instead.
   • Exact script when explicitly triggered: "Unfortunately our current members are not equipped and trained to manage special needs kids. We will surely reach out to you if we expand our services to cover it. Thank you for considering our services."
-- TEACHERS / TUTORING RULE: If the user asks "do you have teachers?", "are they teachers?", or "can you send a teacher?":
-  Reply: "All our members are educated female graduates or students who engage children with educational activities, worksheets, puzzles, and homework help. While they are not school teachers, they are thoroughly trained in child engagement and learning."
+- TEACHERS / TUTORING / STUDIES & TUITION SUPPORT RULE:
+  • If the user asks "do you have teachers?", "are they teachers?", or "can you send a teacher?":
+    Reply: "All our members are educated female graduates or students who engage children with educational activities, worksheets, puzzles, and homework help. While they are not school teachers, they are thoroughly trained in child engagement and learning."
+  • If the user says they want support for studies, homework, or tuition (e.g. "We just need support for studies", "Like tuition", "Need only for studies", "Can you focus on studies?", "We need help with studies/homework"):
+    - If the child's age is already known: Reply EXACTLY: "Yes, we can focus more on studies and homework support."
+    - STRICT NEGATIVE CONSTRAINT: NEVER say "we are not a tuition service" or "rather than providing traditional tutoring"!
 - ABSOLUTE PRIORITY 2: OUT-OF-SCOPE TOPICS, RANDOM NONSENSE, PERSONAL ADVICE & SPAM RULE:
   • You are an automated assistant EXCLUSIVELY for KidDost child engagement and tutoring services in Bangalore. You are NOT a general AI, NOT a relationship counselor, NOT a friend, and NOT an advice columnist.
   • If the user's message is about ANY topic unrelated to KidDost services (e.g. personal advice, romance, crushes, dating, how to impress someone, best friends, gift ideas, homework solving, trivia, jokes, storytelling, songs, weather, tech/computers, buying products, or any random non-KidDost chat):
@@ -884,7 +889,9 @@ function normalizeMessageTypos(text) {
     .replace(/\b(\d+(?:\.\d+)?)\s*m(?:on)?ths?\s*ild\b/gi, '$1 months old')
     .replace(/\b(\d+(?:\.\d+)?)\s*y(?:ea)?rs?\s*old\b/gi, '$1 years old')
     .replace(/\bpee\s+hour\b/gi, 'per hour')
-    .replace(/\bpe\s+hour\b/gi, 'per hour');
+    .replace(/\bpe\s+hour\b/gi, 'per hour')
+    .replace(/\b(?:avilable|availble|avalable)\b/gi, 'available')
+    .replace(/\btutions?\b/gi, 'tuition');
 }
 
 const BANGALORE_AREAS_RE = /\b(?:koramangala|btm(?:\s*layout)?|white\s*field|hsr(?:\s*layout)?|indira\s*nagar|j\.?\s*p\.?\s*nagar|marath?ahalli|munnekol(?:a|la)?l(?:a)?|doddanekundi|doddakannelli|kaikondrahalli|chinnap+anahalli|thubarahalli|nallurhalli|siddapura|karthik\s*nagar|spice\s*garden|beml\s*layout|pai\s*layout|itpl|electronic\s*city(?:\s*phase\s*[12])?|ecity|jayanagar|malles(?:h)?waram|hebbal|yelahanka|sarjapur(?:a)?(?:\s*road)?|bellandur|banashankari|rajajinagar|sadashivanagar|frazer\s*town|cooke\s*town|kalyan\s*nagar|kammanahalli|richmond\s*town|ulsoor|hal|kadugodi|hoodi|varthur|panathur|kundalahalli|domlur|ejipura|shanthi\s*nagar|basavanagudi|padmanabhanagar|uttarahalli|r\.?\s*r\.?\s*nagar|rajarajeshwari\s*nagar|kengeri|nagavara|hennur|thanisandra|jakkur|sahakara\s*nagar|r\.?\s*t\.?\s*nagar|yeshwanthpur|peenya|vidyaranyapura|sompura(?:\s*gate)?|haralur(?:\s*road)?|kasavanahalli|green\s*glen|hosa\s*road|singasandra|begur(?:\s*road)?|kudlu|aecs\s*layout|c\.?\s*v\.?\s*raman\s*nagar|mahadevapura|k\.?\s*r\.?\s*puram|brookefield|brookfield|bannerghatta(?:\s*road)?|gottigere|hulimavu|arekere|bilekahalli|bom+anahalli|hongasandra|akshayanagar|puttenahalli|yelachenahalli|kumaraswamy\s*layout|konanakunte|kanakapura(?:\s*road)?|mathikere|sanjay\s*nagar|new\s*bel\s*road|bellary\s*road|old\s*airport\s*road|outer\s*ring\s*road|ramamurthy\s*nagar|horamavu|banaswadi|kasturi\s*nagar|hrbr(?:\s*layout)?|hbr(?:\s*layout)?|cox\s*town|benson\s*town|vasanth\s*nagar|shivajinagar|wilson\s*garden|adugodi|tavarekere|madiwala|girinagar|hanumanthanagar|chamrajpet|vijay(?:a)?\s*nagar|nagar(?:a)?bhavi|chandra\s*layout|mahalakshmi\s*layout|nandini\s*layout|basaveshwara\s*nagar|vyalikaval|geddalahalli|rmv|dollars?\s*colony|kodigehalli|ms\s*palya|jalahalli|dasarahalli|bagalagunte|kothanur|kannuru|bagalur|budigere|hoskote|carmelaram|kodathi|dommasandra|chandapura|attibele|jigani|neeladri\s*nagar|yem(?:a)?lur|murugeshpalya|jeevan\s*bheema\s*nagar|thippasandra|gm\s*palya|kaggadasapura|vignana?\s*nagar|garudacharpalya|seetharampalya|medahalli|tc\s*palya|rachenahalli|amruthahalli|byatarayanapura|kogilu|devanahalli)\b/i;
@@ -1667,6 +1674,31 @@ Consider the FULL conversation history carefully — do not confuse one child's 
         } else if (!/[.?!\"]$/.test(aiReply)) {
           aiReply += ".";
         }
+      }
+    }
+
+    // Safety net: Studies / Tuition / Homework support inquiry
+    const STUDIES_TUITION_INQUIRY_RE = /\b(?:support for studies|focus on studies|only for studies|just (?:need |for )?studies|need\b.*\bstudies|like tuition|for tuition|tuition support|homework support)\b/i;
+    const FALSE_ANTI_TUITION_REPLY_RE = /(?:not a tuition service|rather than providing traditional tutoring)/i;
+    if (!isJobContextOrMsg && (STUDIES_TUITION_INQUIRY_RE.test(combinedMessage) || FALSE_ANTI_TUITION_REPLY_RE.test(aiReply))) {
+      console.warn(`[SAFETY NET] Enforcing studies & homework support response for ${fullPhone}. User message: "${combinedMessage}"`);
+      if (detectedAge != null) {
+        aiReply = "Yes, we can focus more on studies and homework support.\n\nFeel free to let us know if you have any questions.";
+      } else {
+        aiReply = "Could I please know the child's age first?";
+      }
+    }
+
+    // Safety net: Block false "English only" rejection on English messages with typos or salutations (e.g. "Mam day care avilable")
+    const ENGLISH_ONLY_REPLY_RE = /I can provide support in English only/i;
+    const NON_LATIN_SCRIPT_RE = /[^\x00-\x7F\u2000-\u206F₹📍]/;
+    const NON_ENGLISH_WORDS_RE = /\b(?:mera|meri|mere|hum|hume|hamara|kya|kaise|kab|kaha|kahan|kitna|kitne|hai|hain|tha|thi|aur|nahi|nahin|chahiye|chahie|batao|bataiye|bataye|karo|kariye|krna|karna|milega|milegi|milta|baccha|bacha|bache|bachche|beti|beta|apka|aapka|aap|mujhe|mujhko|koi|kuch|abhi|kal|aaj|parso|subah|shaam|raat|ghar|kaam|paisa|paise|rupaye|han\s*ji|haan\s*ji|ji\s*haan|namaskara|vanakkam|eppadi|kavali|cheppandi|madam\s+ji|sir\s+ji)\b/i;
+    if (ENGLISH_ONLY_REPLY_RE.test(aiReply) && !NON_LATIN_SCRIPT_RE.test(combinedMessage) && !NON_ENGLISH_WORDS_RE.test(combinedMessage)) {
+      console.warn(`[SAFETY NET] Blocked false 'English only' reply on English message "${combinedMessage}" for ${fullPhone}`);
+      if (detectedAge != null) {
+        aiReply = getActivityPitchForAge(detectedAge);
+      } else {
+        aiReply = "Could I please know the child's age first?";
       }
     }
 
