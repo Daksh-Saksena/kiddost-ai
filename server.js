@@ -1473,7 +1473,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
 
     // Safety net: Block false rejection/hesitation exit on pure acknowledgments or scope acceptances like "Ok", "Okay", "Okay that's fine"
     const PURE_ACKNOWLEDGMENT_RE = /^[\s\.\,\!\?]*(?:ok|okay|k|got it|sure|alright|cool|noted|fine|that['’]?s\s*(?:fine|okay|ok|alright|good|great|cool)|it['’]?s\s*(?:fine|okay|ok|alright)|(?:ok|okay|alright)\s*(?:,\s*)?(?:that['’]?s\s*)?(?:fine|okay|ok|alright|cool|got it|noted|sure|no problem|no worries|no issues)|no\s*(?:problem|worries|issues?)|works(?:\s+for\s+me)?|sounds\s+(?:good|fine|great|okay)|makes\s+sense|fair\s+enough|understood)[\s\.\,\!\?]*$/i;
-    const AD_HOC_REPLY_RE = /Thank you for considering our services[!\.]?\s*If you ever need ad-hoc support/i;
+    const AD_HOC_REPLY_RE = /(?:Thank you for considering our services[!\.]?\s*)?If you ever need ad-hoc support/i;
     if (PURE_ACKNOWLEDGMENT_RE.test(combinedMessage) && AD_HOC_REPLY_RE.test(aiReply)) {
       console.warn(`[SAFETY NET] Blocked false hesitation exit on pure acknowledgment "${combinedMessage}" for ${fullPhone}`);
       aiReply = "Feel free to let us know if you have any questions.";
@@ -1484,6 +1484,7 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     // IMPORTANT: Never use bare `\bwork\b` (which false-positives on "How does this work", "What time would work", "work from home")
     // and never treat a parent who has shared a child's age as a job applicant!
     const NON_BANGALORE_REJECTION_RE = /(?:operate only in Bangalore.*expanding soon|notify you when we'?re available in your area)/i;
+    const alreadySaidNonBangaloreRejection = history.some(m => m.role === 'assistant' && NON_BANGALORE_REJECTION_RE.test(m.content || ''));
     const hasParentChildContext = Boolean(activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText) || (allChildren && allChildren.length > 0)) ||
       /\b(?:my\s+(?:kid|child|children|son|daughter|baby|toddler|infant)|years?\s+old|months?\s+old)\b/i.test(allCustomerText);
     const isJobContext = !hasParentChildContext && JOB_INQUIRY_RE.test(allCustomerText);
@@ -1492,7 +1493,12 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       /\[Media\/Document Attached\]|\b(?:my\s+(?:latest\s+)?resume|attached\s+resume|shared\s+resume)\b/i.test(combinedMessage);
     const alreadySaidWillReviewProfile = history.some(m => m.role === 'assistant' && /review your profile and get back to you/i.test(m.content || ''));
 
-    if ((isJobContext || isJobMessage) && (
+    if (alreadySaidNonBangaloreRejection && !hasUserSharedLocation(combinedMessage) && !/\b(bangalore|bengaluru)\b/i.test(combinedMessage)) {
+      // Rule 1: After sending the non-Bangalore city rejection ("Currently we operate only in Bangalore..."),
+      // STOP and respond UNSURE to any follow-up reply (e.g. "Sure", "Yes") so a human agent can handle it.
+      console.warn(`[SAFETY NET] Enforcing Rule 1 UNSURE stop after non-Bangalore rejection for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = 'UNSURE';
+    } else if ((isJobContext || isJobMessage) && (
       aiReply === 'UNSURE' ||
       /\bUNSURE\b/i.test(aiReply) ||
       AD_HOC_REPLY_RE.test(aiReply) ||
