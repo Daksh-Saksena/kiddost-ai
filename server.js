@@ -1471,12 +1471,25 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       }
     }
 
-    // Safety net: Block false rejection/hesitation exit on pure acknowledgments or scope acceptances like "Ok", "Okay", "Okay that's fine"
-    const PURE_ACKNOWLEDGMENT_RE = /^[\s\.\,\!\?]*(?:ok|okay|k|got it|sure|alright|cool|noted|fine|that['’]?s\s*(?:fine|okay|ok|alright|good|great|cool)|it['’]?s\s*(?:fine|okay|ok|alright)|(?:ok|okay|alright)\s*(?:,\s*)?(?:that['’]?s\s*)?(?:fine|okay|ok|alright|cool|got it|noted|sure|no problem|no worries|no issues)|no\s*(?:problem|worries|issues?)|works(?:\s+for\s+me)?|sounds\s+(?:good|fine|great|okay)|makes\s+sense|fair\s+enough|understood)[\s\.\,\!\?]*$/i;
+    // Safety net: Block false rejection/hesitation exit and prevent spamming "Feel free to let us know if you have any questions."
+    // on pure acknowledgments like "Ok", "Okk", "Okay", "Okay, thanks", "K thankyou", "Okay that's fine"
+    const PURE_ACKNOWLEDGMENT_RE = /^[\s\.\,\!\?]*(?:ok+|okay|k|got it|sure|alright|cool|noted|fine|thank\s*you|thankyou|thanks|thnk\s*u|ty|that['’]?s\s*(?:fine|okay|ok|alright|good|great|cool)|it['’]?s\s*(?:fine|okay|ok|alright)|(?:ok+|okay|alright|k)\s*(?:,\s*)?(?:that['’]?s\s*)?(?:fine|okay|ok|alright|cool|got it|noted|sure|no problem|no worries|no issues|thank\s*you|thankyou|thanks|thnk\s*u)|no\s*(?:problem|worries|issues?)|works(?:\s+for\s+me)?|sounds\s+(?:good|fine|great|okay)|makes\s+sense|fair\s+enough|understood)[\s\.\,\!\?]*$/i;
     const AD_HOC_REPLY_RE = /(?:Thank you for considering our services[!\.]?\s*)?If you ever need ad-hoc support/i;
-    if (PURE_ACKNOWLEDGMENT_RE.test(combinedMessage) && AD_HOC_REPLY_RE.test(aiReply)) {
-      console.warn(`[SAFETY NET] Blocked false hesitation exit on pure acknowledgment "${combinedMessage}" for ${fullPhone}`);
-      aiReply = "Feel free to let us know if you have any questions.";
+    const feelFreeEverInHistory = history.some(m => m.role === 'assistant' && /(?:feel free.*questions|questions.*feel free)/i.test(m.content || ''));
+    const adHocExitAlreadySent = history.some(m => m.role === 'assistant' && AD_HOC_REPLY_RE.test(m.content || ''));
+
+    if (PURE_ACKNOWLEDGMENT_RE.test(combinedMessage)) {
+      if (adHocExitAlreadySent) {
+        console.log(`[SAFETY NET] Pure acknowledgment "${combinedMessage}" after ad-hoc exit for ${fullPhone} — staying silent.`);
+        return;
+      }
+      if (AD_HOC_REPLY_RE.test(aiReply) || /^\s*(?:feel free to (?:let us know|ask)|if you have any (?:other )?questions)[^\.\?!]*[\.\?!]?\s*$/i.test(aiReply)) {
+        if (feelFreeEverInHistory) {
+          console.log(`[SAFETY NET] Pure acknowledgment "${combinedMessage}" for ${fullPhone} and 'Feel free' already sent earlier — staying silent.`);
+          return;
+        }
+        aiReply = "Feel free to let us know if you have any questions.";
+      }
     }
 
     // Safety net: Block false customer hesitation / ad-hoc message, false non-Bangalore rejection,
@@ -1579,11 +1592,17 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     // Safety net: Block false age ask when age is already known or present in current message/history
     const AGE_ASK_RE = /(?:Could I please know the child'?s age first|share (?:your|the) child'?s age|what is the (?:child'?s )?age)/i;
     const detectedAge = activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText);
-    const userAskedForNanny = /\b(nanny|babysitter|caretaker|caregiver|permanent\s+basis)\b/i.test(allCustomerText);
+    const userAskedForNanny = /\b(nanny|baby\s*sitter|caretaker|caregiver|permanent\s+basis)\b/i.test(allCustomerText);
     const NANNY_DISCLAIMER_TEXT = "Would like to clarify, we don't provide nanny services. Our team members are female graduates or students pursuing graduation, and our primary mode of interaction is in English.";
     const NANNY_DISCLAIMER_RE = /we don'?t provide nanny services/i;
     const alreadyGaveNannyDisclaimer = NANNY_DISCLAIMER_RE.test(aiReply) || history.some(m => m.role === 'assistant' && NANNY_DISCLAIMER_RE.test(m.content));
-    const hasKnownLocation = Boolean(convVars?.notes?.location || intent?.notes?.location) || hasUserSharedLocation(allCustomerText);
+    const isSpecificLocality = (loc) => Boolean(loc && !/^\s*(?:bangalore|bengaluru|blr|karnataka|india)\s*$/i.test(String(loc)));
+    const hasKnownLocation = isSpecificLocality(convVars?.notes?.location) || isSpecificLocality(intent?.notes?.location) || hasUserSharedLocation(allCustomerText);
+
+    // Normalize harsh "Unfortunately, we don't provide nanny services" to approved "Would like to clarify..."
+    if (/unfortunately,?\s*we don'?t provide nanny services/i.test(aiReply)) {
+      aiReply = aiReply.replace(/unfortunately,?\s*we don'?t provide nanny services/gi, "Would like to clarify, we don't provide nanny services");
+    }
 
     if (AGE_ASK_RE.test(aiReply) && detectedAge != null) {
       console.warn(`[SAFETY NET] Intercepted false age ask when age is already known (${detectedAge}) for ${fullPhone}`);
@@ -1886,7 +1905,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
 
     // Split reply on image markers and send segments in order
     const MARKER_SPLIT_REGEX = /(\[(?:PRICING_IMAGE|MONTH_IMAGE)(?::[^\]]*)?\])/gi;
-    const FEEL_FREE_PATTERN = /feel free to let us know if you have any questions\.?/i;
+    const FEEL_FREE_PATTERN = /(?:feel free to (?:let us know|ask|reach out)[^\.\?!]*\bquestions\b[^\.\?!]*|if you have any (?:other |further )?questions,?\s*feel free[^\.\?!]*)[.!?\s]*/gi;
+    const FEEL_FREE_CHECK_RE = /(?:feel free.*questions|questions.*feel free)/i;
     const FEEL_FREE_TEXT = 'Feel free to let us know if you have any questions.';
     const parts = aiReply.split(MARKER_SPLIT_REGEX);
     let pricingImageSent = false;
@@ -1906,8 +1926,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       } else {
         // Strip any residual image markers that might have leaked into text
         part = part.replace(/\[(?:PRICING_IMAGE|MONTH_IMAGE|INTRO_FLYER_IMAGE)[^\]]*\]/gi, '').trim();
-        // Extract "Feel free" sentence to always send as its own final message
-        if (FEEL_FREE_PATTERN.test(part)) {
+        // Extract "Feel free" sentence to always send as its own final message (at most once per conversation)
+        if (FEEL_FREE_CHECK_RE.test(part)) {
           shouldSendFeelFree = true;
           part = part.replace(FEEL_FREE_PATTERN, '').trim();
         }
@@ -1957,8 +1977,8 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       await new Promise(r => setTimeout(r, 400));
     }
 
-    // Send "Feel free" as its own final message ONLY IF not already sent recently in conversation
-    const feelFreeAlreadyInHistory = history.slice(-5).some(m => m.role === 'assistant' && FEEL_FREE_PATTERN.test(m.content || ''));
+    // Send "Feel free" as its own final message ONLY IF never sent earlier anywhere in this conversation
+    const feelFreeAlreadyInHistory = history.some(m => m.role === 'assistant' && FEEL_FREE_CHECK_RE.test(m.content || ''));
     if (shouldSendFeelFree && !feelFreeAlreadyInHistory) {
       await new Promise(r => setTimeout(r, 400));
       await sendAIText(FEEL_FREE_TEXT);
