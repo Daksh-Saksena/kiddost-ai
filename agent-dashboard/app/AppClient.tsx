@@ -1087,19 +1087,32 @@ export default function AppClient() {
   // Register service worker and subscribe to push notifications on login
   useEffect(() => {
     if (!authed) return;
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
 
-    async function setupPush() {
+    function urlBase64ToUint8Array(base64String: string) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+    }
+
+    async function subscribeAndSync() {
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js');
+        await navigator.serviceWorker.register('/sw.js');
+        const reg = await navigator.serviceWorker.ready;
+        reg.update().catch(() => {});
+
         const keyRes = await fetch(`${SERVER}/vapid-public-key`);
         const { publicKey } = await keyRes.json();
         if (!publicKey) return;
 
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        let existing = await reg.pushManager.getSubscription();
+        // If subscription is expiring within 24 hours, renew it
+        if (existing?.expirationTime && existing.expirationTime - Date.now() < 24 * 60 * 60 * 1000) {
+          await existing.unsubscribe().catch(() => {});
+          existing = null;
+        }
 
-        const existing = await reg.pushManager.getSubscription();
         const subscription = existing || await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicKey)
@@ -1115,14 +1128,49 @@ export default function AppClient() {
       }
     }
 
-    function urlBase64ToUint8Array(base64String: string) {
-      const padding = '='.repeat((4 - base64String.length % 4) % 4);
-      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-      const raw = atob(base64);
-      return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+    async function setupPush() {
+      if (Notification.permission === 'granted') {
+        await subscribeAndSync();
+        return;
+      }
+      if (Notification.permission === 'default') {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            await subscribeAndSync();
+          }
+        } catch {}
+      }
     }
 
+    // iOS Safari / PWA requires Notification.requestPermission() to be called directly inside a user tap/click handler
+    const handleFirstUserGesture = async () => {
+      if (Notification.permission === 'default') {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            await subscribeAndSync();
+          }
+        } catch {}
+      } else if (Notification.permission === 'granted') {
+        await subscribeAndSync();
+      }
+    };
+
+    const handleVisibilitySync = () => {
+      if (document.visibilityState === 'visible' && Notification.permission === 'granted') {
+        subscribeAndSync();
+      }
+    };
+
     setupPush();
+    window.addEventListener('click', handleFirstUserGesture, { once: true });
+    document.addEventListener('visibilitychange', handleVisibilitySync);
+
+    return () => {
+      window.removeEventListener('click', handleFirstUserGesture);
+      document.removeEventListener('visibilitychange', handleVisibilitySync);
+    };
   }, [authed, agentName]);
 
   const currentChat = chats.find((c) => c.id === selectedChat);

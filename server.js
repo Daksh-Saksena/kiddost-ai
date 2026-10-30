@@ -2385,21 +2385,34 @@ app.post('/push-unsubscribe', async (req, res) => {
 async function sendPushToAll(payload) {
   if (!process.env.VAPID_PUBLIC_KEY) return;
   if (pushSubscriptions.size === 0) {
+    await loadPushSubscriptionsFromDb();
+  }
+  if (pushSubscriptions.size === 0) {
     console.log('[push] no active subscriptions; skipping notification');
     return;
   }
+  const bodyStr = JSON.stringify(payload);
+  const entries = Array.from(pushSubscriptions.entries());
   const dead = [];
-  for (const [endpoint, { subscription }] of pushSubscriptions) {
-    try {
-      await webpush.sendNotification(subscription, JSON.stringify(payload));
-    } catch (e) {
-      if (e.statusCode === 410 || e.statusCode === 404 || e.statusCode === 401 || e.statusCode === 403) {
-        dead.push(endpoint);
-      } else {
-        console.error('[push] send error:', e.statusCode || e.message);
+
+  await Promise.allSettled(
+    entries.map(async ([endpoint, { subscription }]) => {
+      try {
+        await webpush.sendNotification(subscription, bodyStr, {
+          timeout: 10000,
+          urgency: 'high',
+          TTL: 86400
+        });
+      } catch (e) {
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          dead.push(endpoint);
+        } else {
+          console.error('[push] send error:', e.statusCode || e.message);
+        }
       }
-    }
-  }
+    })
+  );
+
   for (const ep of dead) {
     pushSubscriptions.delete(ep);
     await deletePushSubscription(ep);
