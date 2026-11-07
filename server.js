@@ -919,6 +919,8 @@ function hasUserSharedLocation(text) {
 
 function extractChildAgeFromText(text) {
   if (!text) return null;
+  const multiMatch = text.trim().match(/^(\d+(?:\.\d+)?)\s*(?:and|&|,)\s*(\d+(?:\.\d+)?)(?:\s*(?:years?|yrs?|yr|y\/o|yo))?$/i);
+  if (multiMatch) return parseFloat(multiMatch[1]);
   const ageMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:years?|yrs?|yr|y\/o|yo|years?\s*ild|yrs?\s*ild)\b/i);
   if (ageMatch) return parseFloat(ageMatch[1]);
   const mMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:months?|mths?)\b/i);
@@ -1029,6 +1031,11 @@ async function handleAIResponse(fullPhone, combinedMessage, options = {}) {
       history.pop();
       removed++;
     }
+
+    const allCustomerText = [
+      combinedMessage,
+      ...history.filter(m => m.role === 'user').map(m => m.content)
+    ].join(' ');
 
     // Load conversation variables AND ai_paused flag
     let convVars = {};
@@ -1399,10 +1406,6 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     const isWithinBusinessHours = nowMins >= (9 * 60) && nowMins <= (19 * 60 + 45);
 
     const OUT_OF_HOURS_REPLY_RE = /(our team is available between\s*9(?:\:?00)?\s*am\s*(?:and|-)\s*7(?:\:?45)?\s*pm|first thing in the morning|could we find a slot within that window|would you like to schedule for another time)/i;
-    const allCustomerText = [
-      combinedMessage,
-      ...history.filter(m => m.role === 'user').map(m => m.content)
-    ].join(' ');
     const mentionsNanny = /\b(nanny|babysitter|caretaker|caregiver)\b/i.test(allCustomerText);
 
     const extractTimesToMinutes = (text) => {
@@ -1442,10 +1445,6 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     // for infants under 1 year, questions about teachers/tutors, or unfamiliar questions.
     const SPECIAL_NEEDS_REPLY_RE = /not equipped and trained to manage special needs kids/i;
     if (SPECIAL_NEEDS_REPLY_RE.test(aiReply)) {
-      const allCustomerText = [
-        combinedMessage,
-        ...history.filter(m => m.role === 'user').map(m => m.content)
-      ].join(' ');
       const userMentionsDisability = /\b(special\s*needs?|autis\w*|adhd|a\.d\.h\.d|down\s*syndrome|disab\w*|handicap\w*|cerebral\s*palsy|mental\s*retardation|slow\s*learner|special\s*child)\b/i.test(allCustomerText);
       if (!userMentionsDisability) {
         console.warn(`[SAFETY NET] Blocked false special needs rejection for ${fullPhone}. User message: "${combinedMessage}"`);
