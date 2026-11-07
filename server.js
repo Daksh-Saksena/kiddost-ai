@@ -531,6 +531,14 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
   • If the user says they want support for studies, homework, or tuition (e.g. "We just need support for studies", "Like tuition", "Need only for studies", "Can you focus on studies?", "We need help with studies/homework"):
     - If the child's age is already known: Reply EXACTLY: "Yes, we can focus more on studies and homework support."
     - STRICT NEGATIVE CONSTRAINT: NEVER say "we are not a tuition service" or "rather than providing traditional tutoring"!
+- STRICT B2B / PLAY SCHOOL / INSTITUTION RULE:
+  • KidDost provides services EXCLUSIVELY for individual families and parents directly at their homes or apartment societies (B2C only). We DO NOT provide services for businesses, play schools, preschools, daycare centers, nurseries, schools, corporations, or institutional setups (no B2B).
+  • If the user asks for services for a play school, preschool, daycare center, school, institution, or B2B tie-up (e.g. "I wanted it for my play school", "for our preschool", "services for daycare center", "do you provide to schools?"):
+    You MUST reject with EXACTLY: "Currently, our services are exclusively for individual families at home, and we do not cater to play schools, preschools, daycare centers, or institutional setups. Thank you for considering our services!"
+  • STRICT NEGATIVE CONSTRAINT:
+    - NEVER say "We can certainly provide engaging activities for preschool settings" or agree to serve schools/institutions!
+    - NEVER ask for children's ages, time slots, or proceed with bookings for institutional or B2B requests!
+    - If the user follows up after this rejection, reply with ONLY the single word: UNSURE.
 - ABSOLUTE PRIORITY 2: OUT-OF-SCOPE TOPICS, RANDOM NONSENSE, PERSONAL ADVICE & SPAM RULE:
   • You are an automated assistant EXCLUSIVELY for KidDost child engagement and tutoring services in Bangalore. You are NOT a general AI, NOT a relationship counselor, NOT a friend, and NOT an advice columnist.
   • If the user's message is about ANY topic unrelated to KidDost services (e.g. personal advice, romance, crushes, dating, how to impress someone, best friends, gift ideas, homework solving, trivia, jokes, storytelling, songs, weather, tech/computers, buying products, or any random non-KidDost chat):
@@ -1307,6 +1315,11 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       console.log(`[Location Check] Non-Bangalore city detected: "${detectedNonBangaloreCity}" — injecting rejection`);
       messagesForAI.splice(-1, 0, { role: "system", content: `NON-BANGALORE CITY DETECTED: The user mentioned "${detectedNonBangaloreCity}". This is NOT in Bangalore. You MUST reject: "Currently we operate only in Bangalore. We're expanding soon — would you like us to notify you when we're available in your area?" Do NOT proceed with booking. Do NOT ask for more details.` });
     }
+    const B2B_QUERY_RE = /\b(?:(?:for|in|at)\s+(?:my|our)\s+(?:play\s*school|playschool|pre-?school|day\s*care(?:\s*center)?|daycare(?:\s*center)?|cr[eè]che|kindergarten|nursery\s*school|school|institution|center|centre)|for\s+(?:a|the)\s+(?:play\s*school|playschool|pre-?school|day\s*care\s*center|daycare\s*center|cr[eè]che|kindergarten|institution)|(?:run|own|manage|have|start(?:ing)?)\s+(?:a|an|our|my)\s+(?:play\s*school|playschool|pre-?school|day\s*care|daycare|cr[eè]che|kindergarten|nursery)|(?:tie\s*-?up|partner(?:ship)?|collaborat\w*)\s+(?:with|for)\s+(?:our|a|an)?\s*(?:play\s*school|playschool|pre-?school|day\s*care|daycare|cr[eè]che|school|institution)|(?:services?|activities)\s+for\s+(?:play\s*schools?|preschools?|pre-schools?|day\s*care\s*centers?|daycare\s*centers?|schools?|institutions?)|b2b|corporate\s+(?:service|tie-?up|requirement)|institutional\s+(?:service|tie-?up|requirement)|for\s+preschool\s+settings?)\b/i;
+    if (B2B_QUERY_RE.test(combinedMessage) || B2B_QUERY_RE.test(allCustomerText)) {
+      console.log(`[B2B Check] B2B / play school inquiry detected for ${fullPhone} — injecting B2B rejection instruction`);
+      messagesForAI.splice(-1, 0, { role: "system", content: `B2B / INSTITUTIONAL INQUIRY DETECTED: The user is asking about services for a play school, preschool, daycare, school, or B2B/institutional setup. KidDost provides services EXCLUSIVELY for individual families at home (B2C only) and does NOT serve businesses or schools. You MUST reply with EXACTLY: "Currently, our services are exclusively for individual families at home, and we do not cater to play schools, preschools, daycare centers, or institutional setups. Thank you for considering our services!" Do NOT ask for ages. Do NOT proceed with booking.` });
+    }
     const JOB_INQUIRY_RE = /\b(?:job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv|work\s+opportunities?|work\s+with\s+(?:you|kiddost)|part\s*time\s*job|apply\s+for\s+teaching|can\s+i\s+apply|experience\s+of\s+teaching|teaching\s+experience)\b/i;
     const IN_SCOPE_INQUIRY_RE = /\b(know more|tell me more|more info|more details|how (?:does this|it) work|what is kiddost|about your service|about kiddost|details|charges|fees|cost|rate|pricing|activities|tutoring|care|child|children|kid|kids|baby|infant|toddler|session|booking|hours|nanny|supervisor|play|puzzle|job|jobs|vacancy|vacancies|hiring|career|careers|internship|resume|cv)\b/i;
     if (intent.isOutOfScope === true && !IN_SCOPE_INQUIRY_RE.test(combinedMessage) && !JOB_INQUIRY_RE.test(combinedMessage)) {
@@ -1498,6 +1511,11 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     // and never treat a parent who has shared a child's age as a job applicant!
     const NON_BANGALORE_REJECTION_RE = /(?:operate only in Bangalore.*expanding soon|notify you when we'?re available in your area)/i;
     const alreadySaidNonBangaloreRejection = history.some(m => m.role === 'assistant' && NON_BANGALORE_REJECTION_RE.test(m.content || ''));
+    const B2B_REJECTION_RE = /(?:exclusively for individual families at home|do not cater to play schools|not cater to play schools|not cater to.*preschool)/i;
+    const alreadySaidB2BRejection = history.some(m => m.role === 'assistant' && B2B_REJECTION_RE.test(m.content || ''));
+    const isB2bInquiry = B2B_QUERY_RE.test(combinedMessage) || B2B_QUERY_RE.test(allCustomerText);
+    const isB2bMessage = B2B_QUERY_RE.test(combinedMessage);
+    const FALSE_B2B_ACCEPTANCE_RE = /(?:provide|support|activities|service)\s+(?:for|in)\s+(?:preschool\s+settings?|play\s*schools?|schools?|day\s*care\s*centers?|institutions?)/i;
     const hasParentChildContext = Boolean(activeChildAge || extractChildAgeFromText(combinedMessage) || extractChildAgeFromText(allCustomerText) || (allChildren && allChildren.length > 0)) ||
       /\b(?:my\s+(?:kid|child|children|son|daughter|baby|toddler|infant)|years?\s+old|months?\s+old)\b/i.test(allCustomerText);
     const isJobContext = !hasParentChildContext && JOB_INQUIRY_RE.test(allCustomerText);
@@ -1506,7 +1524,13 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       /\[Media\/Document Attached\]|\b(?:my\s+(?:latest\s+)?resume|attached\s+resume|shared\s+resume)\b/i.test(combinedMessage);
     const alreadySaidWillReviewProfile = history.some(m => m.role === 'assistant' && /review your profile and get back to you/i.test(m.content || ''));
 
-    if (alreadySaidNonBangaloreRejection && !hasUserSharedLocation(combinedMessage) && !/\b(bangalore|bengaluru)\b/i.test(combinedMessage)) {
+    if (alreadySaidB2BRejection) {
+      console.warn(`[SAFETY NET] Enforcing UNSURE stop after B2B rejection for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = 'UNSURE';
+    } else if (isB2bMessage || FALSE_B2B_ACCEPTANCE_RE.test(aiReply) || (isB2bInquiry && !alreadySaidB2BRejection)) {
+      console.warn(`[SAFETY NET] Enforcing B2B rejection for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "Currently, our services are exclusively for individual families at home, and we do not cater to play schools, preschools, daycare centers, or institutional setups. Thank you for considering our services!";
+    } else if (alreadySaidNonBangaloreRejection && !hasUserSharedLocation(combinedMessage) && !/\b(bangalore|bengaluru)\b/i.test(combinedMessage)) {
       // Rule 1: After sending the non-Bangalore city rejection ("Currently we operate only in Bangalore..."),
       // STOP and respond UNSURE to any follow-up reply (e.g. "Sure", "Yes") so a human agent can handle it.
       console.warn(`[SAFETY NET] Enforcing Rule 1 UNSURE stop after non-Bangalore rejection for ${fullPhone}. User message: "${combinedMessage}"`);
