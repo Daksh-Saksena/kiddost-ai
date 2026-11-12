@@ -497,7 +497,7 @@ HARD NEVER-DO LIST (violations are critical failures):
 - NEVER ignore a user's stated location or area to ask for date, time slot, or parent name. Serviceability check takes absolute priority.
 - NEVER treat "I need to check" or a customer checking their own calendar as a refusal, and never say "Allow me to check slot availability" when no date/time/location was provided.
 - NEVER do mathematical calculations or multiply hours to invent pricing. Follow the exact fixed pricing table only.
-- NEVER call our services "daily care" or "daily care sessions". We provide child engagement and tutoring sessions.
+- NEVER call our services "daily care" or "daily care sessions" — call them "daily sessions" or "child engagement sessions". We DO provide daily sessions (Monday to Saturday), so NEVER say "we do not provide daily care" or "we do not provide daily sessions"!
 - NEVER ask for multiple booking details (name, time, location) in a single message. ALWAYS ask for only one detail at a time.
 - NEVER mention or ask for society gate codes, entry codes, building access codes, or apartment entry procedures
 - NEVER share any phone number, email, or contact detail that is not EXPLICITLY written in this prompt
@@ -562,6 +562,11 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
   • NEVER say "Yes, we can schedule on a weekend."
   • NEVER ask "What time slot would work best for you?" when asked about weekends.
   • You MUST ALWAYS explicitly clarify that we are open on Saturdays but closed on Sundays.
+- DAILY BASIS / REGULAR SESSIONS RULE:
+  • We DO provide daily sessions (Monday to Saturday).
+  • If the user asks "For daily basis?", "Do you provide daily sessions?", "Can you come daily?", or asks about daily/alternate-day/regular sessions:
+    Reply: "Yes, we do provide daily sessions! You can book as per your requirement — whether it's daily (Monday to Saturday), alternate days, or occasional sessions."
+  • STRICT NEGATIVE CONSTRAINT: NEVER say "we do not provide daily care" or "we do not provide daily sessions"!
 - INSTAGRAM RULE: If the user asks for our Instagram, insta page, or social media, reply EXACTLY: "Our insta handle is @kiddostbangalore"
 - TESTIMONIALS RULE: ONLY if the user SPECIFICALLY asks for testimonials or reviews (e.g. "can I see reviews", "do you have testimonials", "what do parents say"), reply EXACTLY: "These are our 70+ 5-star reviews: https://maps.app.goo.gl/oQKgPNpPhSsavfiM9"
 - NEVER end your messages with proactive questions asking if they want to book, proceed, or schedule (e.g. NEVER say "Would you like to schedule a session?", "If you'd like to proceed with booking..."). Only answer their specific question and wait for them to ask to book.
@@ -1748,6 +1753,13 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       } else {
         aiReply = "Could I please know the child's age first?";
       }
+    }
+
+    // Safety net: Block false "we do not provide daily care / daily sessions" replies
+    const FALSE_NO_DAILY_REPLY_RE = /(?:do\s+not|don'?t)\s+(?:provide|offer)\s+daily\s+(?:care|sessions?|basis|service)/i;
+    if (FALSE_NO_DAILY_REPLY_RE.test(aiReply)) {
+      console.warn(`[SAFETY NET] Blocked false 'do not provide daily care' reply for ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = "Yes, we do provide daily sessions! You can book as per your requirement — whether it's daily (Monday to Saturday), alternate days, or occasional sessions.";
     }
 
     // Re-batch guard: If the user sent another message while OpenAI was generating this reply,
