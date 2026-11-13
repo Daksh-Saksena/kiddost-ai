@@ -538,6 +538,7 @@ RESPONSE PLAYBOOK — stick closely to these scripts. You may adjust phrasing sl
   • STRICT NEGATIVE CONSTRAINT:
     - NEVER say "We can certainly provide engaging activities for preschool settings" or agree to serve schools/institutions!
     - NEVER ask for children's ages, time slots, or proceed with bookings for institutional or B2B requests!
+    - NEVER use this play school / B2B rejection script for parents asking about nanny services, babysitters, or home sessions! ONLY use it if the user explicitly mentions a play school, preschool, daycare center, school, or B2B setup.
     - If the user follows up after this rejection, reply with ONLY the single word: UNSURE.
 - ABSOLUTE PRIORITY 2: OUT-OF-SCOPE TOPICS, RANDOM NONSENSE, PERSONAL ADVICE & SPAM RULE:
   • You are an automated assistant EXCLUSIVELY for KidDost child engagement and tutoring services in Bangalore. You are NOT a general AI, NOT a relationship counselor, NOT a friend, and NOT an advice columnist.
@@ -1528,12 +1529,19 @@ Consider the FULL conversation history carefully — do not confuse one child's 
       /\[Media\/Document Attached\]|\b(?:my\s+(?:latest\s+)?resume|attached\s+resume|shared\s+resume)\b/i.test(combinedMessage);
     const alreadySaidWillReviewProfile = history.some(m => m.role === 'assistant' && /review your profile and get back to you/i.test(m.content || ''));
 
-    if (alreadySaidB2BRejection) {
+    if (isB2bInquiry && alreadySaidB2BRejection) {
       console.warn(`[SAFETY NET] Enforcing UNSURE stop after B2B rejection for ${fullPhone}. User message: "${combinedMessage}"`);
       aiReply = 'UNSURE';
-    } else if (isB2bMessage || FALSE_B2B_ACCEPTANCE_RE.test(aiReply) || (isB2bInquiry && !alreadySaidB2BRejection)) {
+    } else if (isB2bMessage || (isB2bInquiry && !alreadySaidB2BRejection) || (isB2bInquiry && FALSE_B2B_ACCEPTANCE_RE.test(aiReply))) {
       console.warn(`[SAFETY NET] Enforcing B2B rejection for ${fullPhone}. User message: "${combinedMessage}"`);
       aiReply = "Currently, our services are exclusively for individual families at home, and we do not cater to play schools, preschools, daycare centers, or institutional setups. Thank you for considering our services!";
+    } else if (!isB2bInquiry && B2B_REJECTION_RE.test(aiReply)) {
+      const isSteppingBackForNanny = /\b(?:looking for|wanted|needed|need)\s+(?:a\s+)?(?:nanny|baby\s*sitter|caretaker|caregiver|full[- ]?time|permanent)\b/i.test(combinedMessage) &&
+        /\b(?:understood|okay|ok|alright|got it|oh|thanks|thank you)\b/i.test(combinedMessage);
+      console.warn(`[SAFETY NET] Blocked false B2B rejection for non-B2B parent ${fullPhone}. User message: "${combinedMessage}"`);
+      aiReply = isSteppingBackForNanny
+        ? "Thank you for considering our services! If you ever need ad-hoc support, don’t hesitate to reach out. We’re here to help."
+        : 'UNSURE';
     } else if (alreadySaidNonBangaloreRejection && !hasUserSharedLocation(combinedMessage) && !/\b(bangalore|bengaluru)\b/i.test(combinedMessage)) {
       // Rule 1: After sending the non-Bangalore city rejection ("Currently we operate only in Bangalore..."),
       // STOP and respond UNSURE to any follow-up reply (e.g. "Sure", "Yes") so a human agent can handle it.
