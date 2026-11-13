@@ -642,7 +642,7 @@ export default function AppClient() {
     }
 
     // Backfill any conversation phone numbers not present in the top 1000 messages (e.g. Geeta, Maggi)
-    const missingPhones = conversationsData.map(c => c.phone).filter(p => !latestMsgMap.has(p));
+    const missingPhones = conversationsData.map(c => c.phone).filter(p => !latestMsgMap.has(p)).slice(0, 100);
     if (missingPhones.length > 0) {
       try {
         const { data: missingMsgs } = await supabase
@@ -1062,12 +1062,14 @@ export default function AppClient() {
     };
   }, [selectedChat, authed]);
 
-  // Polling fallback: refresh chats every 60s when tab is active (realtime handles immediate updates)
+  // Polling fallback: refresh chats every 5m when tab is active (realtime handles immediate updates)
+  const lastPollSyncRef = useRef<number>(Date.now());
   useEffect(() => {
     if (!authed) return;
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && Date.now() - lastPollSyncRef.current > 60000) {
+        lastPollSyncRef.current = Date.now();
         loadChats();
       }
     };
@@ -1075,8 +1077,9 @@ export default function AppClient() {
 
     const iv = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
+      lastPollSyncRef.current = Date.now();
       loadChats();
-    }, 60000);
+    }, 300000);
 
     return () => {
       clearInterval(iv);
