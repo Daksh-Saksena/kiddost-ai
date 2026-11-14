@@ -951,8 +951,14 @@ function getActivityPitchForAge(age) {
       numAge = years + (months / 12);
       isMonths = false;
     } else if (mMatch) {
-      isMonths = true;
-      numAge = parseFloat(mMatch[1]);
+      const monthsVal = parseFloat(mMatch[1]);
+      if (monthsVal >= 12) {
+        numAge = monthsVal / 12;
+        isMonths = false;
+      } else {
+        isMonths = true;
+        numAge = monthsVal;
+      }
     } else {
       numAge = parseFloat(trimmed);
     }
@@ -1768,6 +1774,14 @@ Consider the FULL conversation history carefully — do not confuse one child's 
     if (FALSE_NO_DAILY_REPLY_RE.test(aiReply)) {
       console.warn(`[SAFETY NET] Blocked false 'do not provide daily care' reply for ${fullPhone}. User message: "${combinedMessage}"`);
       aiReply = "Yes, we do provide daily sessions! You can book as per your requirement — whether it's daily (Monday to Saturday), alternate days, or occasional sessions.";
+    }
+
+    // Returning user after a long gap (14+ days) sending a fresh general info inquiry without specifying current age:
+    // Do NOT dump an old age's activity/infant script from months ago — ask for their child's current age!
+    const RETURNING_GENERAL_INFO_RE = /\b(?:know more|more info|more details|get info|need info|tell me more|how (?:does this|it) work|what is kiddost|details please|share details|can you help)\b/i;
+    if (prependWelcomeBack && RETURNING_GENERAL_INFO_RE.test(combinedMessage) && extractChildAgeFromText(combinedMessage) == null) {
+      console.log(`[SAFETY NET] Returning user (${fullPhone}) after long gap sent general info inquiry — asking for current child age instead of repeating stale age script.`);
+      aiReply = "Could you please share your child's current age?";
     }
 
     // Re-batch guard: If the user sent another message while OpenAI was generating this reply,
