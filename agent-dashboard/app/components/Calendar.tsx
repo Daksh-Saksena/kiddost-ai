@@ -95,6 +95,13 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [savingMember, setSavingMember] = useState(false);
 
   // Manual daily reminder trigger state
+  const REMINDER_RECIPIENTS = [
+    { name: "Admin (Default)", phone: "919901029836", display: "+91 99010 29836" },
+    { name: "Rakhi", phone: "919678751100", display: "+91 96787 51100" },
+    { name: "Mahima", phone: "919035979788", display: "+91 90359 79788" },
+  ];
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [selectedReminderPhones, setSelectedReminderPhones] = useState<string[]>(["919901029836"]);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [reminderStatus, setReminderStatus] = useState<string | null>(null);
 
@@ -274,25 +281,37 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setShowMembers(true);
   };
 
+  const toggleReminderPhone = (phone: string) => {
+    setSelectedReminderPhones(prev =>
+      prev.includes(phone) ? prev.filter(p => p !== phone) : [...prev, phone]
+    );
+  };
+
   const handleSendDailyReminder = async () => {
-    if (sendingReminder) return;
+    if (sendingReminder || selectedReminderPhones.length === 0) return;
     setSendingReminder(true);
     setReminderStatus(null);
     try {
-      const res = await fetch(`${SERVER}/calendar/send-reminder`, { method: 'POST' });
+      const res = await fetch(`${SERVER}/calendar/send-reminder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phones: selectedReminderPhones })
+      });
       const json = await res.json().catch(() => ({}));
+      setShowReminderModal(false);
       if (res.ok && json.ok) {
         setReminderStatus(json.sent
-          ? `Sent tomorrow's summary (${json.count} session${json.count === 1 ? '' : 's'}) to WhatsApp`
+          ? (json.message || `Sent tomorrow's summary (${json.count} session${json.count === 1 ? '' : 's'}) to WhatsApp`)
           : (json.message || 'No sessions scheduled for tomorrow'));
       } else {
         setReminderStatus(`Failed to send reminder: ${json.error || res.statusText}`);
       }
     } catch {
+      setShowReminderModal(false);
       setReminderStatus('Failed to reach server');
     } finally {
       setSendingReminder(false);
-      setTimeout(() => setReminderStatus(null), 4500);
+      setTimeout(() => setReminderStatus(null), 5000);
     }
   };
 
@@ -327,7 +346,7 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
           <BarChart3 className="w-5 h-5" />
         </button>
         <button
-          onClick={handleSendDailyReminder}
+          onClick={() => setShowReminderModal(true)}
           disabled={sendingReminder}
           className={`text-white hover:bg-white/10 transition-opacity p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-95 ${sendingReminder ? 'opacity-40 animate-pulse' : 'opacity-80'}`}
           title="Send tomorrow's sessions on WhatsApp"
@@ -811,6 +830,74 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
               {saving ? "Saving..." : editEvent ? "Update Event" : formRepeat > 1 ? `Create ${formRepeat} Sessions` : "Create Event"}
             </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Tomorrow's Reminder Modal */}
+      {showReminderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-sm rounded-2xl p-5 shadow-2xl border ${isDarkMode ? "bg-gray-900 border-blue-900/40" : "bg-white border-gray-200"}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Bell className={`w-5 h-5 ${isDarkMode ? "text-blue-400" : "text-[#008069]"}`} />
+                <h3 className={`text-base font-bold ${text}`}>Send Tomorrow&apos;s Sessions</h3>
+              </div>
+              <button onClick={() => setShowReminderModal(false)} className={`p-1 rounded-full ${subtext}`}><X className="w-5 h-5" /></button>
+            </div>
+            <p className={`text-xs mb-3 ${subtext}`}>
+              Pick who should receive tomorrow&apos;s session summary on WhatsApp right now (regular 9:00 PM schedule still sends only to Admin):
+            </p>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-xs font-semibold ${subtext}`}>RECIPIENTS</span>
+              <button
+                type="button"
+                onClick={() => setSelectedReminderPhones(
+                  selectedReminderPhones.length === REMINDER_RECIPIENTS.length
+                    ? ["919901029836"]
+                    : REMINDER_RECIPIENTS.map(r => r.phone)
+                )}
+                className={`text-xs font-medium ${isDarkMode ? "text-blue-400 hover:text-blue-300" : "text-[#008069] hover:underline"}`}
+              >
+                {selectedReminderPhones.length === REMINDER_RECIPIENTS.length ? "Default only" : "Select all"}
+              </button>
+            </div>
+            <div className="space-y-2 mb-4">
+              {REMINDER_RECIPIENTS.map(r => {
+                const checked = selectedReminderPhones.includes(r.phone);
+                return (
+                  <button
+                    key={r.phone}
+                    type="button"
+                    onClick={() => toggleReminderPhone(r.phone)}
+                    className={`flex items-center gap-3 w-full rounded-xl px-3.5 py-2.5 text-left border transition-all ${
+                      checked
+                        ? isDarkMode ? "bg-blue-950/50 border-blue-500/60 text-white" : "bg-emerald-50 border-[#008069] text-gray-900"
+                        : isDarkMode ? "bg-gray-800/60 border-gray-800 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-600"
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${
+                      checked
+                        ? isDarkMode ? "bg-blue-600 text-white" : "bg-[#008069] text-white"
+                        : isDarkMode ? "bg-gray-700" : "bg-gray-300"
+                    }`}>
+                      {checked ? "✓" : ""}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{r.name}</div>
+                      <div className={`text-xs ${subtext}`}>{r.display}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={handleSendDailyReminder}
+              disabled={sendingReminder || selectedReminderPhones.length === 0}
+              className={`w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 active:scale-95 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-[#008069] text-white hover:bg-[#006d5b]"}`}
+            >
+              {sendingReminder ? "Sending..." : `Send to ${selectedReminderPhones.length} Selected`}
+            </button>
           </div>
         </div>
       )}

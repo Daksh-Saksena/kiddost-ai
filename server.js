@@ -4206,8 +4206,15 @@ cron.schedule('* * * * *', () => {
 // ── Daily session reminder ──────────────────────────────────────────────
 const REMINDER_PHONE = process.env.REMINDER_PHONE || '919901029836';
 
-async function sendDailyReminder() {
+async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
   try {
+    const recipients = (Array.isArray(targetPhones) && targetPhones.length > 0 ? targetPhones : [REMINDER_PHONE])
+      .map(p => String(p).replace(/[^\d]/g, ''))
+      .filter(Boolean);
+    if (recipients.length === 0) {
+      return { ok: false, error: 'No valid recipients selected' };
+    }
+
     // Get tomorrow's date in IST (UTC+5:30)
     const istMs = Date.now() + (5.5 * 60 * 60 * 1000);
     const tomorrow = new Date(istMs + 24 * 60 * 60 * 1000);
@@ -4247,34 +4254,57 @@ async function sendDailyReminder() {
 
     msg += `📊 *Total: ${events.length} session${events.length > 1 ? 's' : ''}*`;
 
-    console.log('[reminder] Sending to', REMINDER_PHONE, ':', msg.slice(0, 200));
+    console.log('[reminder] Sending to', recipients.join(', '), ':', msg.slice(0, 200));
 
-    // Try template first, fall back to session message
     const useTemplate = process.env.REMINDER_TEMPLATE_ID;
-    let sent = false;
-    if (useTemplate) {
-      try {
-        await axios.post(
-          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-          { name: '', phone: REMINDER_PHONE, templateId: useTemplate, variables: [msg] },
-          { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
-        );
-        console.log('[reminder] Sent via template', useTemplate);
-        sent = true;
-      } catch (tplErr) {
-        console.warn('[reminder] Template failed, falling back to session message:', tplErr?.response?.data?.message || tplErr.message);
+    const results = await Promise.all(recipients.map(async (phone) => {
+      let sent = false;
+      if (useTemplate) {
+        try {
+          await axios.post(
+            `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+            { name: '', phone, templateId: useTemplate, variables: [msg] },
+            { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+          );
+          console.log('[reminder] Sent via template', useTemplate, 'to', phone);
+          sent = true;
+        } catch (tplErr) {
+          console.warn('[reminder] Template failed for', phone, ', falling back to session message:', tplErr?.response?.data?.message || tplErr.message);
+        }
       }
+      if (!sent) {
+        try {
+          await axios.post(
+            `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+            { phone, text: msg },
+            { params: { apiKey: BOTSPACE_API_KEY } }
+          );
+          console.log('[reminder] Sent via session message to', phone);
+          sent = true;
+        } catch (sessErr) {
+          const errMsg = sessErr?.response?.data?.message || sessErr?.response?.data || sessErr.message;
+          console.error('[reminder] Failed for', phone, ':', errMsg);
+          return { phone, ok: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) };
+        }
+      }
+      return { phone, ok: true };
+    }));
+
+    const succeeded = results.filter(r => r.ok);
+    const failed = results.filter(r => !r.ok);
+    if (succeeded.length === 0) {
+      return { ok: false, error: failed.map(f => `${f.phone}: ${f.error}`).join('; '), results };
     }
-    if (!sent) {
-      // Session message — only works within 24h window
-      await axios.post(
-        `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-        { phone: REMINDER_PHONE, text: msg },
-        { params: { apiKey: BOTSPACE_API_KEY } }
-      );
-      console.log('[reminder] Sent via session message');
-    }
-    return { ok: true, sent: true, count: events.length, date: tomorrowStr, message: `Sent ${events.length} session${events.length > 1 ? 's' : ''} for ${tomorrowStr}` };
+    return {
+      ok: true,
+      sent: true,
+      count: events.length,
+      sentCount: succeeded.length,
+      failedCount: failed.length,
+      date: tomorrowStr,
+      results,
+      message: `Sent ${events.length} session${events.length > 1 ? 's' : ''} to ${succeeded.length}/${recipients.length} recipient${recipients.length > 1 ? 's' : ''}`
+    };
   } catch (e) {
     const errMsg = e?.response?.data?.message || e?.response?.data || e.message || String(e);
     console.error('[reminder] Error:', errMsg);
@@ -4296,8 +4326,9 @@ app.get('/test-reminder', async (req, res) => {
 });
 
 app.post('/calendar/send-reminder', async (req, res) => {
-  console.log('[calendar/send-reminder] Triggered from dashboard');
-  const result = await sendDailyReminder();
+  const phones = Array.isArray(req.body?.phones) && req.body.phones.length > 0 ? req.body.phones : [REMINDER_PHONE];
+  console.log('[calendar/send-reminder] Triggered from dashboard for:', phones);
+  const result = await sendDailyReminder(phones);
   res.status(result?.ok === false ? 500 : 200).json(result || { ok: true, message: 'Reminder sent' });
 });
 
