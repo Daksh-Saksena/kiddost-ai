@@ -4258,36 +4258,38 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
 
     const useTemplate = process.env.REMINDER_TEMPLATE_ID;
     const results = await Promise.all(recipients.map(async (phone) => {
-      let sent = false;
-      if (useTemplate) {
-        try {
-          await axios.post(
-            `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-            { name: '', phone, templateId: useTemplate, variables: [msg] },
-            { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
-          );
-          console.log('[reminder] Sent via template', useTemplate, 'to', phone);
-          sent = true;
-        } catch (tplErr) {
-          console.warn('[reminder] Template failed for', phone, ', falling back to session message:', tplErr?.response?.data?.message || tplErr.message);
+      // Try session message FIRST so WhatsApp preserves all line breaks and spacing.
+      // Fall back to template only if recipient is outside the 24h session window.
+      try {
+        await axios.post(
+          `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
+          { phone, text: msg },
+          { params: { apiKey: BOTSPACE_API_KEY } }
+        );
+        console.log('[reminder] Sent via session message to', phone);
+        return { phone, ok: true, method: 'session' };
+      } catch (sessErr) {
+        const sessErrMsg = sessErr?.response?.data?.message || sessErr?.response?.data || sessErr.message;
+        console.warn('[reminder] Session message failed for', phone, ':', sessErrMsg);
+        if (useTemplate) {
+          try {
+            // WhatsApp template variables collapse newlines, so use ' | ' separators for fallback readability
+            const templateSafeMsg = msg.replace(/\n+/g, ' | ');
+            await axios.post(
+              `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+              { name: '', phone, templateId: useTemplate, variables: [templateSafeMsg] },
+              { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+            );
+            console.log('[reminder] Sent via template', useTemplate, 'to', phone);
+            return { phone, ok: true, method: 'template' };
+          } catch (tplErr) {
+            const tplErrMsg = tplErr?.response?.data?.message || tplErr?.response?.data || tplErr.message;
+            console.error('[reminder] Template fallback also failed for', phone, ':', tplErrMsg);
+            return { phone, ok: false, error: typeof tplErrMsg === 'string' ? tplErrMsg : JSON.stringify(tplErrMsg) };
+          }
         }
+        return { phone, ok: false, error: typeof sessErrMsg === 'string' ? sessErrMsg : JSON.stringify(sessErrMsg) };
       }
-      if (!sent) {
-        try {
-          await axios.post(
-            `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
-            { phone, text: msg },
-            { params: { apiKey: BOTSPACE_API_KEY } }
-          );
-          console.log('[reminder] Sent via session message to', phone);
-          sent = true;
-        } catch (sessErr) {
-          const errMsg = sessErr?.response?.data?.message || sessErr?.response?.data || sessErr.message;
-          console.error('[reminder] Failed for', phone, ':', errMsg);
-          return { phone, ok: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) };
-        }
-      }
-      return { phone, ok: true };
     }));
 
     const succeeded = results.filter(r => r.ok);
