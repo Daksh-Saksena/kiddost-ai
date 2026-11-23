@@ -4254,6 +4254,20 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
 
     msg += `📊 *Total: ${events.length} session${events.length > 1 ? 's' : ''}*`;
 
+    // Template-safe spaced version (Meta strips \n and >4 consecutive spaces in template variables)
+    const templateLines = events.map((ev, i) => {
+      const startFmt = ev.start_time ? formatTimeIST(ev.start_time) : null;
+      const endFmt = ev.end_time ? formatTimeIST(ev.end_time) : null;
+      const time = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt || 'Time TBD';
+      const trial = ev.is_trial ? ' [TRIAL]' : '';
+      const parts = [`${i + 1}. *${ev.title}*${trial}`, `🕐 ${time}`];
+      if (ev.assigned_member) parts.push(`👤 ${ev.assigned_member}`);
+      if (ev.phone) parts.push(`📞 ${ev.phone}`);
+      if (ev.notes) parts.push(`📝 ${ev.notes}`);
+      return parts.join(' • ');
+    });
+    const templateSafeMsg = `📅 *Tomorrow (${dayLabel}) — ${events.length} session${events.length > 1 ? 's' : ''}:*   ➖➖➖   ${templateLines.join('   ➖➖➖   ')}`;
+
     console.log('[reminder] Sending to', recipients.join(', '), ':', msg.slice(0, 200));
 
     const useTemplate = process.env.REMINDER_TEMPLATE_ID;
@@ -4273,8 +4287,6 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
         console.warn('[reminder] Session message failed for', phone, ':', sessErrMsg);
         if (useTemplate) {
           try {
-            // WhatsApp template variables collapse newlines, so use ' | ' separators for fallback readability
-            const templateSafeMsg = msg.replace(/\n+/g, ' | ');
             await axios.post(
               `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
               { name: '', phone, templateId: useTemplate, variables: [templateSafeMsg] },
