@@ -4254,7 +4254,7 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
 
     msg += `📊 *Total: ${events.length} session${events.length > 1 ? 's' : ''}*`;
 
-    // Template-safe spaced version (Meta strips \n and >4 consecutive spaces in template variables)
+    // Template-safe spaced version (Meta strips \n and >4 consecutive spaces in template variables, and caps at 1024 chars)
     const templateLines = events.map((ev, i) => {
       const startFmt = ev.start_time ? formatTimeIST(ev.start_time) : null;
       const endFmt = ev.end_time ? formatTimeIST(ev.end_time) : null;
@@ -4266,14 +4266,40 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
       if (ev.notes) parts.push(`📝 ${ev.notes}`);
       return parts.join(' • ');
     });
-    const templateSafeMsg = `📅 *Tomorrow (${dayLabel}) — ${events.length} session${events.length > 1 ? 's' : ''}:*   ➖➖➖   ${templateLines.join('   ➖➖➖   ')}`;
+    const templateHeader = `📅 *Tomorrow (${dayLabel}) — ${events.length} session${events.length > 1 ? 's' : ''}:*`;
+    const templateChunks = [];
+    let currentChunk = templateHeader;
+    for (const line of templateLines) {
+      const sep = '   ➖➖➖   ';
+      if ((currentChunk + sep + line).length > 980 && currentChunk !== templateHeader) {
+        templateChunks.push(currentChunk);
+        currentChunk = line;
+      } else {
+        currentChunk = `${currentChunk}${sep}${line}`;
+      }
+    }
+    if (currentChunk) templateChunks.push(currentChunk);
 
     console.log('[reminder] Sending to', recipients.join(', '), ':', msg.slice(0, 200));
 
     const useTemplate = process.env.REMINDER_TEMPLATE_ID;
     const results = await Promise.all(recipients.map(async (phone) => {
-      // Try session message FIRST so WhatsApp preserves all line breaks and spacing.
-      // Fall back to template only if recipient is outside the 24h session window.
+      // Always try template FIRST (BotSpace send-session-message returns 200 OK even when Meta drops it outside 24h window)
+      if (useTemplate) {
+        try {
+          for (const chunk of templateChunks) {
+            await axios.post(
+              `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
+              { name: '', phone, templateId: useTemplate, variables: [chunk] },
+              { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+          console.log('[reminder] Sent via template', useTemplate, 'to', phone);
+          return { phone, ok: true, method: 'template' };
+        } catch (tplErr) {
+          console.warn('[reminder] Template failed for', phone, ', falling back to session message:', tplErr?.response?.data?.message || tplErr.message);
+        }
+      }
       try {
         await axios.post(
           `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-session-message`,
@@ -4283,24 +4309,9 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
         console.log('[reminder] Sent via session message to', phone);
         return { phone, ok: true, method: 'session' };
       } catch (sessErr) {
-        const sessErrMsg = sessErr?.response?.data?.message || sessErr?.response?.data || sessErr.message;
-        console.warn('[reminder] Session message failed for', phone, ':', sessErrMsg);
-        if (useTemplate) {
-          try {
-            await axios.post(
-              `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-              { name: '', phone, templateId: useTemplate, variables: [templateSafeMsg] },
-              { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
-            );
-            console.log('[reminder] Sent via template', useTemplate, 'to', phone);
-            return { phone, ok: true, method: 'template' };
-          } catch (tplErr) {
-            const tplErrMsg = tplErr?.response?.data?.message || tplErr?.response?.data || tplErr.message;
-            console.error('[reminder] Template fallback also failed for', phone, ':', tplErrMsg);
-            return { phone, ok: false, error: typeof tplErrMsg === 'string' ? tplErrMsg : JSON.stringify(tplErrMsg) };
-          }
-        }
-        return { phone, ok: false, error: typeof sessErrMsg === 'string' ? sessErrMsg : JSON.stringify(sessErrMsg) };
+        const errMsg = sessErr?.response?.data?.message || sessErr?.response?.data || sessErr.message;
+        console.error('[reminder] Failed for', phone, ':', errMsg);
+        return { phone, ok: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) };
       }
     }));
 
