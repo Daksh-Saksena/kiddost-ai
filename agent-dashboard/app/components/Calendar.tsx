@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send, BarChart3, User, Phone } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, CalendarDays, Sparkles, Send, BarChart3, User, Phone, Bell } from "lucide-react";
 
 const SERVER = "https://kiddost-ai.onrender.com";
 
@@ -93,6 +93,10 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberPhone, setNewMemberPhone] = useState("");
   const [savingMember, setSavingMember] = useState(false);
+
+  // Manual daily reminder trigger state
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderStatus, setReminderStatus] = useState<string | null>(null);
 
   // Known members: DB list is primary (has phones), fall back to names from events for any not yet in DB
   const dbMemberNames = membersList.map(m => m.name);
@@ -270,6 +274,28 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
     setShowMembers(true);
   };
 
+  const handleSendDailyReminder = async () => {
+    if (sendingReminder) return;
+    setSendingReminder(true);
+    setReminderStatus(null);
+    try {
+      const res = await fetch(`${SERVER}/calendar/send-reminder`, { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        setReminderStatus(json.sent
+          ? `Sent tomorrow's summary (${json.count} session${json.count === 1 ? '' : 's'}) to WhatsApp`
+          : (json.message || 'No sessions scheduled for tomorrow'));
+      } else {
+        setReminderStatus(`Failed to send reminder: ${json.error || res.statusText}`);
+      }
+    } catch {
+      setReminderStatus('Failed to reach server');
+    } finally {
+      setSendingReminder(false);
+      setTimeout(() => setReminderStatus(null), 4500);
+    }
+  };
+
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   const bg = isDarkMode ? "bg-black" : "bg-white";
@@ -301,6 +327,15 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
           <BarChart3 className="w-5 h-5" />
         </button>
         <button
+          onClick={handleSendDailyReminder}
+          disabled={sendingReminder}
+          className={`text-white hover:bg-white/10 transition-opacity p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-95 ${sendingReminder ? 'opacity-40 animate-pulse' : 'opacity-80'}`}
+          title="Send tomorrow's sessions on WhatsApp"
+          aria-label="Send tomorrow's sessions on WhatsApp"
+        >
+          <Bell className="w-5 h-5" />
+        </button>
+        <button
           onClick={openMembers}
           className="text-white hover:bg-white/10 opacity-80 transition-opacity p-2 rounded-full min-w-[40px] min-h-[40px] flex items-center justify-center active:scale-95"
           title="Member phones"
@@ -317,6 +352,12 @@ export function Calendar({ isDarkMode, onBack, agentName }: CalendarProps) {
           <Plus className="w-5 h-5" />
         </button>
       </div>
+
+      {reminderStatus && (
+        <div className={`px-4 py-2 text-xs font-medium text-center border-b ${border} ${isDarkMode ? "bg-blue-950/60 text-blue-200" : "bg-emerald-50 text-emerald-800"}`}>
+          {reminderStatus}
+        </div>
+      )}
 
       {/* Month navigation */}
       <div className={`flex items-center justify-between px-5 py-3 ${isDarkMode ? "bg-gray-950" : "bg-white"}`}>

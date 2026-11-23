@@ -4221,10 +4221,10 @@ async function sendDailyReminder() {
       .eq('date', tomorrowStr)
       .order('start_time', { ascending: true });
 
-    if (error) { console.error('[reminder] DB error', error.message); return; }
+    if (error) { console.error('[reminder] DB error', error.message); return { ok: false, error: error.message }; }
     if (!events || events.length === 0) {
       console.log('[reminder] No sessions tomorrow, skipping');
-      return;
+      return { ok: true, sent: false, count: 0, message: `No sessions scheduled for ${tomorrowStr}` };
     }
 
     // Build message
@@ -4272,8 +4272,11 @@ async function sendDailyReminder() {
       );
       console.log('[reminder] Sent via session message');
     }
+    return { ok: true, sent: true, count: events.length, date: tomorrowStr, message: `Sent ${events.length} session${events.length > 1 ? 's' : ''} for ${tomorrowStr}` };
   } catch (e) {
-    console.error('[reminder] Error:', e?.response?.data || e.message || e);
+    const errMsg = e?.response?.data?.message || e?.response?.data || e.message || String(e);
+    console.error('[reminder] Error:', errMsg);
+    return { ok: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) };
   }
 }
 
@@ -4283,11 +4286,17 @@ cron.schedule('0 21 * * *', () => {
   sendDailyReminder();
 }, { timezone: 'Asia/Kolkata' });
 
-// Manual test endpoint
+// Manual test & dashboard trigger endpoints
 app.get('/test-reminder', async (req, res) => {
   console.log('[test-reminder] Triggered manually');
-  await sendDailyReminder();
-  res.json({ ok: true, message: 'Reminder sent (check WhatsApp)' });
+  const result = await sendDailyReminder();
+  res.status(result?.ok === false ? 500 : 200).json(result || { ok: true, message: 'Reminder sent (check WhatsApp)' });
+});
+
+app.post('/calendar/send-reminder', async (req, res) => {
+  console.log('[calendar/send-reminder] Triggered from dashboard');
+  const result = await sendDailyReminder();
+  res.status(result?.ok === false ? 500 : 200).json(result || { ok: true, message: 'Reminder sent' });
 });
 
 // Test endpoint: send a member reminder right now for a specific member/event
