@@ -4232,18 +4232,20 @@ async function sendDailyReminder() {
     let msg = `📅 *Sessions for tomorrow (${dayLabel}):*\n\n`;
 
     events.forEach((ev, i) => {
-      const time = ev.start_time && ev.end_time
-        ? `${ev.start_time} – ${ev.end_time}`
-        : ev.start_time || 'Time TBD';
+      const startFmt = ev.start_time ? formatTimeIST(ev.start_time) : null;
+      const endFmt = ev.end_time ? formatTimeIST(ev.end_time) : null;
+      const time = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt || 'Time TBD';
       const trial = ev.is_trial ? ' 🟠 TRIAL' : '';
-      const member = ev.assigned_member ? ` → ${ev.assigned_member}` : '';
-      const phone = ev.phone ? ` (${ev.phone})` : '';
-      msg += `${i + 1}. *${ev.title}*${trial}\n   🕐 ${time}${member}${phone}\n`;
+
+      msg += `${i + 1}. *${ev.title}*${trial}\n`;
+      msg += `   🕐 ${time}\n`;
+      if (ev.assigned_member) msg += `   👤 ${ev.assigned_member}\n`;
+      if (ev.phone) msg += `   📞 ${ev.phone}\n`;
       if (ev.notes) msg += `   📝 ${ev.notes}\n`;
-      msg += '\n';
+      msg += `\n\n`;
     });
 
-    msg += `Total: ${events.length} session${events.length > 1 ? 's' : ''}`;
+    msg += `📊 *Total: ${events.length} session${events.length > 1 ? 's' : ''}*`;
 
     console.log('[reminder] Sending to', REMINDER_PHONE, ':', msg.slice(0, 200));
 
