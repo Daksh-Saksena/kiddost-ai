@@ -4254,22 +4254,31 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
 
     msg += `📊 *Total: ${events.length} session${events.length > 1 ? 's' : ''}*`;
 
-    // Separate-message format for template (1 header + 1 bubble per session so each is cleanly separated)
-    const templateHeader = `📅 *Sessions for tomorrow (${dayLabel}) — ${events.length} session${events.length > 1 ? 's' : ''}:*`;
-    const templateMessages = [
-      templateHeader,
-      ...events.map((ev, i) => {
-        const startFmt = ev.start_time ? formatTimeIST(ev.start_time) : null;
-        const endFmt = ev.end_time ? formatTimeIST(ev.end_time) : null;
-        const time = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt || 'Time TBD';
-        const trial = ev.is_trial ? ' [TRIAL]' : '';
-        const parts = [`${i + 1}. *${ev.title}*${trial}`, `🕐 ${time}`];
-        if (ev.assigned_member) parts.push(`👤 ${ev.assigned_member}`);
-        if (ev.phone) parts.push(`📞 ${ev.phone}`);
-        if (ev.notes) parts.push(`📝 ${ev.notes}`);
-        return parts.join(' • ');
-      })
-    ];
+    // Template-safe spaced paragraph format (Meta strips \n and >4 consecutive spaces in template variables, and caps at 1024 chars)
+    const templateLines = events.map((ev, i) => {
+      const startFmt = ev.start_time ? formatTimeIST(ev.start_time) : null;
+      const endFmt = ev.end_time ? formatTimeIST(ev.end_time) : null;
+      const time = startFmt && endFmt ? `${startFmt} – ${endFmt}` : startFmt || 'Time TBD';
+      const trial = ev.is_trial ? ' [TRIAL]' : '';
+      const parts = [`${i + 1}. *${ev.title}*${trial}`, `🕐 ${time}`];
+      if (ev.assigned_member) parts.push(`👤 ${ev.assigned_member}`);
+      if (ev.phone) parts.push(`📞 ${ev.phone}`);
+      if (ev.notes) parts.push(`📝 ${ev.notes}`);
+      return parts.join(' • ');
+    });
+    const templateHeader = `📅 *Tomorrow (${dayLabel}) — ${events.length} session${events.length > 1 ? 's' : ''}:*`;
+    const templateChunks = [];
+    let currentChunk = templateHeader;
+    for (const line of templateLines) {
+      const sep = '   ➖➖➖   ';
+      if ((currentChunk + sep + line).length > 980 && currentChunk !== templateHeader) {
+        templateChunks.push(currentChunk);
+        currentChunk = line;
+      } else {
+        currentChunk = `${currentChunk}${sep}${line}`;
+      }
+    }
+    if (currentChunk) templateChunks.push(currentChunk);
 
     console.log('[reminder] Sending to', recipients.join(', '), ':', msg.slice(0, 200));
 
@@ -4278,15 +4287,14 @@ async function sendDailyReminder(targetPhones = [REMINDER_PHONE]) {
       // Always try template FIRST (BotSpace send-session-message returns 200 OK even when Meta drops it outside 24h window)
       if (useTemplate) {
         try {
-          for (const itemMsg of templateMessages) {
+          for (const chunk of templateChunks) {
             await axios.post(
               `https://public-api.bot.space/v1/${CHANNEL_ID}/message/send-message`,
-              { name: '', phone, templateId: useTemplate, variables: [itemMsg] },
+              { name: '', phone, templateId: useTemplate, variables: [chunk] },
               { params: { apiKey: BOTSPACE_API_KEY }, headers: { 'Content-Type': 'application/json' } }
             );
-            await new Promise(r => setTimeout(r, 150));
           }
-          console.log('[reminder] Sent', templateMessages.length, 'template messages via', useTemplate, 'to', phone);
+          console.log('[reminder] Sent via template', useTemplate, 'to', phone);
           return { phone, ok: true, method: 'template' };
         } catch (tplErr) {
           console.warn('[reminder] Template failed for', phone, ', falling back to session message:', tplErr?.response?.data?.message || tplErr.message);
