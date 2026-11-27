@@ -2416,6 +2416,11 @@ app.post("/api/cleanup-duplicate-messages", async (req, res) => {
   }
 });
 
+// Health check endpoint (used by keep-alive monitors to prevent Render cold-start webhook drops)
+app.get('/health', (req, res) => {
+  res.status(200).json({ ok: true, uptime: Math.round(process.uptime()) });
+});
+
 // Push notification endpoints
 app.get('/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
@@ -2755,6 +2760,29 @@ app.post("/webhook", async (req, res) => {
       }
     }
 
+    // Extract quoted / tagged message context if the user replied to an earlier message on WhatsApp
+    const ctxObj = body?.payload?.context || body?.payload?.payload?.context || body?.context || body?.payload?.quotedMessage || body?.quotedMessage || body?.replyTo || null;
+    let quotedText = (
+      ctxObj?.text ||
+      ctxObj?.body ||
+      ctxObj?.caption ||
+      ctxObj?.message ||
+      ctxObj?.quotedMessage?.text ||
+      ctxObj?.quotedMessage?.body ||
+      ''
+    ).trim();
+    const quotedId = ctxObj?.id || ctxObj?.messageId || ctxObj?.message_id || ctxObj?.whatsapp_id || body?.payload?.context?.id || null;
+    if (!quotedText && quotedId) {
+      try {
+        const { data: qRow } = await supabase
+          .from('messages')
+          .select('content')
+          .eq('whatsapp_id', quotedId)
+          .maybeSingle();
+        if (qRow?.content) quotedText = String(qRow.content).trim();
+      } catch {}
+    }
+
     // Check if this event represents an OUTGOING message (e.g. agent typing in BotSpace)
     const isOutgoing = body?.direction === 'outgoing' ||
       body?.payload?.direction === 'outgoing' ||
@@ -3045,6 +3073,12 @@ app.post("/webhook", async (req, res) => {
       } catch (e) {
         console.error('failed to fetch/upload incoming media', e.response?.data || e.message || e);
       }
+    }
+
+    // Prepend quoted/tagged message context so agents & AI see what the customer replied to
+    if (quotedText) {
+      const snippet = quotedText.replace(/\s+/g, ' ').slice(0, 140);
+      message = message ? `↩️ Replying to: "${snippet}"\n${message}` : `↩️ Replying to: "${snippet}"`;
     }
 
     // Save user message (preserve ai_enabled if conversation previously disabled)
