@@ -585,7 +585,7 @@ export default function AppClient() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const loadChats = async () => {
+  const loadChats = async (isBackgroundSync = false) => {
     // Read pinned chats locally (support shared pins across profiles, strictly capped to max 3)
     const store = getPinnedStore();
     let scopedPinned: string[] = [];
@@ -602,17 +602,24 @@ export default function AppClient() {
       }
     }
 
-    // Lightweight query: recent conversations, messages, and contacts directly from Supabase
-    const [convsRes, msgsRes, contactsRes1, contactsRes2] = await Promise.all([
-      supabase.from("conversations").select("phone, needs_human, vars").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("contacts").select("phone, name, notes, labels").range(0, 999),
-      supabase.from("contacts").select("phone, name, notes, labels").range(1000, 1999)
-    ]);
+    // Lightweight query: on background sync only fetch top 100 recent rows; full load fetches 500 + contacts
+    const convLimit = isBackgroundSync ? 100 : 500;
+    const msgLimit = isBackgroundSync ? 100 : 500;
+    const queries: any[] = [
+      supabase.from("conversations").select("phone, needs_human, vars").order("created_at", { ascending: false }).limit(convLimit),
+      supabase.from("messages").select("phone, content, role, sender, agent, media_url, created_at").order("created_at", { ascending: false }).limit(msgLimit),
+    ];
+    if (!isBackgroundSync) {
+      queries.push(
+        supabase.from("contacts").select("phone, name, notes, labels").range(0, 999),
+        supabase.from("contacts").select("phone, name, notes, labels").range(1000, 1999)
+      );
+    }
+    const [convsRes, msgsRes, contactsRes1, contactsRes2] = await Promise.all(queries);
 
     const conversationsData = convsRes.data || [];
     let messagesData = msgsRes.data || [];
-    const dbContacts = [...(contactsRes1.data || []), ...(contactsRes2.data || [])];
+    const dbContacts = isBackgroundSync ? [] : [...(contactsRes1?.data || []), ...(contactsRes2?.data || [])];
 
     if (msgsRes.error && conversationsData.length === 0) return;
 
@@ -641,8 +648,8 @@ export default function AppClient() {
       }
     }
 
-    // Backfill any conversation phone numbers not present in the top 1000 messages (e.g. Geeta, Maggi)
-    const missingPhones = conversationsData.map(c => c.phone).filter(p => !latestMsgMap.has(p)).slice(0, 100);
+    // Backfill any conversation phone numbers not present in the top messages (skip on background syncs)
+    const missingPhones = isBackgroundSync ? [] : conversationsData.map((c: any) => c.phone).filter((p: string) => !latestMsgMap.has(p)).slice(0, 50);
     if (missingPhones.length > 0) {
       try {
         const { data: missingMsgs } = await supabase
@@ -831,9 +838,15 @@ export default function AppClient() {
       setMessages([]);
     }
 
-    // 2. Background sync to fetch fresh messages
-    const { data, error } = await supabase.from("messages").select("*").eq("phone", phone).order("created_at", { ascending: true });
+    // 2. Background sync to fetch fresh messages (cap to latest 200 for fast indexed read)
+    const { data: rawDataDesc, error } = await supabase
+      .from("messages")
+      .select("id, phone, content, role, sender, agent, media_url, whatsapp_id, status, ai_enabled, created_at")
+      .eq("phone", phone)
+      .order("created_at", { ascending: false })
+      .limit(200);
     if (error || selectedChatRef.current !== phone) return;
+    const data = rawDataDesc ? [...rawDataDesc].reverse() : null;
     if (!data) {
       setMessages([]);
       messagesCacheRef.current[phone] = [];
@@ -1070,7 +1083,7 @@ export default function AppClient() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && Date.now() - lastPollSyncRef.current > 60000) {
         lastPollSyncRef.current = Date.now();
-        loadChats();
+        loadChats(true);
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1078,7 +1091,7 @@ export default function AppClient() {
     const iv = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       lastPollSyncRef.current = Date.now();
-      loadChats();
+      loadChats(true);
     }, 300000);
 
     return () => {

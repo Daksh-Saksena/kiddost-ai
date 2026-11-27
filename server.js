@@ -2636,11 +2636,15 @@ function extractContactNameCandidate(body, phone, fullPhone) {
   return raw;
 }
 
-// Helper to reliably sync contact name to Supabase contacts table
+// Helper to reliably sync contact name to Supabase contacts table (cached in memory to avoid Disk IO on every status receipt)
+const syncedContactPhones = new Map(); // fullPhone -> timestamp
+const syncedConvIds = new Map(); // fullPhone -> { convId, ts }
 async function syncContactName(fullPhone, contactName) {
   if (!fullPhone || !contactName) return;
   const cleanName = contactName.trim();
   if (!cleanName) return;
+  const lastSync = syncedContactPhones.get(fullPhone);
+  if (lastSync && Date.now() - lastSync < 3600000) return;
 
   try {
     const { data: existingContact } = await supabase
@@ -2675,6 +2679,7 @@ async function syncContactName(fullPhone, contactName) {
         .eq('phone', fullPhone);
       console.log(`[contact-sync] Updated name for ${fullPhone} from "${currName}" to "${cleanName}"`);
     }
+    syncedContactPhones.set(fullPhone, Date.now());
   } catch (e) {
     console.error('[contact-sync] error:', e.message);
   }
@@ -2924,9 +2929,10 @@ app.post("/webhook", async (req, res) => {
         await supabase.from('messages').update({ status }).eq('whatsapp_id', messageId);
         console.log(`Updated message status for ${messageId} -> ${status}`);
       }
-      if (fullPhone && contactName) syncContactName(fullPhone, contactName).catch(() => {});
       const botspaceConversationId = body?.customer?.id || null;
-      if (fullPhone && botspaceConversationId) {
+      const cachedConv = botspaceConversationId ? syncedConvIds.get(fullPhone) : null;
+      if (fullPhone && botspaceConversationId && (!cachedConv || cachedConv.convId !== botspaceConversationId || Date.now() - cachedConv.ts > 3600000)) {
+        syncedConvIds.set(fullPhone, { convId: botspaceConversationId, ts: Date.now() });
         supabase.from('conversations').update({ conversation_id: botspaceConversationId }).eq('phone', fullPhone).then(() => {}).catch(() => {});
       }
       return res.status(200).json({ ok: true });
@@ -2946,21 +2952,21 @@ app.post("/webhook", async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
-    // Robust check for existing conversation and message history
+    // Robust check for existing conversation and message history (O(1) limit(1) instead of full COUNT(*))
     let existingConversation = null;
     let priorMsgCount = 0;
     let dbCheckFailed = false;
     try {
-      const [convRes, msgCountRes] = await Promise.all([
+      const [convRes, msgCheckRes] = await Promise.all([
         supabase.from("conversations").select("phone, ai_paused").eq("phone", fullPhone).maybeSingle(),
-        supabase.from("messages").select("id", { count: 'exact', head: true }).eq("phone", fullPhone)
+        supabase.from("messages").select("id").eq("phone", fullPhone).limit(1)
       ]);
-      if (convRes?.error || msgCountRes?.error) {
+      if (convRes?.error || msgCheckRes?.error) {
         dbCheckFailed = true;
-        console.error('[webhook] Error in conversation/message check:', convRes?.error || msgCountRes?.error);
+        console.error('[webhook] Error in conversation/message check:', convRes?.error || msgCheckRes?.error);
       } else {
         existingConversation = convRes?.data || null;
-        priorMsgCount = msgCountRes?.count || 0;
+        priorMsgCount = (msgCheckRes?.data && msgCheckRes.data.length > 0) ? 1 : 0;
       }
     } catch (checkErr) {
       dbCheckFailed = true;
